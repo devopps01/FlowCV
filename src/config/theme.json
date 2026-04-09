@@ -1,0 +1,187 @@
+{
+  "theme": {
+    "colors": {
+      "primary": "#41017d",
+      "primaryHover": "#5a1fa8",
+      "secondary": "#ee14ff",
+      "secondaryHover": "#f566ff",
+      "accent": "#ee14ff",
+      "buttonGradient": [
+        "#41017d",
+        "#ee14ff"
+      ],
+      "buttonBackground": "#41017d",
+      "buttonHover": "#5a1fa8",
+      "background": {
+        "light": "#ffffff",
+        "gray": "#f9fafb",
+        "medium": "#f3f4f6"
+      },
+      "text": {
+        "primary": "#111827",
+        "secondary": "#6b7280",
+        "muted": "#9ca3af"
+      },
+      "border": {
+        "default": "#e5e7eb",
+        "light": "#f3f4f6"
+      },
+      "success": "#10b981",
+      "error": "#ef4444",
+      "warning": "#f59e0b"
+    },
+    "spacing": {
+      "xs": "0.25rem",
+      "sm": "0.5rem",
+      "md": "0.75rem",
+      "lg": "1rem",
+      "xl": "1.5rem",
+      "2xl": "2rem",
+      "3xl": "3rem"
+    },
+    "padding": {
+      "input": {
+        "x": "px-3",
+        "y": "py-2"
+      },
+      "section": {
+        "mobile": "p-3",
+        "tablet": "p-4",
+        "desktop": "p-6"
+      },
+      "container": {
+        "mobile": "p-3",
+        "tablet": "p-4",
+        "desktop": "p-6"
+      }
+    },
+    "margin": {
+      "section": {
+        "mobile": "m-3",
+        "tablet": "m-4",
+        "desktop": "m-6"
+      }
+    },
+    "gap": {
+      "form": "gap-3",
+      "grid": "gap-4",
+      "section": "gap-6"
+    },
+    "borderRadius": {
+      "small": "rounded-lg",
+      "medium": "rounded-xl",
+      "large": "rounded-xl"
+    },
+    "fontSize": {
+      "xs": "text-xs",
+      "sm": "text-sm",
+      "base": "text-base",
+      "lg": "text-lg",
+      "xl": "text-xl",
+      "2xl": "text-2xl"
+    },
+    "fontFamily": {
+      "sans": "Inter, system-ui, sans-serif",
+      "heading": "Inter, system-ui, sans-serif",
+      "body": "Inter, system-ui, sans-serif"
+    },
+    "shadows": {
+      "sm": "shadow-sm",
+      "md": "shadow-md",
+      "lg": "shadow-lg",
+      "xl": "shadow-xl"
+    },
+    "breakpoints": {
+      "mobile": "640px",
+      "tablet": "768px",
+      "desktop": "1024px",
+      "wide": "1280px"
+    },
+    "zIndex": {
+      "dropdown": 1000,
+      "sticky": 100,
+      "fixed": 50,
+      "modal": 1000,
+      "toast": 1100
+    }
+  },
+  "components": {
+    "button": {
+      "primary": {
+        "bg": "bg-[#39FF14]",
+        "hover": "hover:bg-[#32CD32]",
+        "text": "text-white",
+        "padding": "px-6 py-2",
+        "borderRadius": "rounded-lg",
+        "fontWeight": "font-bold",
+        "transition": "transition-all"
+      },
+      "secondary": {
+        "bg": "bg-[#00FFFF]",
+        "hover": "hover:bg-[#00E5EE]",
+        "text": "text-white",
+        "padding": "px-6 py-2",
+        "borderRadius": "rounded-lg",
+        "fontWeight": "font-bold",
+        "transition": "transition-all"
+      },
+      "outline": {
+        "border": "border border-red-200",
+        "text": "text-red-500",
+        "hover": "hover:bg-red-50",
+        "padding": "px-4 py-2",
+        "borderRadius": "rounded-lg",
+        "fontWeight": "font-bold"
+      }
+    },
+    "input": {
+      "default": {
+        "padding": "px-3 py-2",
+        "textSize": "text-sm",
+        "border": "border border-gray-200",
+        "borderRadius": "rounded-lg",
+        "focus": "focus:outline-none focus:ring-2 focus:ring-[#39FF14]",
+        "background": "bg-white"
+      }
+    },
+    "card": {
+      "default": {
+        "background": "bg-white",
+        "borderRadius": "rounded-lg",
+        "padding": "p-3",
+        "margin": "m-3",
+        "shadow": "shadow-sm",
+        "border": "border border-gray-100"
+      }
+    },
+    "section": {
+      "header": {
+        "fontSize": "text-2xl",
+        "fontWeight": "font-bold",
+        "color": "text-gray-900",
+        "marginBottom": "mb-4"
+      }
+    }
+  },
+  "responsive": {
+    "mobile": {
+      "maxWidth": "640px",
+      "layout": "single-column",
+      "padding": "p-3",
+      "fontSize": "text-sm"
+    },
+    "tablet": {
+      "minWidth": "641px",
+      "maxWidth": "1024px",
+      "layout": "two-column",
+      "padding": "p-4",
+      "fontSize": "text-base"
+    },
+    "desktop": {
+      "minWidth": "1025px",
+      "layout": "multi-column",
+      "padding": "p-6",
+      "fontSize": "text-base"
+    }
+  }
+}

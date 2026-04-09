@@ -1,0 +1,128 @@
+{
+  "mainsection": {
+    "id": "template-13",
+    "name": "MODERN HEADER 13",
+    "description": "A modern-header professional design using Playfair Display.",
+    "resumeinfo": {
+      "isPremium": false,
+      "subscription": "Free"
+    }
+  },
+  "secondary": {
+    "style": {
+      "primaryColor": "#1f2937",
+      "secondaryColor": "#f5f3ff",
+      "accentColor": "#5b21b6",
+      "fontFamily": "Outfit",
+      "isSerif": true,
+      "layout": "modern-header",
+      "spacing": 4,
+      "borderRadius": "lg",
+      "fontSize": 11,
+      "textColor": "#1f2937",
+      "backgroundColor": "#ffffff"
+    },
+    "data": {
+      "personalInfo": {
+        "id": "personal",
+        "fullName": "Alexander J. Sterling",
+        "email": "alex.sterling@example.com",
+        "phone": "+1 (555) 012-3456",
+        "location": "New York, NY",
+        "professionalTitle": "Senior Strategy Operations Manager",
+        "summary": "Dynamic and results-oriented professional with over 12 years of experience in driving operational excellence and strategic growth for Fortune 500 companies. Expert in cross-functional leadership, data-driven decision making, and scaling complex business processes. Proven track record of increasing efficiency by 40% while reducing overhead costs."
+      },
+      "experience": [
+        {
+          "id": "exp_mnpzrc53_75",
+          "company": "Global Tech Solutions",
+          "position": "Director of Operations",
+          "startDate": "Jan 2020",
+          "endDate": "Present",
+          "description": "<ul><li>Spearheaded a global digital transformation initiative resulting in a $15M annual saving.</li><li>Manage an international team of 50+ across 4 continents.</li><li>Implemented Agile methodologies that improved project delivery speed by 35%.</li></ul>"
+        },
+        {
+          "id": "exp_mnpzrc53_76",
+          "company": "North Star Ventures",
+          "position": "Senior Business Analyst",
+          "startDate": "Jun 2015",
+          "endDate": "Dec 2019",
+          "description": "<ul><li>Developed predictive modeling tools that improved forecasting accuracy by 92%.</li><li>Collaborated with C-suite executives to define long-term strategic roadmaps.</li><li>Redesigned the supply chain workflow, cutting lead times by 20%.</li><li>Organized quarterly workshops for junior analysts, increasing productivity by 15%.</li></ul>"
+        }
+      ],
+      "education": [
+        {
+          "id": "edu_mnpzrc53_77",
+          "school": "Harvard Business School",
+          "degree": "Master of Business Administration (MBA)",
+          "field": "Strategic Management",
+          "graduationYear": "2015"
+        },
+        {
+          "id": "edu_mnpzrc53_78",
+          "school": "Stanford University",
+          "degree": "Bachelor of Science",
+          "field": "Economics",
+          "graduationYear": "2012"
+        }
+      ],
+      "skills": [
+        {
+          "id": "skill_mnpzrc53_79",
+          "name": "Strategic Planning"
+        },
+        {
+          "id": "skill_mnpzrc53_80",
+          "name": "Financial Modeling"
+        },
+        {
+          "id": "skill_mnpzrc53_81",
+          "name": "Lean Six Sigma"
+        },
+        {
+          "id": "skill_mnpzrc53_82",
+          "name": "Team Leadership"
+        },
+        {
+          "id": "skill_mnpzrc53_83",
+          "name": "Data Analysis"
+        },
+        {
+          "id": "skill_mnpzrc53_84",
+          "name": "Project Management"
+        },
+        {
+          "id": "skill_mnpzrc53_85",
+          "name": "Agile"
+        },
+        {
+          "id": "skill_mnpzrc53_86",
+          "name": "Tableau"
+        },
+        {
+          "id": "skill_mnpzrc53_87",
+          "name": "Python"
+        },
+        {
+          "id": "skill_mnpzrc53_88",
+          "name": "SQL"
+        },
+        {
+          "id": "skill_mnpzrc53_89",
+          "name": "Public Speaking"
+        }
+      ],
+      "languages": [],
+      "certifications": [],
+      "projects": [],
+      "awards": [],
+      "interests": [],
+      "courses": [],
+      "organisations": [],
+      "publications": [],
+      "references": [],
+      "custom": [],
+      "socials": []
+    }
+  }
+}
