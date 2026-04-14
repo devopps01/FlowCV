@@ -4,6 +4,8 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'prod.flowcvassets.com', 'assets.flowcvassets.com'],
   },
+  // Puppeteer must run server-side only
+  serverExternalPackages: ['puppeteer', 'puppeteer-core'],
 }
 
 module.exports = nextConfig

@@ -247,7 +247,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
             fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
             lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
             width: '210mm',
-            minHeight: '297mm',
+            // Only enforce minHeight in preview mode — not during export/print (avoids blank pages)
+            minHeight: isExporting ? 'auto' : '297mm',
             color: design.textColor ?? '#1f2937',
             paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
             paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
@@ -256,7 +257,6 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
             backgroundColor: design.backgroundColor ?? '#ffffff',
             overflow: 'visible',
             colorScheme: 'light',
-            // No shadow on the content itself — shadows go on page sheets
             boxShadow: 'none',
           }}
         >
@@ -335,7 +335,33 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
 const RichContent = ({ html, className = '', style }: { html: string; className?: string; style?: React.CSSProperties }) => {
   if (!html || html === '<p></p>') return null;
-  return <div className={`rich-content ${className}`} style={style} dangerouslySetInnerHTML={{ __html: html }} />;
+  // Strip any AI error messages that may have been saved as content
+  const errorPatterns = [
+    /error:\s*gemini[_\s]api[_\s]key[^.]*\./gi,
+    /error:\s*GEMINI_API_KEY[^.]*\./gi,
+    /add it to \.env\.local[^.]*\./gi,
+    /AI service temporarily unavailable[^.]*\./gi,
+    /Rate limit reached[^.]*\./gi,
+  ];
+  let cleaned = html;
+  for (const pattern of errorPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  cleaned = cleaned.trim();
+  if (!cleaned || cleaned === '<p></p>' || cleaned === '<p> </p>') return null;
+  return <div className={`rich-content ${className}`} style={style} dangerouslySetInnerHTML={{ __html: cleaned }} />;
+};
+
+// Strip AI error messages from plain text
+const cleanText = (text: string): string => {
+  if (!text) return text;
+  return text
+    .replace(/error:\s*gemini[_\s]api[_\s]key[^.]*\./gi, '')
+    .replace(/error:\s*GEMINI_API_KEY[^.]*\./gi, '')
+    .replace(/add it to \.env\.local[^.]*\./gi, '')
+    .replace(/AI service temporarily unavailable[^.]*\./gi, '')
+    .replace(/Rate limit reached[^.]*\./gi, '')
+    .trim();
 };
 
 // Smart SectionHeader: handles complex styles that need wrapper elements
@@ -501,28 +527,31 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
                ? (content.interests || [])
                : (content.socials || []);
 
-       if (!items?.length) return null;
+       // Ensure items is always an array — AI sometimes returns objects or null
+       const safeItems = Array.isArray(items) ? items : [];
+
+       if (!safeItems.length) return null;
 
        const getLevel = (item: any) => {
-         if (isLanguages) return getLevelPercentage(item.proficiency || '');
          if (typeof item === 'string') return getLevelPercentage(item);
+         if (isLanguages) return getLevelPercentage(item.proficiency || '');
          return 50;
        };
 
         const getItemLabel = (item: any) => {
+          if (typeof item === 'string') return item;
           if (isLanguages) {
-            // Show full name — handle both old code-based and new name-based storage
             const langName = item.language || '';
             return langName;
           }
-          if (isCertifications) return `${item.name} (${item.issuer})`;
-          if (sid === 'socials') return item.platform || item.label || item.url;
-          if (isSkills || isInterests) return item.name || '';
-          return item.label || String(item);
+          if (isCertifications) return `${item.name || ''}${item.issuer ? ` (${item.issuer})` : ''}`;
+          if (sid === 'socials') return item.platform || item.label || item.url || '';
+          if (isSkills || isInterests) return item.name || item.label || String(item);
+          return item.label || item.name || String(item);
         };
 
-        // For languages in grid style, show "Language — Proficiency"
         const getLanguageLabel = (item: any) => {
+          if (typeof item === 'string') return item;
           const name = item.language || '';
           const prof = item.proficiency || '';
           return prof ? `${name} — ${prof}` : name;
@@ -545,16 +574,16 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
             {styleType === 'compact' ? (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-80 font-medium" style={{ fontSize: '11px' }}>
-                {items.map((item, i) => (
+                {safeItems.map((item, i) => (
                   <React.Fragment key={i}>
                     <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                    {i < items.length - 1 && <span className="opacity-30">•</span>}
+                    {i < safeItems.length - 1 && <span className="opacity-30">•</span>}
                   </React.Fragment>
                 ))}
               </div>
             ) : styleType === 'bubble' ? (
               <div className="flex flex-wrap gap-1.5">
-                {items.map((item, i) => (
+                {safeItems.map((item, i) => (
                   <span
                     key={i}
                     className="px-2.5 py-0.5 rounded-full font-semibold opacity-80"
@@ -566,7 +595,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
               </div>
             ) : styleType === 'level' ? (
               <div className={`grid gap-x-4 gap-y-2`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {items.map((item, i) => {
+                {safeItems.map((item, i) => {
                   const level = getLevel(item);
                   return (
                     <div key={i} className="space-y-1">
@@ -584,7 +613,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
             ) : (
               /* Default: GRID */
               <div className={`grid gap-x-3 gap-y-1`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {items.map((item, i) => (
+                {safeItems.map((item, i) => (
                   <div key={i} className="flex items-center gap-1.5 font-medium opacity-80" style={{ fontSize: '11px' }}>
                     <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
                     <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
@@ -597,15 +626,16 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
    }
 
    let listProps = { title: '', items: [] as any[] };
-   if (sid === 'experience') listProps = { title: 'Experience', items: content.experience?.map((x: any, i: number) => ({ t: x.position, s: x.company, d: `${x.startDate} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.experience[${i}].position`, sPath: `content.experience[${i}].company`, descPath: `content.experience[${i}].description` })) || [] };
-   else if (sid === 'education') listProps = { title: 'Education', items: content.education?.map((x: any, i: number) => ({ t: design.educationOrder === 'school-degree' ? x.school : x.degree, s: design.educationOrder === 'school-degree' ? `${x.degree} in ${x.field}` : x.school, d: x.graduationYear, desc: '', tPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'school' : 'degree'}`, sPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'degree' : 'school'}`, descPath: '' })) || [] };
-   else if (sid === 'projects') listProps = { title: 'Projects', items: content.projects?.map((x: any, i: number) => ({ t: x.name, s: x.technologies?.join(', '), d: '', desc: x.description, tPath: `content.projects[${i}].name`, sPath: '', descPath: `content.projects[${i}].description` })) || [] };
-   else if (sid === 'awards') listProps = { title: 'Awards', items: content.awards?.map((x: any, i: number) => ({ t: x.title, s: x.issuer, d: x.date, desc: x.description, tPath: `content.awards[${i}].title`, sPath: `content.awards[${i}].issuer`, descPath: `content.awards[${i}].description` })) || [] };
-   else if (sid === 'courses') listProps = { title: 'Courses', items: content.courses?.map((x: any, i: number) => ({ t: x.title, s: x.provider, d: x.date, desc: x.description, tPath: `content.courses[${i}].title`, sPath: `content.courses[${i}].provider`, descPath: `content.courses[${i}].description` })) || [] };
-   else if (sid === 'organisations') listProps = { title: 'Organisations', items: content.organisations?.map((x: any, i: number) => ({ t: x.name, s: x.role, d: `${x.startDate} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.organisations[${i}].name`, sPath: `content.organisations[${i}].role`, descPath: `content.organisations[${i}].description` })) || [] };
-   else if (sid === 'publications') listProps = { title: 'Publications', items: content.publications?.map((x: any, i: number) => ({ t: x.title, s: x.publisher, d: x.date, desc: x.description, tPath: `content.publications[${i}].title`, sPath: `content.publications[${i}].publisher`, descPath: `content.publications[${i}].description` })) || [] };
-   else if (sid === 'references') listProps = { title: 'References', items: content.references?.map((x: any, i: number) => ({ t: x.name, s: `${x.position} at ${x.company}`, d: '', desc: `${x.email} ${x.phone}`, tPath: `content.references[${i}].name`, sPath: '', descPath: '' })) || [] };
-   else if (sid === 'custom') listProps = { title: 'Custom Section', items: content.custom?.map((x: any, i: number) => ({ t: x.title, s: '', d: '', desc: x.content, tPath: `content.custom[${i}].title`, sPath: '', descPath: `content.custom[${i}].content` })) || [] };
+   const safeArr = (v: any) => Array.isArray(v) ? v : [];
+   if (sid === 'experience') listProps = { title: 'Experience', items: safeArr(content.experience).map((x: any, i: number) => ({ t: x.position, s: x.company, d: `${x.startDate || ''} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.experience[${i}].position`, sPath: `content.experience[${i}].company`, descPath: `content.experience[${i}].description` })) };
+   else if (sid === 'education') listProps = { title: 'Education', items: safeArr(content.education).map((x: any, i: number) => ({ t: design.educationOrder === 'school-degree' ? x.school : x.degree, s: design.educationOrder === 'school-degree' ? `${x.degree} in ${x.field}` : x.school, d: x.graduationYear, desc: '', tPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'school' : 'degree'}`, sPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'degree' : 'school'}`, descPath: '' })) };
+   else if (sid === 'projects') listProps = { title: 'Projects', items: safeArr(content.projects).map((x: any, i: number) => ({ t: x.name, s: Array.isArray(x.technologies) ? x.technologies.join(', ') : (x.technologies || ''), d: '', desc: x.description, tPath: `content.projects[${i}].name`, sPath: '', descPath: `content.projects[${i}].description` })) };
+   else if (sid === 'awards') listProps = { title: 'Awards', items: safeArr(content.awards).map((x: any, i: number) => ({ t: x.title, s: x.issuer, d: x.date, desc: x.description, tPath: `content.awards[${i}].title`, sPath: `content.awards[${i}].issuer`, descPath: `content.awards[${i}].description` })) };
+   else if (sid === 'courses') listProps = { title: 'Courses', items: safeArr(content.courses).map((x: any, i: number) => ({ t: x.title, s: x.provider, d: x.date, desc: x.description, tPath: `content.courses[${i}].title`, sPath: `content.courses[${i}].provider`, descPath: `content.courses[${i}].description` })) };
+   else if (sid === 'organisations') listProps = { title: 'Organisations', items: safeArr(content.organisations).map((x: any, i: number) => ({ t: x.name, s: x.role, d: `${x.startDate || ''} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.organisations[${i}].name`, sPath: `content.organisations[${i}].role`, descPath: `content.organisations[${i}].description` })) };
+   else if (sid === 'publications') listProps = { title: 'Publications', items: safeArr(content.publications).map((x: any, i: number) => ({ t: x.title, s: x.publisher, d: x.date, desc: x.description, tPath: `content.publications[${i}].title`, sPath: `content.publications[${i}].publisher`, descPath: `content.publications[${i}].description` })) };
+   else if (sid === 'references') listProps = { title: 'References', items: safeArr(content.references).map((x: any, i: number) => ({ t: x.name, s: `${x.position || ''} at ${x.company || ''}`, d: '', desc: `${x.email || ''} ${x.phone || ''}`, tPath: `content.references[${i}].name`, sPath: '', descPath: '' })) };
+   else if (sid === 'custom') listProps = { title: 'Custom Section', items: safeArr(content.custom).map((x: any, i: number) => ({ t: x.title, s: '', d: '', desc: x.content, tPath: `content.custom[${i}].title`, sPath: '', descPath: `content.custom[${i}].content` })) };
 
    if (!listProps.items || listProps.items.length === 0) return null;
 
@@ -738,7 +768,7 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
   return (
     <div
       style={{
-        minHeight: isThumbnail ? 'auto' : '297mm',
+        minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
         display: 'block',
         position: 'relative',
       }}
@@ -748,7 +778,7 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
         style={{
           float: isRight ? 'right' : 'left',
           width: '32%',
-          minHeight: isThumbnail ? 'auto' : '297mm',
+          minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
           backgroundColor: design.secondaryColor || '#f8fafc',
           borderRight: isRight ? 'none' : '1px solid rgba(0,0,0,0.05)',
           borderLeft: isRight ? '1px solid rgba(0,0,0,0.05)' : 'none',
@@ -828,7 +858,7 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
           marginRight: isRight ? '32%' : '0',
           padding: isThumbnail ? '16px' : '24px',
           boxSizing: 'border-box',
-          minHeight: isThumbnail ? 'auto' : '297mm',
+          minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
         }}
       >
          <Droppable droppableId="main">
@@ -862,7 +892,7 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const personalInfo = content.personalInfo || {} as any;
   
   return (
-    <div className="flex flex-col w-full" style={{ minHeight: isThumbnail ? 'auto' : '297mm' }}>
+    <div className="flex flex-col w-full" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
       <div className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ backgroundColor: design.secondaryColor || '#f8fafc', marginBottom: `${design.sectionSpacing || 8}mm` }}>
         {design.photoShow && personalInfo.image && (
           <div 
@@ -915,7 +945,7 @@ const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const personalInfo = content.personalInfo || {} as any;
 
   return (
-    <div className="flex flex-col w-full" style={{ minHeight: isThumbnail ? 'auto' : '297mm' }}>
+    <div className="flex flex-col w-full" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
       <div className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ marginBottom: `${Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}>
         <div className={`absolute bottom-0 w-32 h-1 ${design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
         
@@ -969,7 +999,7 @@ const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const personalInfo = content.personalInfo || {} as any;
 
   return (
-    <div className="flex flex-col w-full bg-white" style={{ minHeight: isThumbnail ? 'auto' : '297mm' }}>
+    <div className="flex flex-col w-full bg-white" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
       <div className={`${isThumbnail ? 'h-24' : 'h-32'} flex items-center justify-between ${isThumbnail ? 'px-8' : 'px-12'} text-white overflow-hidden relative`} style={{ backgroundColor: design.primaryColor || '#ff4d7d' }}>
          <div className="flex items-center gap-6 z-10">
             {design.photoShow && personalInfo.image && (

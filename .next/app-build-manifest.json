@@ -15,6 +15,16 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(app)/dashboard/page.js"
+    ],
+    "/(app)/cover-letters/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(app)/cover-letters/page.js"
+    ],
+    "/(app)/cover-letter/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(app)/cover-letter/[id]/page.js"
     ]
   }
 }

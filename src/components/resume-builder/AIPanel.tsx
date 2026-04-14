@@ -66,7 +66,7 @@ function SectionEnhancer({ label, fieldType, currentText, context, onApply }: Se
       if (data.enhanced && !data.error) {
         setResult(data.enhanced);
       } else {
-        setResult(`⚠️ ${data.error || 'AI enhancement failed. Check your GEMINI_API_KEY in .env.local'}`);
+        setResult(`⚠️ ${data.error?.includes('unavailable') || data.error?.includes('rate') ? 'AI is busy, please try again in a moment.' : (data.error || 'AI enhancement failed. Please try again.')}`);
       }
     } catch (e: any) {
       setResult(`⚠️ ${e.message || 'Network error'}`);
@@ -207,6 +207,9 @@ export function AIPanel({ data, onApply, updateNested }: AIPanelProps) {
       if (!res.ok) throw new Error(json.error || 'Generation failed');
       if (json.content) {
         setGeneratedPreview(json.content);
+        if (json.warning) {
+          setError(json.warning);
+        }
       }
     } catch (e: any) {
       setError(e.message || 'Failed to generate resume');
@@ -290,18 +293,37 @@ export function AIPanel({ data, onApply, updateNested }: AIPanelProps) {
             style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
           >
             {generating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Generating with Gemini AI...</>
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generating with AI...</>
             ) : (
               <><Sparkles className="w-4 h-4" /> Generate Resume</>
             )}
           </button>
 
-          {/* Error */}
+          {/* Error / Warning */}
           {error && (
-            <div className="px-3 py-2 rounded-xl text-[11px] font-medium text-red-500" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              {error.includes('GEMINI_API_KEY') ? (
-                <span>⚠️ Add your <code className="font-mono bg-red-50 px-1 rounded">GEMINI_API_KEY</code> to <code className="font-mono bg-red-50 px-1 rounded">.env.local</code> to use AI features.</span>
-              ) : error}
+            <div
+              className="px-3 py-2 rounded-xl text-[11px] font-medium"
+              style={{
+                background: error.includes('unavailable') || error.includes('GROQ') || error.includes('busy')
+                  ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${error.includes('unavailable') || error.includes('GROQ') || error.includes('busy') ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.2)'}`,
+                color: error.includes('unavailable') || error.includes('GROQ') || error.includes('busy') ? '#b45309' : '#ef4444',
+              }}
+            >
+              {error.includes('unavailable') || error.includes('GROQ') || error.includes('busy') ? (
+                <span>
+                  ⚠️ AI unavailable.{' '}
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-bold"
+                  >
+                    Get a free Groq API key
+                  </a>
+                  {' '}and add it as <code className="font-mono text-[10px] px-1 rounded" style={{ background: 'rgba(0,0,0,0.08)' }}>GROQ_API_KEY</code> in .env.local
+                </span>
+              ) : `⚠️ ${error}`}
             </div>
           )}
 

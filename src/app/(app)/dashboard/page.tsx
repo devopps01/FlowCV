@@ -32,13 +32,21 @@ function ResumeThumbnail({ data }: { data: ResumeData }) {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none select-none bg-white">
-      <div ref={ref} className="origin-top-left" style={{ transform: 'scale(0.34)', width: '210mm' }}>
+      <div
+        ref={ref}
+        style={{
+          transform: 'scale(0.34)',
+          transformOrigin: 'top left',
+          width: '210mm',
+        }}
+      >
         <ResumePreview
           data={data}
           numPages={1}
           previewRef={{ current: null } as any}
           zoomLevel={100}
           isThumbnail={true}
+          isExporting={true}
         />
       </div>
     </div>

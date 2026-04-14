@@ -44,7 +44,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
       if (data.enhanced && !data.error) {
         setAiResult(data.enhanced);
       } else {
-        setAiResult(`⚠️ ${data.error || 'AI failed. Check GEMINI_API_KEY in .env.local'}`);
+        const msg = data.error || '';
+        setAiResult(`⚠️ ${msg.includes('unavailable') || msg.includes('rate') || msg.includes('quota') ? 'AI is busy, please try again.' : 'AI enhancement failed. Please try again.'}`);
       }
     } catch {
       setAiResult('⚠️ Network error. Please try again.');

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateWithGemini } from '@/lib/ai/gemini';
+import { generateWithAI } from '@/lib/ai/gemini';
 import { processContentWithIds, getDefaultResumeContent } from '@/lib/utils/resume-ids';
 
 export async function POST(req: Request) {
@@ -123,13 +123,52 @@ CRITICAL REQUIREMENTS:
 - Do not include any explanatory text outside the JSON structure
 `;
 
-    let rawJson = await generateWithGemini(instruction, { fieldType: 'resume' });
-    
-    if (rawJson.startsWith('\`\`\`json')) {
-      rawJson = rawJson.replace(/^\`\`\`json\s*/, '').replace(/\`\`\`$/, '').trim();
-    } else if (rawJson.startsWith('\`\`\`')) {
-      rawJson = rawJson.replace(/^\`\`\`\s*/, '').replace(/\`\`\`$/, '').trim();
+    let rawJson = await generateWithAI(instruction, { fieldType: 'resume' });
+
+    // If AI returned empty — build a structured resume from the user's existing data
+    if (!rawJson || rawJson.trim().length === 0) {
+      const existing = cleanData || {};
+      const pInfo = existing.personalInfo || {};
+      const fallbackContent = {
+        personalInfo: {
+          fullName: pInfo.fullName || pInfo.firstName ? `${pInfo.firstName || ''} ${pInfo.lastName || ''}`.trim() : 'Your Name',
+          email: pInfo.email || 'your.email@example.com',
+          phone: pInfo.phone || '+1 (555) 000-0000',
+          location: pInfo.location || 'City, State',
+          professionalTitle: pInfo.professionalTitle || prompt?.split(' ').slice(0, 4).join(' ') || 'Professional',
+          summary: `Results-driven ${pInfo.professionalTitle || 'professional'} with proven expertise in delivering high-impact solutions. Skilled at leading cross-functional teams, optimizing processes, and driving measurable business outcomes. Committed to continuous learning and professional excellence.`,
+        },
+        experience: existing.experience?.length > 0 ? existing.experience : [
+          { company: 'Previous Company', position: 'Senior Role', startDate: '2020-01', endDate: 'Present', description: 'Led key initiatives that improved team productivity by 30%. Collaborated with stakeholders to deliver projects on time and within budget.' },
+          { company: 'Earlier Company', position: 'Mid-Level Role', startDate: '2017-06', endDate: '2019-12', description: 'Developed and implemented solutions that reduced operational costs by 20%. Mentored junior team members and contributed to knowledge-sharing initiatives.' },
+        ],
+        education: existing.education?.length > 0 ? existing.education : [
+          { school: 'University', degree: 'Bachelor of Science', field: 'Relevant Field', graduationYear: '2017' },
+        ],
+        skills: existing.skills?.length > 0 ? existing.skills : ['Leadership', 'Project Management', 'Communication', 'Problem Solving', 'Team Collaboration', 'Strategic Planning'],
+        languages: existing.languages?.length > 0 ? existing.languages : [{ language: 'English', proficiency: 'Native' }],
+        projects: existing.projects || [],
+        certifications: existing.certifications || [],
+      };
+
+      const contentWithIds = processContentWithIds({
+        ...getDefaultResumeContent(),
+        ...fallbackContent,
+      });
+      return NextResponse.json({ content: contentWithIds, warning: 'AI unavailable — resume built from your existing data. Add a GROQ_API_KEY to .env.local for AI generation.' });
     }
+
+    // Strip markdown code fences if present
+    rawJson = rawJson.trim();
+    if (rawJson.startsWith('```json')) rawJson = rawJson.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    else if (rawJson.startsWith('```')) rawJson = rawJson.replace(/^```\s*/, '').replace(/```$/, '').trim();
+
+    // Find the JSON object (skip any leading text)
+    const jsonStart = rawJson.indexOf('{');
+    if (jsonStart === -1) {
+      return NextResponse.json({ error: 'AI returned invalid response. Please try again.' }, { status: 500 });
+    }
+    rawJson = rawJson.slice(jsonStart);
 
     const parsedContent = JSON.parse(rawJson);
 

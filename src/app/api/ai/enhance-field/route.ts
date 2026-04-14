@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateWithGemini } from '@/lib/ai/gemini';
+import { generateWithAI } from '@/lib/ai/gemini';
 
 export async function POST(req: Request) {
   try {
@@ -32,7 +32,7 @@ ${instruction ? `Instruction: ${instruction}` : ''}`,
     const prompt = prompts[fieldType] || prompts.default;
 
     // Pass fallbackText so local enhancement works even without API key
-    const enhanced = await generateWithGemini(prompt, {
+    const enhanced = await generateWithAI(prompt, {
       fieldType,
       fallbackText: text,
     });

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 /**
  * InlineEditor â€” Click any text element in the resume to edit it.
@@ -138,8 +138,7 @@ interface PanelProps {
   target: EditTarget;
   value: string;
   onChange: (v: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
+  onClose: () => void;
   panelPos: { top: number; left: number };
   data: ResumeData;
   updateNested: (path: string, value: any) => void;
@@ -148,7 +147,7 @@ interface PanelProps {
 }
 
 function FloatingPanel({
-  target, value, onChange, onCommit, onCancel, panelPos, data, updateNested,
+  target, value, onChange, onClose, panelPos, data, updateNested,
   styleOverrides, onStyleChange,
 }: PanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -200,9 +199,10 @@ function FloatingPanel({
   }, [target.fieldType]);
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
-    if (e.key === 'Enter' && target.fieldType !== 'textarea') { e.preventDefault(); onCommit(); return; }
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onCommit(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+    // Enter closes for single-line fields
+    if (e.key === 'Enter' && target.fieldType !== 'textarea') { e.preventDefault(); onClose(); return; }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onClose(); return; }
   };
 
   // AI suggestion tags — context-aware based on field type
@@ -321,7 +321,7 @@ function FloatingPanel({
           >
             <Palette className="w-3.5 h-3.5" />
           </button>
-          <button onMouseDown={e => { e.preventDefault(); onCancel(); }} className="p-1 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-all">
+          <button onMouseDown={e => { e.preventDefault(); onClose(); }} className="p-1 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-all">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -417,14 +417,6 @@ function FloatingPanel({
         </button>
 
         <div className="flex-1" />
-
-        <button
-          onMouseDown={e => { e.preventDefault(); onCommit(); }}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black text-white transition-all"
-          style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
-        >
-          <Check className="w-3.5 h-3.5" /> Save
-        </button>
       </div>
 
       {/* AI Panel */}
@@ -704,7 +696,6 @@ export function InlineEditor({
   const getContainerRect = useCallback((): DOMRect | null => {
     return containerRef.current?.getBoundingClientRect() ?? null;
   }, [containerRef]);
-
   // â”€â”€ Find editable element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const findEditTarget = useCallback((clicked: HTMLElement): EditTarget | null => {
     let el: HTMLElement | null = clicked;
@@ -757,11 +748,9 @@ export function InlineEditor({
 
     return { top, left };
   }, [containerRef, zoom]);
-
-  // â”€â”€ Click handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Click handler — opens the floating panel when user clicks resume text
   const handleClick = useCallback((e: React.MouseEvent) => {
     const clicked = e.target as HTMLElement;
-
     if (
       clicked.closest('[data-inline-toolbar]') ||
       ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(clicked.tagName) ||
@@ -776,44 +765,35 @@ export function InlineEditor({
       setEditTarget(target);
       setEditValue(target.value);
     } else {
-      if (editTarget) commitEdit();
-      else setEditTarget(null);
-    }
-  }, [findEditTarget, calcPanelPos, editTarget]);
-
-  // â”€â”€ Commit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const commitEdit = useCallback(() => {
-    if (!editTarget) return;
-
-    const newValue = editValue.trim();
-    if (!newValue || newValue.startsWith('âš ï¸') || newValue.startsWith('Error:')) {
       setEditTarget(null);
-      return;
     }
+  }, [findEditTarget, calcPanelPos]);
 
-    if (newValue !== editTarget.value) {
-      if (editTarget.path) {
-        updateNested(editTarget.path, newValue);
-      } else if (editTarget.element) {
-        editTarget.element.textContent = newValue;
-        let parent = editTarget.element.parentElement;
-        while (parent && parent !== containerRef.current) {
-          const path = parent.getAttribute('data-edit-path');
-          if (path) { updateNested(path, newValue); break; }
-          parent = parent.parentElement;
-        }
+  // Auto-save: apply every keystroke immediately to live preview
+  const handleValueChange = useCallback((newValue: string) => {
+    setEditValue(newValue);
+    if (!editTarget) return;
+    if (newValue.startsWith('Error:')) return;
+    if (editTarget.path) {
+      updateNested(editTarget.path, newValue);
+    } else if (editTarget.element) {
+      editTarget.element.textContent = newValue;
+      let parent = editTarget.element.parentElement;
+      while (parent && parent !== containerRef.current) {
+        const path = parent.getAttribute('data-edit-path');
+        if (path) { updateNested(path, newValue); break; }
+        parent = parent.parentElement;
       }
     }
-    setEditTarget(null);
-  }, [editTarget, editValue, updateNested, containerRef]);
+  }, [editTarget, updateNested, containerRef]);
 
-  const cancelEdit = useCallback(() => setEditTarget(null), []);
+  const closePanel = useCallback(() => setEditTarget(null), []);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && editTarget) cancelEdit(); };
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && editTarget) closePanel(); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [editTarget, cancelEdit]);
+  }, [editTarget, closePanel]);
 
   return (
     <div
@@ -828,9 +808,8 @@ export function InlineEditor({
         <FloatingPanel
           target={editTarget}
           value={editValue}
-          onChange={setEditValue}
-          onCommit={commitEdit}
-          onCancel={cancelEdit}
+          onChange={handleValueChange}
+          onClose={closePanel}
           panelPos={panelPos}
           data={data}
           updateNested={updateNested}

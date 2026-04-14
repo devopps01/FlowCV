@@ -1,9 +1,13 @@
 {
-  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
-  "/api/ai/enhance-field/route": "app/api/ai/enhance-field/route.js",
-  "/api/ai/generate-resume/route": "app/api/ai/generate-resume/route.js",
-  "/api/resumes/[id]/route": "app/api/resumes/[id]/route.js",
   "/(app)/resume/[id]/page": "app/(app)/resume/[id]/page.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/templates/route": "app/api/templates/route.js"
+  "/api/resumes/[id]/route": "app/api/resumes/[id]/route.js",
+  "/api/templates/route": "app/api/templates/route.js",
+  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
+  "/api/resumes/route": "app/api/resumes/route.js",
+  "/api/theme/route": "app/api/theme/route.js",
+  "/(app)/cover-letters/page": "app/(app)/cover-letters/page.js",
+  "/(app)/cover-letter/[id]/page": "app/(app)/cover-letter/[id]/page.js",
+  "/api/cover-letters/route": "app/api/cover-letters/route.js",
+  "/api/cover-letters/[id]/route": "app/api/cover-letters/[id]/route.js"
 }

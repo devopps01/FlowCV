@@ -8,8 +8,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 import { ResumeData } from './types';
 import ResumePreview from './ResumePreview';
@@ -199,142 +197,212 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     }
   }, [clipboard]);
 
-  // Export PDF with improved quality
+  // Export PDF — uses server-side Puppeteer for pixel-perfect output matching the preview
   const exportPDF = useCallback(async () => {
     const el = document.getElementById('resume-preview');
     if (!el) return;
-
-    const originalZoom = zoomLevel;
-    if (zoomLevel !== 100) setZoomLevel(100);
 
     setIsExporting(true);
     toast.loading('Generating PDF...', { id: 'pdf' });
 
     try {
-      // 1. Ensure the selected font is loaded in the current document
       const fontFamily = data.design.fontFamily || 'Inter';
       const fontQuery = fontFamily.replace(/\s+/g, '+');
       const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
 
-      // Inject font if not already present
-      const existingLink = document.querySelector(`link[href*="${fontQuery}"]`);
-      if (!existingLink) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = fontUrl;
-        document.head.appendChild(link);
-      }
-
-      // 2. Wait for all fonts to be ready (including the newly injected one)
+      // Wait for fonts to be ready
       await document.fonts.ready;
+      await new Promise(r => setTimeout(r, 200));
 
-      // 3. Extra wait to ensure font renders in DOM
-      await new Promise(r => setTimeout(r, 300));
+      // Collect all computed CSS rules from the page (Tailwind + custom styles)
+      const allStyles = Array.from(document.styleSheets)
+        .map(sheet => {
+          try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); }
+          catch { return ''; }
+        })
+        .join('\n');
 
-      // 4. Capture canvas — inject font into cloned doc
-      const canvas = await html2canvas(el, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: data.design.backgroundColor || '#ffffff',
-        scrollY: -window.scrollY,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-        onclone: async (clonedDoc) => {
-          // Inject the font stylesheet into the cloned document
-          const clonedLink = clonedDoc.createElement('link');
-          clonedLink.rel = 'stylesheet';
-          clonedLink.href = fontUrl;
-          clonedDoc.head.appendChild(clonedLink);
-
-          // Copy all existing font stylesheets
-          document.querySelectorAll('link[rel="stylesheet"]').forEach(l => {
-            const href = (l as HTMLLinkElement).href;
-            if (href.includes('fonts.googleapis') || href.includes('fonts.gstatic')) {
-              const copy = clonedDoc.createElement('link');
-              copy.rel = 'stylesheet';
-              copy.href = href;
-              clonedDoc.head.appendChild(copy);
-            }
-          });
-
-          // Apply font-family explicitly to the resume element
-          const clonedEl = clonedDoc.getElementById('resume-preview');
-          if (clonedEl) {
-            clonedEl.style.fontFamily = `'${fontFamily}', sans-serif`;
-            clonedEl.style.height = 'auto';
-            clonedEl.style.overflow = 'visible';
-            clonedEl.style.transform = 'none';
-            clonedEl.style.boxShadow = 'none';
-          }
-
-          // Wait for fonts in cloned doc
-          await clonedDoc.fonts.ready;
-        },
+      // Clone the resume element — preserve ALL existing inline styles
+      // Only override the properties that would break PDF rendering
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.style.transform = 'none';
+      clone.style.boxShadow = 'none';
+      clone.style.minHeight = 'auto';
+      clone.style.height = 'auto';
+      clone.style.overflow = 'visible';
+      clone.style.margin = '0';
+      // Remove interactive UI elements
+      clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
+      clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
+      // Ensure all children overflow visible so no text is clipped
+      clone.querySelectorAll('*').forEach(child => {
+        const c = child as HTMLElement;
+        if (c.style?.overflow === 'hidden') c.style.overflow = 'visible';
+        if (c.style?.maxHeight) c.style.maxHeight = 'none';
       });
 
-      // 5. Split into A4 pages and build PDF
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const pageHeightPx = Math.floor(canvas.width * (pdfHeight / pdfWidth));
-      const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+      // A4 at 96dpi = 794px wide. We tell Puppeteer to use 96dpi (deviceScaleFactor=1)
+      // so that 210mm = 794px exactly — matching the browser's rendering.
+      const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link rel="stylesheet" href="${fontUrl}">
+  <style>
+    ${allStyles}
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white !important;
+      width: 794px;
+    }
+    @page { size: A4 portrait; margin: 0; }
+    #resume-preview {
+      transform: none !important;
+      box-shadow: none !important;
+      min-height: auto !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    #resume-preview * {
+      overflow: visible !important;
+      max-height: none !important;
+    }
+  </style>
+</head>
+<body>${clone.outerHTML}</body>
+</html>`;
 
-      for (let page = 0; page < totalPages; page++) {
-        const sy = page * pageHeightPx;
-        const sHeight = Math.min(pageHeightPx, canvas.height - sy);
+      const response = await fetch('/api/export/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: fullHtml, title: data.title }),
+      });
 
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = sHeight;
-        const ctx = pageCanvas.getContext('2d');
-        if (!ctx) throw new Error('Canvas context unavailable');
-
-        ctx.drawImage(canvas, 0, sy, canvas.width, sHeight, 0, 0, canvas.width, sHeight);
-        const imgData = pageCanvas.toDataURL('image/png', 1.0);
-
-        if (page > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (sHeight / canvas.width) * pdfWidth, undefined, 'FAST');
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || 'PDF generation failed');
       }
 
-      pdf.save(`${data.title || 'Resume'}.pdf`);
-      toast.success('PDF exported!', { id: 'pdf' });
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to export PDF', { id: 'pdf' });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.title || 'Resume'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('PDF downloaded!', { id: 'pdf' });
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      toast.error(err.message || 'Failed to export PDF', { id: 'pdf' });
     } finally {
       setIsExporting(false);
-      if (originalZoom !== zoomLevel) setZoomLevel(originalZoom);
     }
-  }, [data, zoomLevel]);
+  }, [id, data]);
 
-  // Print functionality
+  // Print functionality — proper A4 single-page print
   const printResume = useCallback(() => {
+    const el = document.getElementById('resume-preview');
+    if (!el) return;
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const printContent = document.getElementById('resume-preview')?.innerHTML;
-    if (!printContent) return;
+    const fontFamily = data.design.fontFamily || 'Inter';
+    const fontQuery = fontFamily.replace(/\s+/g, '+');
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${data.title || 'Resume'}</title>
-          <style>
-            body { margin: 0; font-family: ${data.design.fontFamily || 'Arial'}; }
-            @media print { body { margin: 0; } }
-          </style>
-        </head>
-        <body>${printContent}</body>
-      </html>
-    `);
-    
+    // Collect all computed CSS rules
+    const allStyles = Array.from(document.styleSheets)
+      .map(sheet => {
+        try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); }
+        catch { return ''; }
+      })
+      .join('\n');
+
+    // Clone and clean the resume element
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.cssText = `
+      width: 210mm !important;
+      min-height: auto !important;
+      height: auto !important;
+      transform: none !important;
+      box-shadow: none !important;
+      overflow: visible !important;
+      margin: 0 !important;
+      font-family: '${fontFamily}', sans-serif !important;
+    `;
+    // Remove interactive UI elements
+    clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
+    clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
+    // Ensure all children overflow visible
+    clone.querySelectorAll('*').forEach(child => {
+      const c = child as HTMLElement;
+      if (c.style?.overflow === 'hidden') c.style.overflow = 'visible';
+      if (c.style?.maxHeight) c.style.maxHeight = 'none';
+    });
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${data.title || 'Resume'}</title>
+  <link rel="stylesheet" href="${fontUrl}">
+  <style>
+    ${allStyles}
+    *, *::before, *::after {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white !important;
+      width: 210mm;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+    @media print {
+      html, body { margin: 0 !important; padding: 0 !important; }
+      #resume-preview {
+        min-height: auto !important;
+        height: auto !important;
+        page-break-after: avoid;
+        break-after: avoid;
+      }
+    }
+  </style>
+</head>
+<body>${clone.outerHTML}</body>
+</html>`);
+
     printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
+
+    const doPrint = () => {
+      printWindow.focus();
       printWindow.print();
-      printWindow.close();
-    }, 250);
+      setTimeout(() => { if (!printWindow.closed) printWindow.close(); }, 1000);
+    };
+
+    // Wait for fonts then print
+    if (printWindow.document.fonts) {
+      printWindow.document.fonts.ready.then(() => setTimeout(doPrint, 300));
+    } else {
+      setTimeout(doPrint, 800);
+    }
   }, [data]);
 
   // Share functionality
