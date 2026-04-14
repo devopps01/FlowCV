@@ -21,7 +21,17 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`scroll-smooth ${inter.variable}`}>
-      <body className="antialiased bg-white text-gray-900">
+      <head>
+        {/* Prevent dark mode flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            var m = localStorage.getItem('theme-mode');
+            var dark = m === 'dark' || (!m && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (dark) { document.documentElement.classList.add('dark'); document.body && document.body.classList.add('dark'); }
+          } catch(e) {}
+        `}} />
+      </head>
+      <body className="antialiased" style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}>
         <Providers>{children}</Providers>
       </body>
     </html>

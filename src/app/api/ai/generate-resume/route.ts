@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { generateWithGemini } from '@/lib/ai/gemini';
 import { processContentWithIds, getDefaultResumeContent } from '@/lib/utils/resume-ids';
 
 export async function POST(req: Request) {
   try {
     const { prompt, currentData } = await req.json();
-
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured in .env.local' }, { status: 500 });
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     let cleanData = currentData;
     if (currentData && typeof currentData === 'object') {
@@ -131,8 +123,7 @@ CRITICAL REQUIREMENTS:
 - Do not include any explanatory text outside the JSON structure
 `;
 
-    const result = await model.generateContent(instruction);
-    let rawJson = result.response.text().trim();
+    let rawJson = await generateWithGemini(instruction, { fieldType: 'resume' });
     
     if (rawJson.startsWith('\`\`\`json')) {
       rawJson = rawJson.replace(/^\`\`\`json\s*/, '').replace(/\`\`\`$/, '').trim();
@@ -150,15 +141,7 @@ CRITICAL REQUIREMENTS:
 
     return NextResponse.json({ content: contentWithIds });
   } catch (error: any) {
-    console.error('AI generation API failed:', error);
-    
-    const errorMessage = error?.message || '';
-    if (errorMessage.includes('image') || errorMessage.includes('model does not support')) {
-      return NextResponse.json({ 
-        error: 'Image processing is not supported. Please remove images and try again.' 
-      }, { status: 400 });
-    }
-    
-    return NextResponse.json({ error: error?.message || 'Failed to generate content' }, { status: 500 });
+    console.error('AI generation failed:', error.message);
+    return NextResponse.json({ error: error.message || 'Failed to generate resume' }, { status: 500 });
   }
 }

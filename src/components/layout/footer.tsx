@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: 'var(--app-primary)' }}>
                 <FileText className="h-5 w-5 text-white" />
               </div>
               <span className="text-lg font-bold text-gray-900">FlowCV</span>

@@ -132,11 +132,15 @@ export function ensureIds<T extends Record<string, any>>(
 export function processContentWithIds(content: any): any {
   if (!content) return content;
 
+  const profileImage = content.personalInfo?.image || content.personalInfo?.photo || '';
+
   return {
     ...content,
     personalInfo: {
       id: 'personal',
       ...content.personalInfo,
+      image: profileImage,
+      photo: profileImage,
     },
     experience: ensureIds(content.experience || [], 'id', generateExperienceId),
     education: ensureIds(content.education || [], 'id', generateEducationId),
@@ -204,6 +208,7 @@ export function getDefaultResumeContent() {
       summary: '',
       linkedIn: '',
       website: '',
+      image: '',
       photo: '',
     },
     experience: [],
@@ -244,6 +249,7 @@ export function getSampleResumeContent() {
       summary: 'Results-driven Product Manager with 8+ years of experience leading cross-functional teams to deliver innovative SaaS solutions. Proven track record of increasing revenue by 150% through strategic product roadmap development and user-centric design.',
       linkedIn: 'linkedin.com/in/alexmartinez',
       website: '',
+      image: '',
       photo: '',
     },
     experience: [

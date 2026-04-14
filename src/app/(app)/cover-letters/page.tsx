@@ -9,6 +9,7 @@ import {
   Mail, Target, CreditCard, GraduationCap, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 interface CoverLetter {
   _id: string;
@@ -120,73 +121,22 @@ export default function CoverLettersPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--app-primary)' }} />
       </div>
     );
   }
 
   if (!session) return null;
 
-  const sidebarLinks = [
-    { name: 'Resume', icon: FileText, href: '/dashboard' },
-    { name: 'Cover Letter', icon: Mail, href: '/cover-letters', active: true },
-    { name: 'Job Tracker', icon: Target, href: '/job-tracker' },
-    { name: 'More', icon: Plus, href: '#' },
-  ];
-
   return (
-    <div className="flex min-h-screen bg-[#fdfcfb]">
-      {/* Sidebar */}
-      <aside className="w-64 flex flex-col fixed inset-y-0 border-r border-gray-100 bg-white/50 backdrop-blur-md z-20">
-        <div className="p-6">
-          <Link href="/" className="flex items-center gap-2 mb-10">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4d7d]">
-              <FileText className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight">flowcv</span>
-          </Link>
-
-          <nav className="space-y-1">
-            {sidebarLinks.map((link) => (
-              <Link
-                key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                  link.active 
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-100' 
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
-                }`}
-              >
-                <link.icon className={`h-5 w-5 ${link.active ? 'text-[#ff4d7d]' : 'text-gray-400'}`} />
-                {link.name}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 space-y-1 border-t border-gray-50">
-          <Link href="/pricing" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <CreditCard className="h-5 w-5 text-gray-400" />
-            Plans & Pricing
-          </Link>
-          <Link href="#" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <GraduationCap className="h-5 w-5 text-gray-400" />
-            Student Benefits
-          </Link>
-          <button className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
-              <User className="h-4 w-4 text-gray-400" />
-            </div>
-            My account
-          </button>
-        </div>
-      </aside>
+    <div className="flex min-h-screen" style={{ background: 'var(--app-bg-gray)' }}>
+      <AppSidebar />
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-12">
+      <main className="flex-1 ml-64 p-10">
         <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-12">My Cover Letters</h1>
+          <h1 className="text-3xl font-black mb-10" style={{ color: 'var(--app-text)' }}>My Cover Letters</h1>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
             {/* New Letter Button */}

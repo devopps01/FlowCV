@@ -65,13 +65,14 @@ export default function PricingPage() {
                   key={plan.name}
                   className={`relative rounded-xl border p-8 ${
                     plan.popular
-                      ? 'border-primary-600 shadow-xl ring-2 ring-primary-600'
+                      ? 'shadow-xl ring-2'
                       : 'border-gray-200 shadow-sm'
                   }`}
+                  style={plan.popular ? { borderColor: 'var(--app-primary)', ringColor: 'var(--app-primary)' } : {}}
                 >
                   {plan.popular && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary-600 px-4 py-1 text-sm font-semibold text-white">
+                      <span className="inline-flex items-center gap-1 rounded-full px-4 py-1 text-sm font-semibold text-white" style={{ backgroundColor: 'var(--app-primary)' }}>
                         <Star className="h-4 w-4" />
                         Most Popular
                       </span>
@@ -99,9 +100,10 @@ export default function PricingPage() {
                     href="/register"
                     className={`block w-full text-center rounded-lg px-6 py-3 text-base font-medium transition-colors ${
                       plan.popular
-                        ? 'bg-primary-600 text-white hover:bg-primary-700'
+                        ? 'text-white hover:opacity-90'
                         : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                     }`}
+                    style={plan.popular ? { backgroundColor: 'var(--app-primary)' } : {}}
                   >
                     {plan.cta}
                   </Link>

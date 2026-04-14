@@ -127,6 +127,9 @@ export interface ResumeData {
       professionalTitle: string;
       summary: string;
       image?: string;
+      photo?: string;
+      linkedIn?: string;
+      website?: string;
     };
     experience: Experience[];
     education: Education[];
@@ -249,4 +252,6 @@ export interface ResumeData {
     shadow?: 'none' | 'sm' | 'md' | 'lg';
   };
   activeSections: string[];
+  // Per-element style overrides: key = data-edit-path, value = CSS properties
+  styleOverrides?: Record<string, React.CSSProperties>;
 }

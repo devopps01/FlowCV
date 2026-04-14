@@ -1,13 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Loader2, Sparkles, Download, ArrowLeft, LayoutDashboard,
-  Settings, User, Palette, FileText, Check, Plus,
-  Trash2, Eye, FileDown, ZoomIn, ZoomOut, RotateCcw,
-  Save, Wand2, Share2, Printer, Undo2, Redo2, Copy,
-  Clipboard, Bold, Italic, Underline, AlignLeft, AlignCenter,
-  AlignRight, List, ListOrdered, Link2, Image, Type
+  Loader2, FileDown, ZoomIn, ZoomOut, RotateCcw,
+  Save, Share2, Printer, Undo2, Redo2, Copy,
+  Clipboard, FileText, Palette, ArrowLeft,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,6 +16,9 @@ import ResumePreview from './ResumePreview';
 import ContentEditor from './ContentEditor';
 import DesignEditor from './DesignEditor';
 import TemplateModal from './TemplateModal';
+import { DESIGN_PRESETS } from './design-presets';
+import { EditorTopBar } from './EditorTopBar';
+import { InlineEditor } from './InlineEditor';
 
 interface ResumeEditorProps {
   id: string;
@@ -29,14 +29,6 @@ interface ResumeEditorProps {
 const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates }) => {
   const router = useRouter();
   const [data, setData] = useState<ResumeData>(initialData);
-  
-  // Log initial data for debugging
-  console.log('=== RESUME EDITOR INITIAL DATA ===');
-  console.log('ID:', id);
-  console.log('Initial Data:', JSON.stringify(initialData, null, 2));
-  console.log('Initial Design:', initialData.design);
-  console.log('Initial Layout:', initialData.design?.layout);
-  
   const [activeTab, setActiveTab] = useState<'content' | 'design'>('content');
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
@@ -48,20 +40,27 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
   const [historyIndex, setHistoryIndex] = useState(0);
   const [clipboard, setClipboard] = useState<any>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
-  // Immediate auto-save (removed 2-hour delay)
+  // Build template list from design presets (first 200 for performance)
+  const builtTemplates = useMemo(() => {
+    return DESIGN_PRESETS.slice(0, 200).map(preset => ({
+      mainsection: {
+        id: preset.id,
+        name: preset.name,
+        resumeinfo: { isPremium: false },
+      },
+      secondary: {
+        style: { ...initialData.design, ...preset.designPatch },
+        data: {},
+      },
+    }));
+  }, [initialData.design]);
+
   const handleSave = async (showToast: boolean = true) => {
     if (saving) return;
     setSaving(true);
     try {
-      console.log('=== SAVING RESUME ===');
-      console.log('Resume ID:', id);
-      console.log('Data being saved:', JSON.stringify({
-        title: data.title,
-        template: data.template,
-        design: data.design,
-      }, null, 2));
-
       const response = await fetch(`/api/resumes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -74,19 +73,12 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         }),
       });
 
-      console.log('Save response status:', response.status);
-
       if (response.ok) {
-        const result = await response.json();
-        console.log('Save response:', result);
         if (showToast) toast.success('Changes saved', { icon: '💾' });
       } else {
-        const error = await response.text();
-        console.error('Save failed:', error);
         throw new Error('Save failed');
       }
     } catch (e) {
-      console.error('Save error:', e);
       if (showToast) toast.error('Save failed');
     } finally {
       setSaving(false);
@@ -99,18 +91,49 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     return () => clearTimeout(timeoutId);
   }, [data, id]);
 
-  // A4 Pagination Logic
+  // A4 Pagination Logic — measure actual rendered content height
   useEffect(() => {
-    if (!previewRef.current) return;
-    const resizeObserver = new ResizeObserver(entries => {
-      for (let entry of entries) {
-        const contentHeight = entry.target.scrollHeight;
-        const pages = Math.max(1, Math.ceil((contentHeight - 10) / 1122));
-        setNumPages(pages);
-      }
+    const el = previewRef.current;
+    if (!el) return;
+
+    const A4_PX = 1122; // 297mm at 96dpi
+    // Only create a new page if content overflows by more than 80px (about 21mm)
+    // This prevents near-empty second pages from appearing
+    const PAGE_THRESHOLD = 80;
+
+    const measure = () => {
+      // Walk all child elements to find the true bottom of content
+      let maxBottom = 0;
+      const elRect = el.getBoundingClientRect();
+
+      el.querySelectorAll('*').forEach(child => {
+        const rect = (child as HTMLElement).getBoundingClientRect();
+        const bottom = rect.bottom - elRect.top;
+        if (bottom > maxBottom) maxBottom = bottom;
+      });
+
+      // Also check the element itself
+      const elHeight = elRect.height;
+      const contentHeight = Math.max(elHeight, maxBottom);
+
+      // Only add a page if content meaningfully overflows
+      const pages = contentHeight > A4_PX + PAGE_THRESHOLD
+        ? Math.ceil(contentHeight / A4_PX)
+        : 1;
+
+      setNumPages(Math.max(1, pages));
+    };
+
+    // Delay first measure to let fonts/images/layout settle
+    const t = setTimeout(measure, 200);
+
+    const ro = new ResizeObserver(() => {
+      clearTimeout(t);
+      setTimeout(measure, 50);
     });
-    resizeObserver.observe(previewRef.current);
-    return () => resizeObserver.disconnect();
+    ro.observe(el);
+
+    return () => { clearTimeout(t); ro.disconnect(); };
   }, [data]);
 
   // History management
@@ -185,62 +208,104 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     if (zoomLevel !== 100) setZoomLevel(100);
 
     setIsExporting(true);
-    toast.loading('Generating high-quality PDF...', { id: 'pdf' });
+    toast.loading('Generating PDF...', { id: 'pdf' });
 
-    setTimeout(async () => {
-      try {
-        const canvas = await html2canvas(el, {
-          scale: 3, // Higher quality
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: data.design.backgroundColor || '#ffffff',
-          scrollY: -window.scrollY,
-          windowWidth: el.scrollWidth,
-          windowHeight: el.scrollHeight,
-          onclone: (clonedDoc) => {
-            const clonedEl = clonedDoc.getElementById('resume-preview');
-            if (clonedEl) {
-              clonedEl.style.height = 'auto';
-              clonedEl.style.overflow = 'visible';
-              clonedEl.style.transform = 'none';
-            }
-          }
-        });
+    try {
+      // 1. Ensure the selected font is loaded in the current document
+      const fontFamily = data.design.fontFamily || 'Inter';
+      const fontQuery = fontFamily.replace(/\s+/g, '+');
+      const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
 
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-
-        const pageHeightPx = Math.floor(canvas.width * (pdfHeight / pdfWidth));
-        const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
-
-        for (let page = 0; page < totalPages; page++) {
-          const sy = page * pageHeightPx;
-          const sHeight = Math.min(pageHeightPx, canvas.height - sy);
-
-          const pageCanvas = document.createElement('canvas');
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = sHeight;
-          const ctx = pageCanvas.getContext('2d');
-          if (!ctx) throw new Error('Canvas context unavailable');
-
-          ctx.drawImage(canvas, 0, sy, canvas.width, sHeight, 0, 0, canvas.width, sHeight);
-          const imgData = pageCanvas.toDataURL('image/png', 1.0);
-
-          if (page > 0) pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (sHeight / canvas.width) * pdfWidth, undefined, 'FAST');
-        }
-
-        pdf.save(`${data.title || 'Resume'}.pdf`);
-        toast.success('PDF exported successfully!', { id: 'pdf' });
-      } catch (err) {
-        console.error(err);
-        toast.error('Failed to export PDF', { id: 'pdf' });
-      } finally {
-        setIsExporting(false);
-        if (zoomLevel !== 100) setZoomLevel(originalZoom);
+      // Inject font if not already present
+      const existingLink = document.querySelector(`link[href*="${fontQuery}"]`);
+      if (!existingLink) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = fontUrl;
+        document.head.appendChild(link);
       }
-    }, 500);
+
+      // 2. Wait for all fonts to be ready (including the newly injected one)
+      await document.fonts.ready;
+
+      // 3. Extra wait to ensure font renders in DOM
+      await new Promise(r => setTimeout(r, 300));
+
+      // 4. Capture canvas — inject font into cloned doc
+      const canvas = await html2canvas(el, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: data.design.backgroundColor || '#ffffff',
+        scrollY: -window.scrollY,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+        onclone: async (clonedDoc) => {
+          // Inject the font stylesheet into the cloned document
+          const clonedLink = clonedDoc.createElement('link');
+          clonedLink.rel = 'stylesheet';
+          clonedLink.href = fontUrl;
+          clonedDoc.head.appendChild(clonedLink);
+
+          // Copy all existing font stylesheets
+          document.querySelectorAll('link[rel="stylesheet"]').forEach(l => {
+            const href = (l as HTMLLinkElement).href;
+            if (href.includes('fonts.googleapis') || href.includes('fonts.gstatic')) {
+              const copy = clonedDoc.createElement('link');
+              copy.rel = 'stylesheet';
+              copy.href = href;
+              clonedDoc.head.appendChild(copy);
+            }
+          });
+
+          // Apply font-family explicitly to the resume element
+          const clonedEl = clonedDoc.getElementById('resume-preview');
+          if (clonedEl) {
+            clonedEl.style.fontFamily = `'${fontFamily}', sans-serif`;
+            clonedEl.style.height = 'auto';
+            clonedEl.style.overflow = 'visible';
+            clonedEl.style.transform = 'none';
+            clonedEl.style.boxShadow = 'none';
+          }
+
+          // Wait for fonts in cloned doc
+          await clonedDoc.fonts.ready;
+        },
+      });
+
+      // 5. Split into A4 pages and build PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const pageHeightPx = Math.floor(canvas.width * (pdfHeight / pdfWidth));
+      const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+
+      for (let page = 0; page < totalPages; page++) {
+        const sy = page * pageHeightPx;
+        const sHeight = Math.min(pageHeightPx, canvas.height - sy);
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sHeight;
+        const ctx = pageCanvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context unavailable');
+
+        ctx.drawImage(canvas, 0, sy, canvas.width, sHeight, 0, 0, canvas.width, sHeight);
+        const imgData = pageCanvas.toDataURL('image/png', 1.0);
+
+        if (page > 0) pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, (sHeight / canvas.width) * pdfWidth, undefined, 'FAST');
+      }
+
+      pdf.save(`${data.title || 'Resume'}.pdf`);
+      toast.success('PDF exported!', { id: 'pdf' });
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export PDF', { id: 'pdf' });
+    } finally {
+      setIsExporting(false);
+      if (originalZoom !== zoomLevel) setZoomLevel(originalZoom);
+    }
   }, [data, zoomLevel]);
 
   // Print functionality
@@ -336,198 +401,179 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
   }, [undo, redo, exportPDF, copySection, pasteSection, selectedSectionId, clipboard]);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden font-sans">
-      <Toaster />
+    <div className="flex flex-col h-screen overflow-hidden font-sans" style={{ background: 'var(--app-bg)' }}>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: 'var(--app-bg-card)',
+            color: 'var(--app-text)',
+            border: '1px solid var(--app-border)',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '600',
+            boxShadow: 'var(--app-shadow-md)',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+        }}
+      />
 
-      {/* Tool Sidebar */}
-      <div className="w-[450px] flex flex-col border-r border-gray-100 bg-white z-20 shadow-2xl">
-        {/* Header Actions */}
-        <div className="px-4 py-5 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 hover:text-gray-900 group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            </button>
-            <div>
-              <input
-                value={data.title}
-                onChange={e => updateNested('title', e.target.value)}
-                className="text-sm font-black text-gray-900 bg-transparent border-none focus:ring-0 w-32 truncate"
-              />
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{saving ? 'Saving...' : 'Saved'}</span>
+      {/* ── Top Bar ── */}
+      <EditorTopBar
+        data={data}
+        updateDesign={(key, value) => updateNested(`design.${key}`, value)}
+        updateNested={updateNested}
+        onUndo={undo}
+        onRedo={redo}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < history.length - 1}
+        onSave={() => handleSave(true)}
+        onExport={exportPDF}
+        onPrint={printResume}
+        onShare={shareResume}
+        saving={saving}
+        isExporting={isExporting}
+        zoomLevel={zoomLevel}
+        onZoomIn={() => setZoomLevel(z => Math.min(z + 10, 150))}
+        onZoomOut={() => setZoomLevel(z => Math.max(z - 10, 50))}
+        onZoomReset={() => setZoomLevel(100)}
+        numPages={numPages}
+      />
+
+      {/* ── Main area ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* ── Left Sidebar ── */}
+        <div
+          className="w-[420px] flex flex-col border-r z-20 shrink-0 overflow-hidden"
+          style={{ background: 'var(--app-bg-card)', borderColor: 'var(--app-border)' }}
+        >
+          {/* Back + Title */}
+          <div
+            className="px-4 py-3 flex items-center justify-between border-b shrink-0"
+            style={{ borderColor: 'var(--app-border)' }}
+          >
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="p-2 rounded-xl transition-all hover:bg-gray-100 group"
+                style={{ color: 'var(--app-text-secondary)' }}
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              </button>
+              <div>
+                <input
+                  value={data.title}
+                  onChange={e => updateNested('title', e.target.value)}
+                  className="text-sm font-black bg-transparent border-none focus:ring-0 w-36 truncate"
+                  style={{ color: 'var(--app-text)' }}
+                />
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
+                  <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>
+                    {saving ? 'Saving...' : 'Saved'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Tab Navigation */}
+          <div
+            className="flex mx-3 my-2 rounded-xl p-1"
+            style={{ background: 'var(--app-bg-gray)' }}
+          >
             <button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 hover:text-gray-900 disabled:opacity-50"
-              title="Save resume"
+              onClick={() => setActiveTab('content')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeTab === 'content'
+                  ? 'shadow-sm'
+                  : 'opacity-50 hover:opacity-75'
+              }`}
+              style={activeTab === 'content'
+                ? { background: 'var(--app-bg-card)', color: 'var(--app-text)' }
+                : { color: 'var(--app-text-secondary)' }}
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <FileText className="w-3.5 h-3.5" /> Content
             </button>
             <button
-              onClick={shareResume}
-              className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 hover:text-gray-900"
-              title="Share resume"
+              onClick={() => setActiveTab('design')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeTab === 'design'
+                  ? 'shadow-sm'
+                  : 'opacity-50 hover:opacity-75'
+              }`}
+              style={activeTab === 'design'
+                ? { background: 'var(--app-bg-card)', color: 'var(--app-text)' }
+                : { color: 'var(--app-text-secondary)' }}
             >
-              <Share2 className="w-4 h-4" />
+              <Palette className="w-3.5 h-3.5" /> Design
             </button>
-            <button
-              onClick={printResume}
-              className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 hover:text-gray-900"
-              title="Print resume"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
-            <button
-              onClick={exportPDF}
-              disabled={isExporting}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#ff4d7d] text-white rounded-xl text-xs font-black shadow-lg shadow-pink-100 hover:bg-[#ff3366] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-              Export PDF
-            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {activeTab === 'content' ? (
+              <ContentEditor
+                data={data}
+                updateNested={updateNested}
+                setData={setData}
+              />
+            ) : (
+              <DesignEditor
+                data={data}
+                updateDesign={(key, value) => updateNested(`design.${key}`, value)}
+                updateContent={updateNested}
+                selectedSectionId={selectedSectionId || undefined}
+                setSelectedSectionId={(id) => setSelectedSectionId(id || null)}
+                onOpenTemplates={() => setShowTemplateModal(true)}
+              />
+            )}
           </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-          <button
-            onClick={undo}
-            disabled={historyIndex === 0}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Undo (Ctrl+Z)"
+        {/* ── Preview Area ── */}
+        <div
+          className="flex-1 min-h-0 flex flex-col relative"
+          style={{ background: 'var(--app-bg-medium)', overflow: 'hidden' }}
+          ref={previewContainerRef}
+        >
+          <InlineEditor
+            data={data}
+            updateNested={updateNested}
+            containerRef={previewContainerRef}
+            zoom={zoomLevel / 100}
           >
-            <Undo2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={redo}
-            disabled={historyIndex === history.length - 1}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo2 className="w-4 h-4" />
-          </button>
-          <div className="w-px h-6 bg-gray-200 mx-2" />
-          <button
-            onClick={copySection}
-            disabled={!selectedSectionId}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Copy (Ctrl+C)"
-          >
-            <Copy className="w-4 h-4" />
-          </button>
-          <button
-            onClick={pasteSection}
-            disabled={!clipboard}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Paste (Ctrl+V)"
-          >
-            <Clipboard className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex border-b border-gray-100 mx-4 my-2 bg-gray-50/50 rounded-xl p-1">
-          <button
-            onClick={() => setActiveTab('content')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'content' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-          >
-            <FileText className="w-4 h-4" /> Content
-          </button>
-          <button
-            onClick={() => setActiveTab('design')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'design' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-          >
-            <Palette className="w-4 h-4" /> Design
-          </button>
-        </div>
-
-        {/* Tab Content */}
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {activeTab === 'content' ? (
-            <ContentEditor
+            <ResumePreview
               data={data}
-              updateNested={updateNested}
-              setData={setData}
+              numPages={numPages}
+              previewRef={previewRef}
+              zoomLevel={zoomLevel}
+              isExporting={isExporting}
+              selectedSectionId={selectedSectionId}
+              onSelectSection={(sid) => {
+                setSelectedSectionId(sid);
+                setActiveTab('design');
+              }}
+              onReorderSections={(newOrder) => updateNested('activeSections', newOrder)}
             />
-          ) : (
-            <DesignEditor
-              data={data}
-              updateDesign={(key, value) => updateNested(`design.${key}`, value)}
-              updateContent={updateNested}
-              selectedSectionId={selectedSectionId || undefined}
-              setSelectedSectionId={(id) => setSelectedSectionId(id || null)}
-            />
-          )}
+          </InlineEditor>
         </div>
-      </div>
-
-      {/* Preview Area */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Floating Controls */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-xl px-4 py-0.5 rounded-xl shadow-2xl border border-white/20">
-          <button onClick={() => setZoomLevel(z => Math.max(z - 10, 50))} className="p-2 hover:bg-gray-100 rounded-xl transition-all text-gray-600"><ZoomOut className="w-4 h-4" /></button>
-          <span className="text-[10px] font-black text-gray-400 w-12 text-center">{zoomLevel}%</span>
-          <button onClick={() => setZoomLevel(z => Math.min(z + 10, 150))} className="p-2 hover:bg-gray-100 rounded-xl transition-all text-gray-600"><ZoomIn className="w-4 h-4" /></button>
-          <div className="w-px h-6 bg-gray-100 mx-2" />
-          <button onClick={() => setZoomLevel(100)} className="p-2 hover:bg-gray-100 rounded-xl transition-all text-gray-400"><RotateCcw className="w-4 h-4" /></button>
-          <div className="w-px h-6 bg-gray-100 mx-2" />
-          <div className="flex items-center gap-2 px-3 py-1 bg-[#ff4d7d]/10 rounded-full">
-            <span className="text-[9px] font-black text-[#ff4d7d] uppercase tracking-widest">{numPages} Page{numPages > 1 ? 's' : ''}</span>
-          </div>
-        </div>
-
-        <ResumePreview
-          data={data}
-          numPages={numPages}
-          previewRef={previewRef}
-          zoomLevel={zoomLevel}
-          isExporting={isExporting}
-          selectedSectionId={selectedSectionId}
-          onSelectSection={(sid) => {
-            setSelectedSectionId(sid);
-            setActiveTab('design');
-          }}
-          onReorderSections={(newOrder) => updateNested('activeSections', newOrder)}
-        />
       </div>
 
       <TemplateModal
         isOpen={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
-        templates={templates}
+        templates={builtTemplates}
         isLoading={false}
         onSelect={(t) => {
-          console.log('=== TEMPLATE SELECTED ===');
-          console.log('Template:', t);
-          console.log('Template style:', t.secondary?.style);
-
-          setData(prev => {
-            // Merge design properties from template using latest state
-            const newDesign = {
-              ...prev.design,
-              ...(t.secondary?.style || {}),
-              // Ensure critical properties are overridden
-              ...(t.secondary?.style?.primaryColor && { primaryColor: t.secondary.style.primaryColor }),
-              ...(t.secondary?.style?.accentColor && { accentColor: t.secondary.style.accentColor }),
-              ...(t.secondary?.style?.secondaryColor && { secondaryColor: t.secondary.style.secondaryColor }),
-              ...(t.secondary?.style?.fontFamily && { fontFamily: t.secondary.style.fontFamily }),
-              ...(t.secondary?.style?.layout && { layout: t.secondary.style.layout }),
-            };
-
-            return {
-              ...prev,
-              template: t.mainsection?.id || t.id || t.mainsection?.name,
-              design: newDesign,
-            };
-          });
+          setData(prev => ({
+            ...prev,
+            template: t.mainsection?.id || t.id,
+            design: { ...prev.design, ...(t.secondary?.style || {}) },
+          }));
           setShowTemplateModal(false);
           toast.success(`Template applied: ${t.mainsection?.name || t.name}`);
         }}

@@ -27,34 +27,46 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ isOpen, onClose, template
       />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-7xl h-full max-h-[92vh] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden scale-in-center animate-in zoom-in-95 duration-300">
+      <div
+        className="relative w-full max-w-7xl h-full max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ background: 'var(--app-bg-card)', border: '1px solid var(--app-border)' }}
+      >
         {/* Header */}
-        <div className="px-12 py-6 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10 shadow-sm">
+        <div
+          className="px-10 py-5 flex items-center justify-between sticky top-0 z-10 shrink-0"
+          style={{ borderBottom: '1px solid var(--app-border)', background: 'var(--app-bg-card)' }}
+        >
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h2 className="text-2xl font-black flex items-center gap-3" style={{ color: 'var(--app-text)' }}>
               Choose Template
-              <span className="px-3 py-1 bg-[#ff4d7d] text-white text-[10px] uppercase tracking-widest rounded-full font-bold">Premium</span>
+              <span className="px-2.5 py-0.5 text-white text-[10px] uppercase tracking-widest rounded-full font-black" style={{ background: 'var(--app-primary)' }}>
+                {templates.length}+
+              </span>
             </h2>
-            <p className="text-gray-400 mt-2 font-semibold uppercase text-[10px] tracking-[0.2em]">Select from our 100+ professional designs to transform your career story.</p>
+            <p className="mt-1 font-semibold uppercase text-[10px] tracking-[0.2em]" style={{ color: 'var(--app-text-muted)' }}>
+              Select from our professional designs to transform your career story.
+            </p>
           </div>
-          <div className="flex items-center gap-6">
-             <button 
-               onClick={onClose}
-               className="px-8 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-50 transition-all border border-gray-200 uppercase text-[10px] tracking-widest"
-             >
-               Cancel
-             </button>
-             <button 
-               onClick={onClose}
-               className="p-3 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-gray-900 group"
-             >
-               <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-             </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-full font-bold transition-all text-[10px] uppercase tracking-widest"
+              style={{ border: '1px solid var(--app-border)', color: 'var(--app-text-secondary)', background: 'var(--app-bg-gray)' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2.5 rounded-full transition-all group"
+              style={{ background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}
+            >
+              <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+            </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-12 bg-[#f4f7f9]/80 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar" style={{ background: 'var(--app-bg-gray)' }}>
           {isLoading ? (
             <div className="h-[400px] flex flex-col items-center justify-center gap-4">
                <Loader2 className="w-12 h-12 text-[#ff4d7d] animate-spin" />
@@ -87,11 +99,21 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ isOpen, onClose, template
                     onClick={() => onSelect(template)}
                   >
                     {/* Thumbnail Card */}
-                    <div className={`relative aspect-[1/1.414] bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden transition-all duration-500 ${
-                      currentTemplateId === template.mainsection.id 
-                      ? 'ring-4 ring-[#ff4d7d] ring-offset-4 ring-offset-[#f4f7f9] shadow-2xl scale-[1.02]' 
-                      : 'hover:shadow-2xl hover:-translate-y-2'
-                    }`}>
+                    <div className={`relative aspect-[1/1.414] rounded-xl overflow-hidden transition-all duration-300 ${
+                      currentTemplateId === template.mainsection.id
+                        ? 'shadow-2xl scale-[1.02]'
+                        : 'hover:shadow-2xl hover:-translate-y-1'
+                    }`}
+                      style={{
+                        background: '#ffffff',
+                        border: currentTemplateId === template.mainsection.id
+                          ? '2px solid var(--app-primary)'
+                          : '1px solid var(--app-border)',
+                        boxShadow: currentTemplateId === template.mainsection.id
+                          ? '0 0 0 3px var(--app-primary-light)'
+                          : 'var(--app-shadow)',
+                      }}
+                    >
                        <div className="absolute inset-0 bg-white pointer-events-none flex items-start justify-center pt-[10px]">
                           <div className="origin-top scale-[0.55] w-[210mm]">
                              <ResumePreview 
@@ -112,8 +134,8 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ isOpen, onClose, template
                        )}
 
                        {currentTemplateId === template.mainsection.id && (
-                         <div className="absolute inset-0 bg-[#ff4d7d]/5 flex items-center justify-center z-10">
-                            <div className="bg-[#ff4d7d] text-white p-3 rounded-full shadow-2xl animate-in zoom-in-0 duration-300">
+                         <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: 'var(--app-primary-light)' }}>
+                            <div className="p-3 rounded-full text-white shadow-2xl" style={{ background: 'var(--app-primary)' }}>
                                <Check className="w-6 h-6 stroke-[3]" />
                             </div>
                          </div>
@@ -123,11 +145,10 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ isOpen, onClose, template
                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
                     </div>
 
-                    {/* Clean Title Label */}
-                    <div className="text-center mt-2 px-6">
-                       <p className={`text-[12px] font-bold uppercase tracking-[0.1em] transition-colors ${
-                         currentTemplateId === template.mainsection.id ? 'text-[#ff4d7d]' : 'text-gray-500 group-hover:text-gray-900'
-                       }`}>
+                    {/* Title */}
+                    <div className="text-center mt-2 px-4">
+                       <p className="text-[11px] font-bold uppercase tracking-[0.1em] transition-colors truncate"
+                         style={{ color: currentTemplateId === template.mainsection.id ? 'var(--app-primary)' : 'var(--app-text-secondary)' }}>
                          {template.mainsection.name}
                        </p>
                     </div>

@@ -93,7 +93,7 @@ function RegisterForm() {
   if (status === 'authenticated') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#41017d]" />
       </div>
     );
   }
@@ -306,7 +306,7 @@ export default function RegisterPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#41017d]" />
       </div>
     }>
       <RegisterForm />

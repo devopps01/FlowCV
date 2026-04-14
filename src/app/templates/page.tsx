@@ -1,1281 +1,568 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import { FileText, Download, Star, Users, Clock, ArrowRight, Eye, Filter, Search, Grid, List, Sparkles, Award, Briefcase, BookOpen, Target, Check, Upload, Plus, X, Trash2, Edit } from 'lucide-react';
-import TemplateLivePreview from '@/components/resume-builder/TemplateLivePreview';
-import { TemplatesHeader } from '@/components/layout/TemplatesHeader';
-import { useTheme } from '@/hooks/useTheme';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Eye, X, Search, ChevronDown, Loader2 } from 'lucide-react';
 import ResumePreview from '@/components/resume-builder/ResumePreview';
-import ResumeThumbnail from '@/components/resume-builder/ResumeThumbnail';
-import A4ResumePreview from '@/components/resume-builder/A4ResumePreview';
-import ImageTemplatePreview from '@/components/resume-builder/ImageTemplatePreview';
+import { TemplatesHeader } from '@/components/layout/TemplatesHeader';
 import { ResumeData } from '@/components/resume-builder/types';
-import { 
-  generateId, 
-  generateExperienceId, 
-  generateEducationId, 
-  generateSkillId, 
-  generateLanguageId,
-  generateCertificationId,
-  generateProjectId,
-  generateAwardId,
-  generateInterestId,
-} from '@/lib/utils/resume-ids';
 
-// Template data from config
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface TemplateData {
-  mainsection: {
-    id: string;
-    name: string;
-    description: string;
-    resumeinfo: {
-      isPremium: boolean;
-      subscription: string;
-    };
-  };
-  secondary: {
-    style: {
-      primaryColor: string;
-      secondaryColor: string;
-      accentColor: string;
-      fontFamily: string;
-      isSerif: boolean;
-      layout: string;
-      spacing: number;
-      borderRadius: string;
-      fontSize: number;
-      textColor: string;
-      backgroundColor: string;
-    };
-    data: any;
-  };
+  mainsection: { id: string; name: string; description?: string };
+  secondary: { style: Record<string, any>; data?: any };
 }
 
-// User uploaded template interface
-interface UserTemplate {
-  _id: string;
-  userId: string;
-  title: string;
-  description: string;
-  templateId: string;
-  fileName: string;
-  isPublic: boolean;
-  isPremium: boolean;
-  category: string;
-  tags: string[];
-  downloads: number;
-  rating: number;
-  ratingCount: number;
-  thumbnail: string | null;
-  templateData: TemplateData | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Unified template interface for display
-interface DisplayTemplate {
-  id: string;
-  name: string;
-  description: string;
-  isPremium: boolean;
-  subscription: string;
-  primaryColor: string;
-  accentColor: string;
-  layout: string;
-  fontFamily: string;
-  category: string;
-  isUserUploaded?: boolean;
-  templateId?: string;
-  _id?: string;
-  downloads?: number;
-  rating?: number;
-  ratingCount?: number;
-  thumbnail?: string | null;
-  createdAt?: Date;
-}
-
-// Convert TemplateData to DisplayTemplate
-const convertToDisplayTemplate = (template: any): DisplayTemplate => {
-  try {
-    // Handle different template structures
-    const mainSection = template.mainsection || template.mainSection || template;
-    const secondary = template.secondary || template.secondary || {};
-
-    // Better category detection
-    const categorizeTemplate = (t: any): string => {
-      const name = (mainSection.name || '').toLowerCase();
-      const description = (mainSection.description || '').toLowerCase();
-      const combined = name + ' ' + description;
-
-      // Check for category keywords
-      if (combined.includes('executive') || combined.includes('ceo') || combined.includes('director') || combined.includes('manager') || combined.includes('senior')) {
-        return 'executive';
-      }
-      if (combined.includes('creative') || combined.includes('portfolio') || combined.includes('designer') || combined.includes('artist') || combined.includes('graphic')) {
-        return 'creative';
-      }
-      if (combined.includes('academic') || combined.includes('research') || combined.includes('professor') || combined.includes('scholar') || combined.includes('thesis') || combined.includes('cv')) {
-        return 'academic';
-      }
-      if (combined.includes('entry') || combined.includes('junior') || combined.includes('student') || combined.includes('intern') || combined.includes('graduate') || combined.includes('fresher')) {
-        return 'entry-level';
-      }
-      return 'professional';
-    };
-
-    return {
-      id: mainSection.id || `template-${Math.random().toString(36).substr(2, 9)}`,
-      name: mainSection.name || 'Template Name',
-      description: mainSection.description || 'Professional template design',
-      isPremium: mainSection.resumeinfo?.isPremium || false,
-      subscription: mainSection.resumeinfo?.subscription || 'Free',
-      primaryColor: secondary.style?.primaryColor || '#7c3aed',
-      accentColor: secondary.style?.accentColor || '#5b21b6',
-      layout: secondary.style?.layout || 'sidebar-left',
-      fontFamily: secondary.style?.fontFamily || 'Outfit',
-      category: categorizeTemplate(template),
-      isUserUploaded: false
-    };
-  } catch (error) {
-    console.error('Error converting template:', error);
-    return {
-      id: `fallback-${Math.random().toString(36).substr(2, 9)}`,
-      name: 'Template',
-      description: 'Template description',
-      isPremium: false,
-      subscription: 'Free',
-      primaryColor: '#7c3aed',
-      accentColor: '#5b21b6',
-      layout: 'sidebar-left',
-      fontFamily: 'Outfit',
-      category: 'professional',
-      isUserUploaded: false
-    };
-  }
+// ─── Dummy preview content ────────────────────────────────────────────────────
+const PREVIEW_CONTENT: ResumeData['content'] = {
+  personalInfo: {
+    id: 'p1',
+    fullName: 'Brian T. Wayne',
+    email: 'brian@example.com',
+    phone: '+1 555 000 0000',
+    location: 'San Francisco, CA',
+    professionalTitle: 'Business Development Director',
+    summary: 'Results-driven professional with 8+ years leading cross-functional teams to deliver high-impact solutions.',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+  },
+  experience: [
+    { id: 'e1', company: 'Meta Platforms', position: 'Senior Specialist', startDate: '2020-03', endDate: 'Present', current: true, description: 'Led cross-functional teams delivering high-impact features for 2B+ users. Optimized core algorithms resulting in 15% performance increase.' },
+    { id: 'e2', company: 'Startup Hub', position: 'Founding Member', startDate: '2016-06', endDate: '2020-02', current: false, description: 'Scaled platform from zero to 100k active users within 18 months. Architected MVP using React and Node.js.' },
+    { id: 'e3', company: 'Design Co.', position: 'Junior Architect', startDate: '2014-01', endDate: '2016-05', current: false, description: 'Collaborated on large-scale infrastructure projects focused on sustainable design.' },
+  ],
+  education: [
+    { id: 'ed1', school: 'Stanford University', degree: 'MS', field: 'Computer Science', graduationYear: '2016' },
+    { id: 'ed2', school: 'UC Berkeley', degree: 'BS', field: 'Engineering', graduationYear: '2014' },
+  ],
+  skills: [
+    { id: 's1', name: 'Leadership' }, { id: 's2', name: 'Product Management' },
+    { id: 's3', name: 'Data Analysis' }, { id: 's4', name: 'React' },
+    { id: 's5', name: 'TypeScript' }, { id: 's6', name: 'Agile' },
+    { id: 's7', name: 'Cloud Computing' }, { id: 's8', name: 'System Architecture' },
+  ],
+  languages: [
+    { id: 'l1', language: 'English', proficiency: 'Native' },
+    { id: 'l2', language: 'Spanish', proficiency: 'Fluent' },
+  ],
+  certifications: [
+    { id: 'c1', name: 'PMP Certified', issuer: 'PMI', date: '2020', description: '' },
+    { id: 'c2', name: 'AWS Solutions Architect', issuer: 'Amazon', date: '2021', description: '' },
+  ],
+  projects: [
+    { id: 'pr1', name: 'AI Analytics Dashboard', description: 'Real-time analytics platform with ML predictions', technologies: ['React', 'Python', 'TensorFlow'] },
+  ],
+  awards: [
+    { id: 'aw1', title: 'PM of the Year', issuer: 'TechCorp', date: '2022', description: 'Outstanding product leadership' },
+  ],
+  interests: [
+    { id: 'i1', name: 'Technology' }, { id: 'i2', name: 'Travel' }, { id: 'i3', name: 'Photography' },
+  ],
+  socials: [], courses: [], organisations: [], publications: [], references: [], custom: [],
 };
 
-// Convert UserTemplate to DisplayTemplate
-const convertUserTemplate = (template: UserTemplate): DisplayTemplate => ({
-  id: template.templateId,
-  name: template.title,
-  description: template.description,
-  isPremium: template.isPremium,
-  subscription: template.isPremium ? 'Premium' : 'Free',
-  primaryColor: template.templateData?.secondary?.style?.primaryColor || '#7c3aed',
-  accentColor: template.templateData?.secondary?.style?.accentColor || '#5b21b6',
-  layout: template.category || 'professional',
-  fontFamily: template.templateData?.secondary?.style?.fontFamily || 'Outfit',
-  category: template.category,
-  isUserUploaded: true,
-  templateId: template.templateId,
-  _id: template._id,
-  downloads: template.downloads,
-  rating: template.rating,
-  ratingCount: template.ratingCount,
-  thumbnail: template.thumbnail,
-  createdAt: template.createdAt
-});
+const CATEGORIES = [
+  { id: 'professional', label: 'Professional Resume Templates', desc: 'Clean, ATS-friendly designs trusted by recruiters worldwide. Stand out with a polished, structured layout.' },
+  { id: 'creative', label: 'Creative Resume Templates', desc: 'Express your personality with colorful, bold templates that turn your resume into a visual story.' },
+  { id: 'executive', label: 'Executive Resume Templates', desc: 'Authoritative, sophisticated designs for senior leadership and C-suite roles.' },
+  { id: 'academic', label: 'Academic Resume Templates', desc: 'Scholarly formats for research positions, professorships, and academic applications.' },
+  { id: 'entry-level', label: 'Entry Level Resume Templates', desc: 'Perfect for students and recent graduates entering the workforce for the first time.' },
+];
 
-// Scroll animations hook
-function useScrollAnimations() {
-  useEffect(() => {
-    // Immediately show all elements
-    const allGroups = document.querySelectorAll('.group');
-    allGroups.forEach(el => {
-      (el as HTMLElement).style.opacity = '1';
-      (el as HTMLElement).style.transform = 'translateY(0)';
-    });
-
-    const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
-    };
-
-    const observer = new IntersectionObserver(function (entries) {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('animate-slideInUp');
-        }
-      });
-    }, observerOptions);
-
-    const elements = document.querySelectorAll('.group');
-    elements.forEach(el => observer.observe(el));
-
-    return () => {
-      elements.forEach(el => observer.unobserve(el));
-    };
-  }, []);
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function categorize(t: TemplateData): string {
+  const text = ((t.mainsection?.name || '') + ' ' + ((t.mainsection as any)?.description || '')).toLowerCase();
+  if (/creative|portfolio|designer|artist|graphic|leaves|dark/.test(text)) return 'creative';
+  if (/executive|ceo|director|senior|manager|elite/.test(text)) return 'executive';
+  if (/academic|research|professor|scholar|cv|harvard/.test(text)) return 'academic';
+  if (/entry|junior|student|intern|graduate|fresher/.test(text)) return 'entry-level';
+  return 'professional';
 }
 
-export default function TemplatesPage() {
-  const { isDark } = useTheme();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [templates, setTemplates] = useState<TemplateData[]>([]);
-  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<DisplayTemplate | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+function buildDesign(t: TemplateData): ResumeData['design'] {
+  const s = t.secondary?.style || {};
+  return {
+    primaryColor: s.primaryColor || '#ff4d7d',
+    secondaryColor: s.secondaryColor || '#f8fafc',
+    accentColor: s.accentColor || s.primaryColor || '#ff4d7d',
+    textColor: s.textColor || '#1f2937',
+    backgroundColor: s.backgroundColor || '#ffffff',
+    fontFamily: s.fontFamily || 'Inter',
+    fontCategory: 'sans' as const,
+    fontSize: s.fontSize || 10.5,
+    lineHeight: 1.45,
+    marginLR: 12, marginTB: 16,
+    entrySpacing: 8, sectionSpacing: 16,
+    layout: (s.layout || 'sidebar-left') as any,
+    headingStyle: 'underline',
+    headingCapitalization: 'uppercase' as const,
+    headingSize: 'm' as const,
+    headingIconType: 'none' as const,
+    entryLayout: 'default' as const,
+    entryColumnWidth: 'auto' as const,
+    entryTitleSize: 'm' as const,
+    entrySubtitleStyle: 'normal' as const,
+    entrySubtitlePlacement: 'next-line' as const,
+    descriptionIndent: false,
+    listStyle: 'bullet' as const,
+    showPageNumbers: true,
+    showEmailInFooter: false,
+    showNameInFooter: false,
+    linkUnderline: true,
+    linkBlueColor: false,
+    linkIcon: true,
+    personalAlign: 'left' as const,
+    personalArrangement: 'default' as const,
+    personalIconShow: true,
+    personalBulletShow: false,
+    personalBarShow: false,
+    personalIconStyle: 'default' as const,
+    nameSize: 'm' as const,
+    nameBold: true,
+    nameFontType: 'body' as const,
+    titleSize: 'm' as const,
+    titlePosition: 'below' as const,
+    titleStyle: 'normal' as const,
+    photoShow: true,
+    photoGrayscale: false,
+    photoSize: 'm' as const,
+    photoShape: 'circle' as const,
+    skillsStyle: 'grid' as const,
+    skillsColumns: 2,
+    languagesStyle: 'grid' as const,
+    languagesColumns: 2,
+    interestsStyle: 'grid' as const,
+    interestsColumns: 2,
+    certificationsStyle: 'grid' as const,
+    certificationsColumns: 2,
+    showSummaryHeading: true,
+    educationOrder: 'degree-school' as const,
+    workOrder: 'title-employer' as const,
+    workGroupPromotions: false,
+    applyAccentTo: ['headings', 'headingLine'],
+  };
+}
 
-  // Initialize scroll animations
-  useScrollAnimations();
+function buildResumeData(t: TemplateData): ResumeData {
+  return {
+    title: t.mainsection.name,
+    template: t.mainsection.id,
+    content: PREVIEW_CONTENT,
+    design: buildDesign(t),
+    activeSections: ['summary', 'experience', 'education', 'skills', 'languages', 'certifications', 'projects', 'awards', 'interests'],
+  };
+}
 
-  // Load templates from API
+// ─── TemplateCard ─────────────────────────────────────────────────────────────
+interface TemplateCardProps {
+  template: TemplateData;
+  selected: boolean;
+  creating: boolean;
+  onUse: (t: TemplateData) => void;
+  onPreview: (t: TemplateData) => void;
+}
+
+function TemplateCard({ template, selected, creating, onUse, onPreview }: TemplateCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.22);
+  const resumeData = buildResumeData(template);
+
   useEffect(() => {
-    const loadTemplates = async () => {
-      try {
-        console.log('Loading templates...');
-        setLoading(true);
-
-        // Load system templates
-        const templatesResponse = await fetch('/api/templates');
-        console.log('Templates API status:', templatesResponse.status);
-
-        if (templatesResponse.ok) {
-          const result = await templatesResponse.json();
-          console.log('Templates API result:', result);
-
-          if (result.success && result.data && Array.isArray(result.data.templates)) {
-            console.log('Setting templates:', result.data.templates.length);
-            setTemplates(result.data.templates);
-          } else {
-            console.error('Invalid templates response:', result);
-            setTemplates([]);
-          }
-        } else {
-          console.error('Templates API failed:', templatesResponse.statusText);
-          setTemplates([]);
-        }
-
-        // Load user templates
-        try {
-          const userTemplatesResponse = await fetch('/api/templates/user');
-          if (userTemplatesResponse.ok) {
-            const userResult = await userTemplatesResponse.json();
-            if (userResult.success && userResult.data && Array.isArray(userResult.data.templates)) {
-              setUserTemplates(userResult.data.templates);
-            }
-          }
-        } catch (userError) {
-          console.log('User templates not loaded (optional):', userError);
-        }
-
-      } catch (error) {
-        console.error('Error loading templates:', error);
-        setTemplates([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTemplates();
+    if (!cardRef.current) return;
+    const obs = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width;
+      if (w > 0) setScale(w / 794);
+    });
+    obs.observe(cardRef.current);
+    return () => obs.disconnect();
   }, []);
 
-  const categories = [
-    { id: 'all', name: 'All Templates', icon: Grid },
-    { id: 'professional', name: 'Professional', icon: Briefcase },
-    { id: 'creative', name: 'Creative', icon: Sparkles },
-    { id: 'executive', name: 'Executive', icon: Award },
-    { id: 'academic', name: 'Academic', icon: BookOpen },
-    { id: 'entry-level', name: 'Entry Level', icon: Target },
-    { id: 'user-uploaded', name: 'My Uploads', icon: Upload },
-  ];
+  return (
+    <div className="group flex flex-col gap-2">
+      {/* Card shell */}
+      <div
+        ref={cardRef}
+        className={`relative rounded-xl overflow-hidden bg-white cursor-pointer transition-all duration-200
+          hover:shadow-2xl hover:-translate-y-1
+          ${selected ? 'ring-2 ring-[#41017d] shadow-lg' : 'ring-1 ring-gray-200 shadow-sm'}`}
+        style={{ aspectRatio: '210/297' }}
+      >
+        {/* Scaled live preview */}
+        <div
+          style={{
+            width: '794px',
+            height: `${794 * (297 / 210)}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          <ResumePreview
+            data={resumeData}
+            numPages={1}
+            previewRef={previewRef}
+            zoomLevel={100}
+            isThumbnail={true}
+          />
+        </div>
 
-  // Convert templates to display format with useMemo
-  const displayTemplates: DisplayTemplate[] = useMemo(() => {
-    const systemTemplates = templates.map(convertToDisplayTemplate);
-    const userConvertedTemplates = userTemplates.map(convertUserTemplate);
-
-    return [...systemTemplates, ...userConvertedTemplates];
-  }, [templates, userTemplates]);
-
-  // Use fallback templates if no templates loaded
-  const finalDisplayTemplates = displayTemplates.length > 0
-    ? displayTemplates
-    : !loading
-      ? Array.from({ length: 12 }, (_, index) => ({
-        id: `fallback-${index + 1}`,
-        name: `Professional Template ${index + 1}`,
-        description: `Modern professional resume template with clean design and perfect layout`,
-        isPremium: index % 3 === 0,
-        subscription: index % 3 === 0 ? 'Premium' : 'Free',
-        primaryColor: '#7c3aed',
-        accentColor: '#5b21b6',
-        layout: index % 2 === 0 ? 'sidebar-left' : 'top-header',
-        fontFamily: 'Outfit',
-        category: ['professional', 'creative', 'executive', 'academic', 'entry-level'][index % 5],
-        isUserUploaded: false
-      }))
-      : [];
-
-  console.log('Display templates after conversion:', displayTemplates.length);
-  console.log('Number of display templates:', displayTemplates.length);
-
-  const filteredTemplates = selectedCategory === 'user-uploaded'
-    ? userTemplates.map(convertUserTemplate).filter(template => {
-      const matchesSearch = template.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        template.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
-    })
-    : finalDisplayTemplates.filter(template => {
-      if (selectedCategory !== 'all' && template.category !== selectedCategory) {
-        return false;
-      }
-      const matchesSearch = template.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        template.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
-    });
-
-  console.log('Filtered templates count:', filteredTemplates.length);
-  console.log('Using finalDisplayTemplates:', finalDisplayTemplates.length);
-
-  const applyTemplate = async (templateId: string) => {
-    // Persist locally and optionally update a resume if editing one
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('flowcv_selected_template', templateId);
-      const m = window.location.pathname.match(/\/resume\/([^/?]+)/);
-      const resumeId = m?.[1];
-      if (resumeId) {
-        try {
-          await fetch(`/api/resumes/${resumeId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ template: templateId }),
-          });
-          location.reload();
-        } catch {
-          // ignore
-        }
-      }
-    }
-  };
-  const handleUseTemplate = async (templateId: string) => {
-    try {
-      // Find the template from displayTemplates
-      const template = finalDisplayTemplates.find(t => t.id === templateId);
-
-      if (!template) {
-        console.error('Template not found:', templateId);
-        return;
-      }
-
-      console.log('Selected template:', template);
-
-      // Create design object from template with complete structure
-      const design = {
-        // Colors
-        primaryColor: template.primaryColor || '#7c3aed',
-        secondaryColor: template.accentColor || '#5b21b6',
-        accentColor: template.accentColor || '#5b21b6',
-        textColor: '#1e293b',
-        backgroundColor: '#ffffff',
-
-        // Font
-        fontFamily: template.fontFamily || 'Outfit',
-        fontCategory: 'sans',
-
-        // Spacing
-        fontSize: 10.5,
-        lineHeight: 1.45,
-        marginLR: 12,
-        marginTB: 16,
-        entrySpacing: 8,
-        sectionSpacing: 16,
-
-        // Layout
-        layout: template.layout || 'sidebar-left',
-
-        // Accent
-        accentType: 'basic',
-        applyAccentTo: ['headings', 'headingLine'],
-
-        // Headings
-        headingStyle: 'underline',
-        headingCapitalization: 'uppercase',
-        headingSize: 'm',
-        headingIconType: 'none',
-
-        // Entry layout
-        entryLayout: 'default',
-        entryColumnWidth: 'auto',
-        entryTitleSize: 'm',
-        entrySubtitleStyle: 'normal',
-        entrySubtitlePlacement: 'next-line',
-        descriptionIndent: false,
-        listStyle: 'bullet',
-
-        // Footer
-        showPageNumbers: true,
-        showEmailInFooter: false,
-        showNameInFooter: false,
-
-        // Link styling
-        linkUnderline: true,
-        linkBlueColor: false,
-        linkIcon: true,
-
-        // Personal details
-        personalAlign: 'left',
-        personalArrangement: 'default',
-        personalIconShow: true,
-        personalBulletShow: false,
-        personalBarShow: false,
-        personalIconStyle: 'default',
-
-        // Name
-        nameSize: 'm',
-        nameBold: true,
-        nameFontType: 'body',
-
-        // Professional title
-        titleSize: 'm',
-        titlePosition: 'below',
-        titleStyle: 'normal',
-
-        // Photo
-        photoShow: false,
-        photoGrayscale: false,
-        photoSize: 'm',
-        photoShape: 'circle',
-
-        // Component specific
-        skillsStyle: 'grid',
-        skillsColumns: 2,
-        languagesStyle: 'grid',
-        languagesColumns: 2,
-        interestsStyle: 'grid',
-        interestsColumns: 2,
-        certificationsStyle: 'grid',
-        certificationsColumns: 2,
-
-        // Summary
-        showSummaryHeading: true,
-
-        // Education / Work order
-        educationOrder: 'degree-school',
-        workOrder: 'title-employer',
-        workGroupPromotions: false,
-      };
-
-      console.log('Design object:', design);
-      console.log('=== SENDING TO CREATE API ===');
-      console.log('Template ID:', templateId);
-      console.log('Template primaryColor:', template.primaryColor);
-      console.log('Template accentColor:', template.accentColor);
-      console.log('Template layout:', template.layout);
-      console.log('Template fontFamily:', template.fontFamily);
-      console.log('Final design primaryColor:', design.primaryColor);
-      console.log('Final design secondaryColor:', design.secondaryColor);
-      console.log('Final design accentColor:', design.accentColor);
-      console.log('Final design layout:', design.layout);
-      console.log('Final design fontFamily:', design.fontFamily);
-
-      const requestBody = {
-        title: `${template.name} Resume`,
-        template: templateId,
-        design: design,
-        activeSections: ['summary', 'experience', 'education', 'skills', 'projects', 'awards', 'languages', 'certifications', 'interests'],
-        content: {
-          personalInfo: {
-            id: 'personal',
-            firstName: 'Alexandra',
-            lastName: 'Martinez',
-            fullName: 'Alexandra Martinez',
-            email: 'alex.martinez@email.com',
-            phone: '(555) 123-4567',
-            location: 'San Francisco, CA',
-            professionalTitle: 'Senior Product Manager',
-            summary: 'Results-driven Product Manager with 8+ years of experience leading cross-functional teams to deliver innovative SaaS solutions. Proven track record of increasing revenue by 150% through strategic product roadmap development and user-centric design. Expert in Agile methodologies, data analytics, and stakeholder management with strong technical background.',
-            linkedIn: 'linkedin.com/in/alexmartinez',
-            website: '',
-            photo: '',
-          },
-          experience: [
-            { id: generateExperienceId(), position: 'Senior Product Manager', company: 'TechCorp Inc.', location: 'San Francisco, CA', startDate: 'Jan 2021', endDate: 'Present', current: true, description: 'Led development of AI-powered analytics platform generating $12M ARR. Managed 15-person cross-functional team. Increased user retention by 45%.' },
-            { id: generateExperienceId(), position: 'Product Manager', company: 'StartupXYZ', location: 'San Francisco, CA', startDate: 'Jun 2018', endDate: 'Dec 2020', current: false, description: 'Launched MVP in 6 months, acquired 50,000 users. Implemented OKR framework improving team velocity by 30%.' },
-            { id: generateExperienceId(), position: 'Associate PM', company: 'Digital Solutions', location: 'Palo Alto, CA', startDate: 'Aug 2015', endDate: 'May 2018', current: false, description: 'Supported senior PMs on 3 concurrent projects serving 100K+ users. Created wireframes and PRDs.' },
-            { id: generateExperienceId(), position: 'Marketing Analyst', company: 'BrandCo', location: 'San Jose, CA', startDate: 'Jun 2013', endDate: 'Jul 2015', current: false, description: 'Conducted market research. Improved campaign ROI by 45% through data-driven strategies.' },
-            { id: generateExperienceId(), position: 'Business Analyst', company: 'Enterprise Corp', location: 'Oakland, CA', startDate: 'Jan 2013', endDate: 'May 2013', current: false, description: 'Assisted in strategic planning and market analysis projects.' },
-          ],
-          education: [
-            { id: generateEducationId(), school: 'Stanford University', degree: 'MBA, Product Management', field: 'Business Administration', location: 'Stanford, CA', graduationYear: '2017', description: '' },
-            { id: generateEducationId(), school: 'UC Berkeley', degree: 'BS Computer Science', field: 'Computer Science', location: 'Berkeley, CA', graduationYear: '2015', description: '' },
-          ],
-          skills: [
-            { id: generateSkillId(), name: 'Product Strategy' },
-            { id: generateSkillId(), name: 'Agile/Scrum' },
-            { id: generateSkillId(), name: 'Data Analytics' },
-            { id: generateSkillId(), name: 'SQL' },
-            { id: generateSkillId(), name: 'Python' },
-            { id: generateSkillId(), name: 'Figma' },
-            { id: generateSkillId(), name: 'JIRA' },
-            { id: generateSkillId(), name: 'A/B Testing' },
-            { id: generateSkillId(), name: 'User Research' },
-            { id: generateSkillId(), name: 'Roadmapping' },
-            { id: generateSkillId(), name: 'Competitive Analysis' },
-            { id: generateSkillId(), name: 'Team Leadership' },
-            { id: generateSkillId(), name: 'Project Management' },
-            { id: generateSkillId(), name: 'Data Visualization' },
-            { id: generateSkillId(), name: 'Machine Learning' },
-            { id: generateSkillId(), name: 'Cloud Computing' },
-            { id: generateSkillId(), name: 'API Design' },
-            { id: generateSkillId(), name: 'Customer Acquisition' },
-            { id: generateSkillId(), name: 'Growth Hacking' },
-          ],
-          languages: [
-            { id: generateLanguageId(), language: 'English', proficiency: 'Native' },
-            { id: generateLanguageId(), language: 'Spanish', proficiency: 'Fluent' },
-            { id: generateLanguageId(), language: 'French', proficiency: 'Intermediate' },
-          ],
-          certifications: [
-            { id: generateCertificationId(), name: 'PMP Certified', issuer: 'PMI', date: '2020', description: 'Project Management Professional' },
-            { id: generateCertificationId(), name: 'AWS Solutions Architect', issuer: 'Amazon', date: '2021', description: 'Cloud Architecture' },
-            { id: generateCertificationId(), name: 'Google Analytics', issuer: 'Google', date: '2019', description: 'Digital Analytics' },
-            { id: generateCertificationId(), name: 'Scrum Master', issuer: 'Scrum Alliance', date: '2018', description: 'Agile Methodology' },
-          ],
-          projects: [
-            { id: generateProjectId(), name: 'AI Analytics Dashboard', description: 'Built real-time analytics platform with ML predictions', technologies: ['React', 'Python', 'TensorFlow'] },
-            { id: generateProjectId(), name: 'Mobile App Launch', description: 'Led 0-to-1 mobile app reaching 100K downloads', technologies: ['React Native', 'Firebase'] },
-          ],
-          awards: [
-            { id: generateAwardId(), title: 'PM of the Year 2022', issuer: 'TechCorp', date: '2022', description: 'Outstanding product leadership' },
-            { id: generateAwardId(), title: 'Best Product Launch', issuer: 'StartupXYZ', date: '2021', description: 'Successful MVP delivery' },
-          ],
-          interests: [
-            { id: generateInterestId(), name: 'Technology' },
-            { id: generateInterestId(), name: 'Travel' },
-            { id: generateInterestId(), name: 'Photography' },
-            { id: generateInterestId(), name: 'Reading' },
-            { id: generateInterestId(), name: 'Hiking' },
-            { id: generateInterestId(), name: 'Cooking' },
-          ],
-        },
-      };
-
-      console.log('Request body:', requestBody);
-
-      const response = await fetch('/api/resumes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log('Response status:', response.status);
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Create response:', result);
-        if (result.success) {
-          window.location.href = `/resume/${result.data._id}`;
-        } else {
-          console.error('Create failed:', result);
-        }
-      } else {
-        console.error('Response not ok:', response.status);
-        const errorText = await response.text();
-        console.error('Error text:', errorText);
-      }
-    } catch (error) {
-      console.error('Error creating resume:', error);
-    }
-  };
-
-  const handleUploadTemplate = async () => {
-    if (!uploadFile) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('templateName', `Custom Template ${Date.now()}`);
-      formData.append('templateDescription', 'User uploaded custom template');
-      formData.append('isPremium', 'false');
-
-      const response = await fetch('/api/templates/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
-        const userTemplatesResponse = await fetch('/api/templates/user');
-        if (userTemplatesResponse.ok) {
-          const userResult = await userTemplatesResponse.json();
-          if (userResult.success && userResult.data) {
-            setUserTemplates(userResult.data.templates || []);
-          }
-        }
-        setUploadFile(null);
-        setShowUploadModal(false);
-        alert('Template uploaded successfully!');
-      } else {
-        alert(result.error || 'Failed to upload template');
-      }
-    } catch (error) {
-      console.error('Error uploading template:', error);
-      alert('Upload failed. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--app-bg)' }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent mx-auto mb-4"></div>
-          <p style={{ color: 'var(--app-text)' }}>Loading templates...</p>
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+          <button
+            onClick={(e) => { e.stopPropagation(); onUse(template); }}
+            disabled={creating}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg transition-all disabled:opacity-60 flex items-center gap-1.5"
+            style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
+          >
+            {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+            Use Template
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onPreview(template); }}
+            className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-gray-700 shadow-lg transition-all"
+            title="Preview"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
         </div>
       </div>
-    );
-  }
 
-  // Debug: Show template count
-  console.log('Total templates loaded:', templates.length);
-  console.log('Sample template:', templates[0]);
+      {/* Name */}
+      <p className="text-xs font-semibold text-gray-600 text-center truncate px-1 group-hover:text-gray-900 transition-colors">
+        {template.mainsection.name}
+      </p>
+    </div>
+  );
+}
 
-  // Main component return
+// ─── PreviewModal ─────────────────────────────────────────────────────────────
+interface PreviewModalProps {
+  template: TemplateData;
+  creating: boolean;
+  onUse: (t: TemplateData) => void;
+  onClose: () => void;
+}
+
+function PreviewModal({ template, creating, onUse, onClose }: PreviewModalProps) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const resumeData = buildResumeData(template);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  // Prevent body scroll
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
   return (
-    <div className="min-h-screen transition-colors duration-500" style={{ backgroundColor: 'var(--app-bg)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl overflow-hidden"
+        style={{ maxHeight: '95vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{template.mainsection.name}</h2>
+            {template.mainsection.description && (
+              <p className="text-xs text-gray-500 mt-0.5">{template.mainsection.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => onUse(template)}
+              disabled={creating}
+              className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all disabled:opacity-60 flex items-center gap-2 hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
+            >
+              {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+              Use This Template
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body — scrollable, centered A4 preview */}
+        <div className="flex-1 overflow-auto bg-[#f1f5f9] flex justify-center py-8 px-4">
+          <div
+            style={{
+              width: '794px',
+              transform: 'scale(0.68)',
+              transformOrigin: 'top center',
+              marginBottom: 'calc((0.68 - 1) * 1122px)',
+            }}
+          >
+            <ResumePreview
+              data={resumeData}
+              numPages={1}
+              previewRef={previewRef}
+              zoomLevel={100}
+              isThumbnail={false}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
+          <p className="text-xs text-gray-400">Click &ldquo;Use This Template&rdquo; to start editing with your own content.</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              Close
+            </button>
+            <button
+              onClick={() => onUse(template)}
+              disabled={creating}
+              className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all disabled:opacity-60 flex items-center gap-2 hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
+            >
+              {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+              Use This Template
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CategorySection ──────────────────────────────────────────────────────────
+interface CategorySectionProps {
+  label: string;
+  desc: string;
+  templates: TemplateData[];
+  selectedId: string | null;
+  creatingId: string | null;
+  onUse: (t: TemplateData) => void;
+  onPreview: (t: TemplateData) => void;
+}
+
+function CategorySection({ label, desc, templates, selectedId, creatingId, onUse, onPreview }: CategorySectionProps) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? templates : templates.slice(0, 6);
+
+  return (
+    <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-8 pt-8 pb-2">
+        <h2 className="text-xl font-bold text-gray-900 mb-1">{label}</h2>
+        <p className="text-sm text-gray-500 max-w-2xl">{desc}</p>
+      </div>
+
+      <div className="px-8 pb-8 pt-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-6">
+          {visible.map((t) => (
+            <TemplateCard
+              key={t.mainsection.id}
+              template={t}
+              selected={selectedId === t.mainsection.id}
+              creating={creatingId === t.mainsection.id}
+              onUse={onUse}
+              onPreview={onPreview}
+            />
+          ))}
+        </div>
+
+        {templates.length > 6 && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all"
+            >
+              {showAll ? 'Show Less' : `See More`}
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAll ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+export default function TemplatesPage() {
+  const router = useRouter();
+  const [templates, setTemplates] = useState<TemplateData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<TemplateData | null>(null);
+
+  useEffect(() => {
+    fetch('/api/templates')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) setTemplates(json.data?.templates || []);
+        else setError('Failed to load templates.');
+      })
+      .catch(() => setError('Failed to load templates.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleUseTemplate = useCallback(async (template: TemplateData) => {
+    setSelectedId(template.mainsection.id);
+    setCreatingId(template.mainsection.id);
+    try {
+      const res = await fetch('/api/resumes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${template.mainsection.name} Resume`,
+          template: template.mainsection.id,
+          design: buildDesign(template),
+          content: PREVIEW_CONTENT,
+          activeSections: ['summary', 'experience', 'education', 'skills', 'languages', 'certifications', 'projects', 'awards', 'interests'],
+        }),
+      });
+      const data = await res.json();
+      const id = data.data?._id || data.resume?._id;
+      if (id) router.push(`/resume/${id}`);
+    } finally {
+      setCreatingId(null);
+    }
+  }, [router]);
+
+  // Group templates by category, filtered by search + active category
+  const grouped = (() => {
+    const q = search.toLowerCase();
+    const filtered = templates.filter((t) => {
+      const matchesSearch = !q || t.mainsection.name.toLowerCase().includes(q);
+      const cat = categorize(t);
+      const matchesCat = !activeCategory || cat === activeCategory;
+      return matchesSearch && matchesCat;
+    });
+    const map: Record<string, TemplateData[]> = {};
+    for (const t of filtered) {
+      const cat = categorize(t);
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(t);
+    }
+    return map;
+  })();
+
+  const totalVisible = Object.values(grouped).reduce((s, a) => s + a.length, 0);
+
+  return (
+    <div className="min-h-screen bg-[#f4f6f8]">
       <TemplatesHeader />
 
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="glass-card w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold" style={{ color: 'var(--app-text)' }}>
-                Upload Template
-              </h3>
+      {/* Hero / Search */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Resume Templates</h1>
+          <p className="text-gray-500 mb-8 max-w-xl mx-auto text-sm">
+            {templates.length > 0 ? `${templates.length} professionally designed templates` : 'Professionally designed templates'} — pick one and start editing instantly.
+          </p>
+
+          {/* Search */}
+          <div className="relative max-w-md mx-auto mb-6">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search templates..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent"
+              style={{ '--tw-ring-color': '#41017d' } as any}
+            />
+          </div>
+
+          {/* Category pills */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                activeCategory === null
+                  ? 'text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={activeCategory === null ? { background: 'linear-gradient(135deg, #41017d, #ee14ff)' } : {}}
+            >
+              All Templates
+            </button>
+            {CATEGORIES.map((c) => (
               <button
-                onClick={() => setShowUploadModal(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                style={{ color: 'var(--app-text)' }}
+                key={c.id}
+                onClick={() => setActiveCategory(activeCategory === c.id ? null : c.id)}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                  activeCategory === c.id
+                    ? 'text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                style={activeCategory === c.id ? { background: 'linear-gradient(135deg, #41017d, #ee14ff)' } : {}}
               >
-                <X className="h-5 w-5" />
+                {c.label.replace(' Resume Templates', '')}
               </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--app-text)' }}>
-                  Template File (JSON)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*,.json"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className="w-full p-3 border rounded-lg"
-                  style={{
-                    borderColor: 'var(--app-border)',
-                    backgroundColor: 'var(--app-bg)',
-                    color: 'var(--app-text)'
-                  }}
-                />
-                <p className="text-xs text-gray-500 mt-1">Supports PNG, JPG, or JSON files</p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleUploadTemplate}
-                  disabled={!uploadFile || uploading}
-                  className="flex-1 btn-primary py-3 disabled:opacity-50"
-                >
-                  {uploading ? 'Uploading...' : 'Upload Template'}
-                </button>
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="px-6 py-3 rounded-lg border transition-colors hover:bg-gray-100"
-                  style={{
-                    borderColor: 'var(--app-border)',
-                    color: 'var(--app-text)'
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+      </div>
 
-      <main>
-        {/* Hero Section */}
-        <section className="relative py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-          {/* Animated Background */}
-          <div className="absolute inset-0">
-            <div
-              className="absolute inset-0 opacity-10"
-              style={{
-                background: `linear-gradient(135deg, var(--app-primary) 0%, var(--app-secondary) 100%)`,
-              }}
+      {/* Main content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        {loading && (
+          <div className="flex items-center justify-center py-32">
+            <Loader2 className="w-8 h-8 animate-spin text-[#41017d]" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-32 text-red-500 font-medium">{error}</div>
+        )}
+
+        {!loading && !error && totalVisible === 0 && (
+          <div className="text-center py-32 text-gray-400">
+            <p className="text-lg font-medium mb-2">No templates found</p>
+            <p className="text-sm">Try a different search term or category.</p>
+          </div>
+        )}
+
+        {!loading && !error && CATEGORIES.map((cat) => {
+          const list = grouped[cat.id];
+          if (!list || list.length === 0) return null;
+          return (
+            <CategorySection
+              key={cat.id}
+              label={cat.label}
+              desc={cat.desc}
+              templates={list}
+              selectedId={selectedId}
+              creatingId={creatingId}
+              onUse={handleUseTemplate}
+              onPreview={setPreviewTemplate}
             />
-            <div className="absolute top-20 left-10 w-32 h-32 rounded-full opacity-20 animate-float"
-              style={{ backgroundColor: 'var(--app-primary)' }} />
-            <div className="absolute top-40 right-20 w-24 h-24 rounded-full opacity-20 animate-float"
-              style={{ backgroundColor: 'var(--app-secondary)', animationDelay: '1s' }} />
-            <div className="absolute bottom-20 left-1/4 w-16 h-16 rounded-full opacity-20 animate-float"
-              style={{ backgroundColor: 'var(--app-primary)', animationDelay: '0.5s' }} />
-          </div>
-
-          {/* Hero Content */}
-          <div className="relative z-10 text-center">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 gradient-text">
-              Professional Resume Templates
-            </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto opacity-90"
-              style={{ color: 'var(--app-text-secondary)' }}>
-              Choose from {finalDisplayTemplates.length} expertly designed templates or upload your own custom designs
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-8 py-4 rounded-2xl btn-primary text-lg font-semibold"
-              >
-                <Upload className="h-5 w-5" />
-                Upload Template
-              </button>
-              <Link href="#templates"
-                className="flex items-center gap-2 px-8 py-4 rounded-2xl border-2 text-lg font-semibold transition-all hover:scale-105"
-                style={{
-                  borderColor: 'var(--app-primary)',
-                  color: 'var(--app-primary)'
-                }}>
-                Browse Templates
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Templates Section */}
-        <section id="templates" className="py-20 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Search and Filter Bar */}
-            <div className="mb-12 flex flex-col lg:flex-row gap-6 items-center justify-between">
-              <div className="flex-1 max-w-md">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5"
-                    style={{ color: 'var(--app-text-muted)' }} />
-                  <input
-                    type="text"
-                    placeholder="Search templates..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 rounded-2xl border transition-all focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    style={{
-                      borderColor: 'var(--app-border)',
-                      backgroundColor: 'var(--app-bg)',
-                      color: 'var(--app-text)'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {/* Category Filter */}
-                <div className="hidden md:flex items-center gap-2 p-1 rounded-xl border"
-                  style={{ borderColor: 'var(--app-border)' }}>
-                  {categories.map((category) => (
-                    <button
-                      key={category.id}
-                      onClick={() => setSelectedCategory(category.id)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium ${selectedCategory === category.id ? 'shadow-md' : 'hover:bg-gray-50'
-                        }`}
-                      style={{
-                        backgroundColor: selectedCategory === category.id ? 'var(--app-primary)' : 'transparent',
-                        color: selectedCategory === category.id ? 'white' : 'var(--app-text)'
-                      }}
-                    >
-                      <category.icon className="h-4 w-4" />
-                      <span className="hidden sm:inline">{category.name}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 p-1 rounded-lg border"
-                  style={{ borderColor: 'var(--app-border)' }}>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'shadow-sm' : 'hover:bg-gray-50'
-                      }`}
-                    style={{
-                      backgroundColor: viewMode === 'grid' ? 'var(--app-primary)' : 'transparent',
-                      color: viewMode === 'grid' ? 'white' : 'var(--app-text)'
-                    }}
-                  >
-                    <Grid className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'shadow-sm' : 'hover:bg-gray-50'
-                      }`}
-                    style={{
-                      backgroundColor: viewMode === 'list' ? 'var(--app-primary)' : 'transparent',
-                      color: viewMode === 'list' ? 'white' : 'var(--app-text)'
-                    }}
-                  >
-                    <List className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Templates Grid/List */}
-            <div>
-              {filteredTemplates.length > 0 ? (
-                viewMode === 'grid' ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {filteredTemplates.map((template, index) => (
-                      <div key={template.id || index}
-                        className="group transition-all duration-700"
-                        style={{
-                          animationDelay: `${index * 100}ms`,
-                          opacity: 1,
-                          transform: 'translateY(0)'
-                        }}>
-                        <div className="glass-card overflow-hidden hover:scale-105 transition-all duration-500 hover:shadow-2xl">
-                          {/* Template Preview */}
-                          <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
-                            <div className="absolute inset-0 flex items-center justify-center p-0 m-0">
-                              {template.isUserUploaded && (template as any).thumbnail ? (
-                                <ImageTemplatePreview 
-                                  imageUrl={(template as any).thumbnail}
-                                  className="w-full h-full"
-                                />
-                              ) : (
-                                <ResumeThumbnail 
-                                  data={{
-                                    title: template.name || 'Resume',
-                                    template: template.id || 'template-1',
-                                    content: {
-                                      personalInfo: {
-                                        fullName: 'Alexandra Martinez',
-                                        email: 'alex.martinez@email.com',
-                                        phone: '(555) 123-4567',
-                                        location: 'San Francisco, CA',
-                                        professionalTitle: 'Senior Product Manager',
-                                        summary: 'Results-driven Product Manager with 8+ years of experience leading cross-functional teams to deliver innovative SaaS solutions.',
-                                      },
-                                      experience: [
-                                        {
-                                          position: 'Senior Product Manager',
-                                          company: 'TechCorp Inc.',
-                                          startDate: 'Jan 2021',
-                                          endDate: 'Present',
-                                          description: 'Led development of AI-powered analytics platform generating $12M ARR.'
-                                        }
-                                      ],
-                                      education: [
-                                        {
-                                          school: 'Stanford University',
-                                          degree: 'MBA',
-                                          field: 'Business Administration',
-                                          graduationYear: '2017'
-                                        }
-                                      ],
-                                      skills: ['Product Strategy', 'Agile/Scrum', 'Data Analytics', 'SQL', 'Figma'],
-                                    },
-                                    design: {
-                                      primaryColor: template.primaryColor || '#7c3aed',
-                                      secondaryColor: template.accentColor || template.secondaryColor || '#f5f3ff',
-                                      accentColor: template.accentColor || '#5b21b6',
-                                      fontFamily: template.fontFamily || 'Inter',
-                                      layout: template.layout || 'sidebar-left',
-                                      fontSize: 10.5,
-                                      lineHeight: 1.45,
-                                      marginLR: 0,
-                                      marginTB: 0,
-                                      textColor: '#1f2937',
-                                      backgroundColor: '#ffffff',
-                                      entrySpacing: 8,
-                                      sectionSpacing: 16,
-                                      headingStyle: 'underline',
-                                      headingCapitalization: 'uppercase',
-                                      headingSize: 'm',
-                                      showSummaryHeading: true,
-                                      accentType: 'basic',
-                                      applyAccentTo: ['headings', 'headingLine'],
-                                    },
-                                    activeSections: ['summary', 'experience', 'education', 'skills']
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Decorative Bottom Border */}
-                          <div className="absolute bottom-0 left-0 right-0 h-1.5"
-                            style={{ background: `linear-gradient(90deg, ${template.primaryColor || '#41017d'}, ${template.accentColor || '#ee14ff'})` }}>
-                          </div>
-
-                          {/* Overlay Badges */}
-                          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1 shadow-md">
-                            <span className="text-[9px] font-semibold" style={{ color: template.primaryColor }}>{template.category}</span>
-                          </div>
-                          {template.isPremium && (
-                            <div className="absolute top-3 left-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 rounded-full px-3 py-1 shadow-md">
-                              <span className="text-[9px] font-bold">PRO</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Template Info */}
-                        <div className="p-6">
-                          <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>
-                            {template.name || 'Template Name'}
-                          </h3>
-                            <p className="text-sm mb-4 line-clamp-2" style={{ color: 'var(--app-text-secondary)' }}>
-                              {template.description || 'Template description'}
-                            </p>
-
-                            <div className="flex flex-wrap gap-2 mb-4">
-                              <span className="text-xs px-2 py-1 rounded-full"
-                                style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                {template.layout || 'sidebar-left'}
-                              </span>
-                              <span className="text-xs px-2 py-1 rounded-full"
-                                style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                {template.fontFamily || 'Outfit'}
-                              </span>
-                              <span className="text-xs px-2 py-1 rounded-full"
-                                style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                {template.subscription || 'Free'}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-4 text-sm">
-                                <div className="flex items-center gap-1">
-                                  <Users className="h-4 w-4" style={{ color: 'var(--app-primary)' }} />
-                                  <span style={{ color: 'var(--app-text-secondary)' }}>12K+</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                  <span style={{ color: 'var(--app-text)' }}>4.8</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-3">
-            <button
-              onClick={() => handleUseTemplate(template.id)}
-              className="flex-1 btn-primary text-center py-3"
-            >
-              Apply Template
-            </button>
-                              <button
-                                onClick={() => {
-                                  setPreviewTemplate(template);
-                                  setShowPreviewModal(true);
-                                }}
-                                className="p-3 rounded-xl border transition-all duration-300 hover:scale-110"
-                                style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
-                                <Eye className="h-5 w-5" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                    ))}
-                  </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {filteredTemplates.map((template, index) => (
-                        <div key={template.id || index} className="glass-card p-6 hover:scale-[1.02] transition-all duration-500"
-                          style={{ animationDelay: `${index * 100}ms` }}>
-                          <div className="flex flex-col lg:flex-row gap-6">
-                            {/* Template Preview */}
-                            <div className="lg:w-1/4">
-                              <div className="aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center">
-                                {template.isUserUploaded && (template as any).thumbnail ? (
-                                  <ImageTemplatePreview 
-                                    imageUrl={(template as any).thumbnail}
-                                    className="w-full h-full"
-                                  />
-                                ) : (
-                                  <ResumeThumbnail 
-                                    data={{
-                                      title: template.name || 'Resume',
-                                      template: template.id || 'template-1',
-                                      content: {
-                                        personalInfo: {
-                                          fullName: 'Alexandra Martinez',
-                                          email: 'alex.martinez@email.com',
-                                          phone: '(555) 123-4567',
-                                          location: 'San Francisco, CA',
-                                          professionalTitle: 'Senior Product Manager',
-                                          summary: 'Results-driven Product Manager with 8+ years of experience.',
-                                        },
-                                        experience: [
-                                          {
-                                            position: 'Senior Product Manager',
-                                            company: 'TechCorp Inc.',
-                                            startDate: 'Jan 2021',
-                                            endDate: 'Present',
-                                            description: 'Led development of AI-powered analytics platform.'
-                                          }
-                                        ],
-                                        education: [
-                                          {
-                                            school: 'Stanford University',
-                                            degree: 'MBA',
-                                            field: 'Business Administration',
-                                            graduationYear: '2017'
-                                          }
-                                        ],
-                                        skills: ['Product Strategy', 'Agile/Scrum', 'Data Analytics', 'SQL', 'Figma'],
-                                      },
-                                      design: {
-                                        primaryColor: template.primaryColor || '#7c3aed',
-                                        secondaryColor: template.accentColor || template.secondaryColor || '#f5f3ff',
-                                        accentColor: template.accentColor || '#5b21b6',
-                                        fontFamily: template.fontFamily || 'Inter',
-                                        layout: template.layout || 'sidebar-left',
-                                        fontSize: 10.5,
-                                        lineHeight: 1.45,
-                                        marginLR: 0,
-                                        marginTB: 0,
-                                        textColor: '#1f2937',
-                                        backgroundColor: '#ffffff',
-                                        entrySpacing: 8,
-                                        sectionSpacing: 16,
-                                        headingStyle: 'underline',
-                                        headingCapitalization: 'uppercase',
-                                        headingSize: 'm',
-                                        showSummaryHeading: true,
-                                        accentType: 'basic',
-                                        applyAccentTo: ['headings', 'headingLine'],
-                                      },
-                                      activeSections: ['summary', 'experience', 'education', 'skills']
-                                    }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Template Info */}
-                            <div className="lg:w-3/4 flex flex-col justify-between">
-                              <div>
-                                <h3 className="text-2xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>
-                                  {template.name || 'Template Name'}
-                                </h3>
-                                <p className="text-base mb-4" style={{ color: 'var(--app-text-secondary)' }}>
-                                  {template.description || 'Template description'}
-                                </p>
-
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                  <span className="text-xs px-3 py-1 rounded-full"
-                                    style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                    {template.layout || 'sidebar-left'}
-                                  </span>
-                                  <span className="text-xs px-3 py-1 rounded-full"
-                                    style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                    {template.fontFamily || 'Outfit'}
-                                  </span>
-                                  <span className="text-xs px-3 py-1 rounded-full"
-                                    style={{ backgroundColor: 'var(--app-bg-gray)', color: 'var(--app-primary)' }}>
-                                    {template.subscription || 'Free'}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-6 text-sm">
-                                  <div className="flex items-center gap-1">
-                                    <Users className="h-4 w-4" style={{ color: 'var(--app-primary)' }} />
-                                    <span style={{ color: 'var(--app-text-secondary)' }}>12K+ users</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span style={{ color: 'var(--app-text)' }}>4.8 rating</span>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <Download className="h-4 w-4" style={{ color: 'var(--app-primary)' }} />
-                                    <span style={{ color: 'var(--app-text-secondary)' }}>8.3K downloads</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                                <button
-                                  onClick={() => applyTemplate(template.id)}
-                                  className="btn-primary px-6 py-3"
-                                >
-                                  Apply Template
-                                </button>
-                                <TemplateLivePreview template={template} />
-                                <button
-                                  onClick={() => {
-                                    setPreviewTemplate(template);
-                                    setShowPreviewModal(true);
-                                  }}
-                                  className="p-3 rounded-xl border transition-all duration-300 hover:scale-110"
-                                  style={{ borderColor: 'var(--app-border)', color: 'var(--app-text)' }}>
-                                  <Eye className="h-5 w-5" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-              ) : (
-                <div className="text-center py-16">
-                  <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center"
-                    style={{ backgroundColor: 'var(--app-bg-gray)' }}>
-                    <Search className="h-10 w-10" style={{ color: 'var(--app-text-muted)' }} />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--app-text)' }}>
-                    No templates found
-                  </h3>
-                  <p style={{ color: 'var(--app-text-secondary)' }}>
-                    Try adjusting your search or filter criteria
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      </main>
+          );
+        })}
+      </div>
 
       {/* Preview Modal */}
-      {showPreviewModal && previewTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.8)' }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowPreviewModal(false);
-            }
-          }}>
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-auto rounded-2xl shadow-2xl"
-            style={{ background: isDark ? '#0f172a' : '#ffffff' }}
-            onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b"
-              style={{
-                background: isDark ? '#0f172a' : '#ffffff',
-                borderColor: isDark ? '#334155' : '#e2e8f0'
-              }}>
-              <div>
-                <h2 className="text-xl font-bold" style={{ color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  {previewTemplate.name}
-                </h2>
-                <p className="text-sm" style={{ color: isDark ? '#94a3b8' : '#64748b' }}>
-                  {previewTemplate.description}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => applyTemplate(previewTemplate.id)}
-                  className="btn-primary px-6 py-2 text-nowrap"
-                >
-                  Apply Template
-                </button>
-                <button
-                  onClick={() => setShowPreviewModal(false)}
-                  className="p-2 rounded-xl border transition-all hover:scale-110"
-                  style={{
-                    borderColor: isDark ? '#334155' : '#e2e8f0',
-                    color: isDark ? '#f1f5f9' : '#1e293b'
-                  }}
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Full Resume Preview */}
-            <div className="p-8">
-              <div className="flex justify-center overflow-auto">
-                {previewTemplate.isUserUploaded && (previewTemplate as any).thumbnail ? (
-                  <div className="relative">
-                    <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden"
-                      style={{
-                        width: '210mm',
-                        maxWidth: '100%',
-                        aspectRatio: '210/297',
-                      }}>
-                      <img
-                        src={(previewTemplate as any).thumbnail}
-                        alt={previewTemplate.name || 'Template Preview'}
-                        className="w-full h-full object-contain"
-                        style={{ display: 'block' }}
-                      />
-                    </div>
-                    <div className="absolute -inset-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg -z-10 opacity-20 blur-sm" />
-                  </div>
-                ) : (
-                  <A4ResumePreview 
-                    data={{
-                      title: previewTemplate.name || 'Resume',
-                      template: previewTemplate.id || 'template-1',
-                      content: {
-                        personalInfo: {
-                          fullName: 'Alexandra Martinez',
-                          email: 'alex.martinez@email.com',
-                          phone: '(555) 123-4567',
-                          location: 'San Francisco, CA',
-                          professionalTitle: 'Senior Product Manager',
-                          summary: 'Results-driven Product Manager with 8+ years of experience leading cross-functional teams to deliver innovative SaaS solutions. Proven track record of increasing revenue by 150% through strategic product roadmap development and user-centric design.',
-                        },
-                        experience: [
-                          { position: 'Senior Product Manager', company: 'TechCorp Inc.', startDate: 'Jan 2021', endDate: 'Present', description: 'Led development of AI-powered analytics platform generating $12M ARR. Managed 15-person cross-functional team. Increased user retention by 45%.' },
-                          { position: 'Product Manager', company: 'StartupXYZ', startDate: 'Jun 2018', endDate: 'Dec 2020', description: 'Launched MVP in 6 months, acquired 50,000 users. Implemented OKR framework improving team velocity by 30%.' },
-                          { position: 'Associate PM', company: 'Digital Solutions', startDate: 'Aug 2015', endDate: 'May 2018', description: 'Supported senior PMs on 3 concurrent projects serving 100K+ users.' },
-                        ],
-                        education: [
-                          { school: 'Stanford University', degree: 'MBA, Product Management', field: 'Business', graduationYear: '2017' },
-                          { school: 'UC Berkeley', degree: 'BS Computer Science', field: 'Computer Science', graduationYear: '2015' },
-                        ],
-                        skills: ['Product Strategy', 'Agile/Scrum', 'Data Analytics', 'SQL', 'Python', 'Figma', 'JIRA', 'A/B Testing', 'User Research', 'Roadmapping'],
-                        languages: [
-                          { language: 'English', proficiency: 'Native' },
-                          { language: 'Spanish', proficiency: 'Fluent' },
-                        ],
-                        certifications: [
-                          { name: 'PMP Certified', issuer: 'PMI', date: '2020' },
-                          { name: 'AWS Solutions Architect', issuer: 'Amazon', date: '2021' },
-                        ],
-                      },
-                      design: {
-                        primaryColor: previewTemplate.primaryColor || '#7c3aed',
-                        secondaryColor: previewTemplate.accentColor || '#f5f3ff',
-                        accentColor: previewTemplate.accentColor || '#5b21b6',
-                        fontFamily: previewTemplate.fontFamily || 'Inter',
-                        layout: previewTemplate.layout || 'sidebar-left',
-                        fontSize: 10.5,
-                        lineHeight: 1.45,
-                        marginLR: 0,
-                        marginTB: 0,
-                        textColor: '#1f2937',
-                        backgroundColor: '#ffffff',
-                        entrySpacing: 8,
-                        sectionSpacing: 16,
-                        headingStyle: 'underline',
-                        headingCapitalization: 'uppercase',
-                        headingSize: 'm',
-                        showSummaryHeading: true,
-                        accentType: 'basic',
-                        applyAccentTo: ['headings', 'headingLine'],
-                      },
-                      activeSections: ['summary', 'experience', 'education', 'skills']
-                    }}
-                    showShadow={true}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {previewTemplate && (
+        <PreviewModal
+          template={previewTemplate}
+          creating={creatingId === previewTemplate.mainsection.id}
+          onUse={handleUseTemplate}
+          onClose={() => setPreviewTemplate(null)}
+        />
       )}
     </div>
   );

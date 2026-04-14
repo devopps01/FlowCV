@@ -12,6 +12,7 @@ import {
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Input } from '@/components/ui/input';
 import toast from 'react-hot-toast';
+import { AppSidebar } from '@/components/layout/AppSidebar';
 
 interface Job {
   id: string;
@@ -242,72 +243,23 @@ export default function JobTrackerPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--app-primary)' }} />
       </div>
     );
   }
 
-  const sidebarLinks = [
-    { name: 'Resume', icon: FileText, href: '/dashboard' },
-    { name: 'Cover Letter', icon: Mail, href: '/cover-letters' },
-    { name: 'Job Tracker', icon: Target, href: '/job-tracker', active: true },
-    { name: 'More', icon: Plus, href: '#' },
-  ];
-
   return (
-    <div className="flex min-h-screen bg-[#fdfcfb]">
-      {/* Sidebar */}
-      <aside className="w-64 flex flex-col fixed inset-y-0 border-r border-gray-100 bg-white/50 backdrop-blur-md z-20">
-        <div className="p-6">
-          <Link href="/" className="flex items-center gap-2 mb-10">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff4d7d]">
-              <FileText className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight">flowcv</span>
-          </Link>
-          <nav className="space-y-1">
-            {sidebarLinks.map((link) => (
-              <Link
-                key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all ${
-                  link.active 
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-100' 
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
-                }`}
-              >
-                <link.icon className={`h-5 w-5 ${link.active ? 'text-[#ff4d7d]' : 'text-gray-400'}`} />
-                {link.name}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="mt-auto p-6 space-y-1 border-t border-gray-50">
-          <Link href="/pricing" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <CreditCard className="h-5 w-5 text-gray-400" />
-            Plans & Pricing
-          </Link>
-          <Link href="#" className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <GraduationCap className="h-5 w-5 text-gray-400" />
-            Student Benefits
-          </Link>
-          <button className="flex w-full items-center gap-3 px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-white/50 rounded-xl transition-all">
-            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
-              <User className="h-4 w-4 text-gray-400" />
-            </div>
-            My account
-          </button>
-        </div>
-      </aside>
+    <div className="flex min-h-screen" style={{ background: 'var(--app-bg-gray)' }}>
+      <AppSidebar />
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-12">
+      <main className="flex-1 ml-64 p-10">
         <div className="max-w-full">
-          <div className="mb-10 flex items-center justify-between">
+          <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Job Tracker</h1>
-              <p className="text-gray-500 mt-2">Track and manage all your job applications in one place.</p>
+              <h1 className="text-3xl font-black" style={{ color: 'var(--app-text)' }}>Job Tracker</h1>
+              <p className="text-sm mt-1" style={{ color: 'var(--app-text-secondary)' }}>Track and manage all your job applications in one place.</p>
             </div>
             {saving && (
               <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100 animate-in fade-in zoom-in duration-300">
@@ -373,13 +325,18 @@ export default function JobTrackerPage() {
                         {column.jobs.map((job, index) => (
                           <Draggable key={job.id} draggableId={job.id} index={index}>
                             {(provided, snapshot) => (
-                              <div
+                <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`bg-white p-5 rounded-xl border border-gray-100 shadow-sm mb-3 group hover:shadow-md transition-all ${
-                                  snapshot.isDragging ? 'rotate-2 shadow-xl border-[#ff4d7d]' : ''
+                                className={`p-4 rounded-xl border mb-3 group transition-all ${
+                                  snapshot.isDragging ? 'rotate-1 shadow-xl' : 'hover:shadow-md'
                                 }`}
+                                style={{
+                                  background: 'var(--app-bg-card)',
+                                  borderColor: snapshot.isDragging ? 'var(--app-primary)' : 'var(--app-border)',
+                                  boxShadow: snapshot.isDragging ? 'var(--app-shadow-lg)' : 'var(--app-shadow)',
+                                }}
                               >
                                 <div className="flex items-start justify-between mb-4">
                                   <div className="cursor-pointer flex-1" onClick={() => editCard(column.id, job)}>
@@ -459,10 +416,13 @@ export default function JobTrackerPage() {
             className="absolute inset-0 bg-[#1a1a1a]/40 backdrop-blur-sm" 
             onClick={() => setModal({ isOpen: false, type: null })} 
           />
-          <div className="relative w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div
+            className="relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300"
+            style={{ background: 'var(--app-bg-card)' }}
+          >
             <div className="p-10">
               <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                <h2 className="text-xl font-black tracking-tight" style={{ color: 'var(--app-text)' }}>
                   {modal.type === 'add-column' && 'Add Column'}
                   {modal.type === 'edit-column' && 'Edit Column Title'}
                   {modal.type === 'add-job' && 'Add Job Application'}

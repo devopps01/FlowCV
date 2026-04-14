@@ -190,10 +190,12 @@ export function useTheme() {
       const themeColors = shouldBeDark ? darkTheme : lightTheme;
       updateThemeVariables(themeColors);
       
-      // Update body class
+      // Update html + body class for CSS variable scoping
       if (shouldBeDark) {
+        document.documentElement.classList.add('dark');
         document.body.classList.add('dark');
       } else {
+        document.documentElement.classList.remove('dark');
         document.body.classList.remove('dark');
       }
     };

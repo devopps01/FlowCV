@@ -47,6 +47,7 @@ export interface IPersonalInfo {
   summary: string;
   linkedIn: string;
   website: string;
+  image: string;
   photo: string;
 }
 
@@ -249,6 +250,7 @@ const ResumeSchema = new Schema({
       summary: { type: String, default: '' },
       linkedIn: { type: String, default: '' },
       website: { type: String, default: '' },
+      image: { type: String, default: '' },
       photo: { type: String, default: '' },
     },
     experience: [Schema.Types.Mixed],

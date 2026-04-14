@@ -64,7 +64,7 @@ export default function AboutPage() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-20 bg-primary-600">
+        <section className="py-20" style={{ backgroundColor: 'var(--app-primary)' }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
               <div>

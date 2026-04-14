@@ -17,6 +17,7 @@ export const personalInfoSchema = z.object({
   lastName: z.string().optional(),
   linkedIn: z.string().optional(),
   website: z.string().optional(),
+  image: z.string().optional(),
   photo: z.string().optional(),
 });
 

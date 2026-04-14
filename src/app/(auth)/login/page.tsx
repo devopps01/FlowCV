@@ -80,7 +80,7 @@ function LoginForm() {
   if (status === 'authenticated') {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#41017d]" />
       </div>
     );
   }
