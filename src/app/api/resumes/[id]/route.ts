@@ -63,7 +63,7 @@ export async function PUT(
 
     await connectDB();
 
-    const { title, template, content, design, activeSections, elements, canvasData } = body;
+    const { title, template, content, design, activeSections, elements, canvasData, previewImage } = body;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -76,6 +76,7 @@ export async function PUT(
     if (activeSections !== undefined) updateData.activeSections = activeSections;
     if (elements !== undefined) updateData.elements = elements;
     if (canvasData !== undefined) updateData.canvasData = canvasData;
+    if (previewImage !== undefined) updateData.previewImage = previewImage;
 
     const resume = await Resume.findOneAndUpdate(
       { _id: params.id, userId: session.user.id },

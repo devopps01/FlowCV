@@ -274,7 +274,10 @@ const ResumeSchema = new Schema({
     order: [String]
   },
   design: { type: Schema.Types.Mixed, default: {} },
-  activeSections: { type: [String], default: ['summary', 'experience', 'education', 'skills'] }
+  activeSections: { type: [String], default: ['summary', 'experience', 'education', 'skills'] },
+  previewImage: { type: String, default: '' },
+  isPublic: { type: Boolean, default: false },
+  shareSlug: { type: String, default: '' },
 }, { timestamps: true });
 
 export const Resume = mongoose.models.Resume || mongoose.model<IResume>('Resume', ResumeSchema);

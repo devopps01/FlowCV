@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { AppSidebar } from '@/components/layout/AppSidebar';
+import { useConfirm } from '@/components/ui/ConfirmModal';
 
 interface CoverLetter {
   _id: string;
@@ -45,6 +46,7 @@ export default function CoverLettersPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const { confirmModal, askConfirm } = useConfirm();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -108,7 +110,14 @@ export default function CoverLettersPage() {
   };
 
   const deleteCoverLetter = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this cover letter?')) return;
+    const confirmed = await askConfirm({
+      title: 'Delete Cover Letter',
+      message: 'This will permanently delete this cover letter. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await fetch(`/api/cover-letters/${id}`, { method: 'DELETE' });
       setCoverLetters(coverLetters.filter(cl => cl._id !== id));
@@ -242,5 +251,6 @@ export default function CoverLettersPage() {
         </div>
       </main>
     </div>
+    {confirmModal}
   );
 }

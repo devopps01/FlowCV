@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const resumes = await Resume.find({ userId: session.user.id })
       .sort({ updatedAt: -1 })
-      .select('title template updatedAt isPublic shareSlug previewImage content design');
+      .select('title template updatedAt isPublic shareSlug previewImage content design activeSections');
 
     return NextResponse.json({ resumes });
   } catch (error) {

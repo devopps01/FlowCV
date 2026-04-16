@@ -9,6 +9,8 @@ import { ResumeData } from './types';
 import AddContentModal, { CONTENT_MODULES } from './AddContentModal';
 import { createEmptyItem, generateSocialId } from '@/lib/utils/resume-ids';
 import { AIPanel } from './AIPanel';
+import { SectionAIPanel } from './SectionAIPanel';
+import { useConfirm } from '@/components/ui/ConfirmModal';
 
 interface ContentEditorProps {
   data: ResumeData;
@@ -40,6 +42,59 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'content' | 'ai'>('content');
+  const [aiOpenSection, setAiOpenSection] = useState<string | null>(null);
+  const { confirmModal, askConfirm } = useConfirm();
+
+  // Apply AI-generated data to a specific section
+  const applyAISection = (section: string, generatedData: any, mode: 'merge' | 'replace') => {
+    const sectionPath: Record<string, string> = {
+      personalInfo: 'content.personalInfo',
+      experience: 'content.experience',
+      education: 'content.education',
+      skills: 'content.skills',
+      languages: 'content.languages',
+      projects: 'content.projects',
+      certifications: 'content.certifications',
+      awards: 'content.awards',
+      interests: 'content.interests',
+      courses: 'content.courses',
+      organisations: 'content.organisations',
+      publications: 'content.publications',
+      references: 'content.references',
+      socials: 'content.socials',
+    };
+
+    const path = sectionPath[section];
+    if (!path) return;
+
+    if (section === 'personalInfo') {
+      if (mode === 'replace') {
+        updateNested(path, generatedData);
+      } else {
+        // Merge: only fill empty fields
+        const existing = data.content.personalInfo || {};
+        const merged = { ...existing };
+        Object.entries(generatedData).forEach(([key, val]) => {
+          if (key === 'id' || key === 'image' || key === 'photo') return;
+          const cur = (existing as any)[key];
+          if (!cur || (typeof cur === 'string' && cur.trim() === '')) {
+            (merged as any)[key] = val;
+          }
+        });
+        updateNested(path, merged);
+      }
+    } else if (Array.isArray(generatedData)) {
+      if (mode === 'replace') {
+        updateNested(path, generatedData);
+      } else {
+        // Merge: append to existing
+        const existing = (data.content as any)[section] || [];
+        updateNested(path, [...existing, ...generatedData]);
+      }
+    }
+
+    setAiOpenSection(null);
+  };
 
   const uploadProfilePhoto = async (file: File) => {
     setPhotoError(null);
@@ -70,6 +125,17 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const removeSection = (id: string) => {
     setData(prev => ({ ...prev, activeSections: prev.activeSections.filter(sid => sid !== id) }));
+  };
+
+  const removeSectionConfirmed = async (id: string, label: string) => {
+    const confirmed = await askConfirm({
+      title: `Remove ${label}`,
+      message: `Remove the "${label}" section from your resume? Your data will be preserved if you add it back.`,
+      confirmLabel: 'Remove',
+      cancelLabel: 'Keep it',
+      variant: 'warning',
+    });
+    if (confirmed) removeSection(id);
   };
 
   const addSection = (id: string) => {
@@ -137,7 +203,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             data={data}
             updateNested={updateNested}
             onApply={(content) => {
-              // Merge AI-generated content into current data
+              // Apply all fields from the (already-merged) content object
+              // AIPanel handles smart merge / replace before calling onApply
               Object.entries(content).forEach(([key, value]) => {
                 if (value !== undefined && value !== null) {
                   updateNested(`content.${key}`, value);
@@ -162,26 +229,51 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             boxShadow: 'var(--app-shadow)',
           }}
         >
-          <button
-            onClick={() => setExpandedSection(expandedSection === 'personalInfo' ? null : 'personalInfo')}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between w-full">
+            <button
+              onClick={() => setExpandedSection(expandedSection === 'personalInfo' ? null : 'personalInfo')}
+              className="flex items-center gap-3 flex-1 text-left"
+            >
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}>
                 <User className="w-4 h-4" />
               </div>
               <h3 className="text-sm font-bold capitalize tracking-tight" style={{ color: 'var(--app-text)' }}>Personal Info</h3>
+            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={e => { e.stopPropagation(); setAiOpenSection(aiOpenSection === 'personalInfo' ? null : 'personalInfo'); if (expandedSection !== 'personalInfo') setExpandedSection('personalInfo'); }}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-all"
+                style={aiOpenSection === 'personalInfo'
+                  ? { background: 'var(--app-primary)', color: '#fff' }
+                  : { background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}
+                title="Generate with AI"
+              >
+                <Sparkles className="w-3 h-3" /> AI
+              </button>
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${expandedSection === 'personalInfo' ? 'rotate-180' : ''}`}
+                style={{
+                  background: expandedSection === 'personalInfo' ? 'var(--app-primary-light)' : 'var(--app-bg-gray)',
+                  color: expandedSection === 'personalInfo' ? 'var(--app-primary)' : 'var(--app-text-muted)',
+                }}
+                onClick={() => setExpandedSection(expandedSection === 'personalInfo' ? null : 'personalInfo')}
+              >
+                <ChevronDown className="w-4 h-4" strokeWidth={3} />
+              </div>
             </div>
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${expandedSection === 'personalInfo' ? 'rotate-180' : ''}`}
-              style={{
-                background: expandedSection === 'personalInfo' ? 'var(--app-primary-light)' : 'var(--app-bg-gray)',
-                color: expandedSection === 'personalInfo' ? 'var(--app-primary)' : 'var(--app-text-muted)',
-              }}
-            >
-              <ChevronDown className="w-4 h-4" strokeWidth={3} />
-            </div>
-          </button>
+          </div>
+
+          {/* Personal Info AI Panel */}
+          {aiOpenSection === 'personalInfo' && (
+            <SectionAIPanel
+              section="personalInfo"
+              sectionLabel="Personal Info"
+              currentData={data.content.personalInfo}
+              resumeContext={{ fullName: data.content.personalInfo?.fullName, professionalTitle: data.content.personalInfo?.professionalTitle }}
+              onApply={(generated, mode) => applyAISection('personalInfo', generated, mode)}
+              onClose={() => setAiOpenSection(null)}
+            />
+          )}
 
           {expandedSection === 'personalInfo' && (
             <div className="flex flex-col gap-2 mt-2 w-full">
@@ -312,7 +404,21 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                               </button>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <button
-                                  onClick={e => { e.stopPropagation(); removeSection(sectionId); }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setAiOpenSection(aiOpenSection === sectionId ? null : sectionId);
+                                    if (!isExpanded) setExpandedSection(sectionId);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-all"
+                                  style={aiOpenSection === sectionId
+                                    ? { background: 'var(--app-primary)', color: '#fff' }
+                                    : { background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}
+                                  title="Generate with AI"
+                                >
+                                  <Sparkles className="w-3 h-3" /> AI
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); removeSectionConfirmed(sectionId, sInfo?.title || sectionId); }}
                                   className="p-1.5 rounded-lg transition-colors"
                                   style={{ color: 'var(--app-text-muted)' }}
                                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#ef4444'}
@@ -336,6 +442,18 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                             {/* Expanded content */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 pt-3 w-full" style={{ borderTop: '1px solid var(--app-border-light)' }}>
+                                {/* Section AI Panel */}
+                                {aiOpenSection === sectionId && (
+                                  <SectionAIPanel
+                                    section={sectionId}
+                                    sectionLabel={sInfo?.title || sectionId}
+                                    currentData={(data.content as any)[sectionId]}
+                                    resumeContext={{ fullName: data.content.personalInfo?.fullName, professionalTitle: data.content.personalInfo?.professionalTitle }}
+                                    onApply={(generated, mode) => applyAISection(sectionId, generated, mode)}
+                                    onClose={() => setAiOpenSection(null)}
+                                  />
+                                )}
+
                                 <button
                                   onClick={() => {
                                     const sectionMap: Record<string, { path: string; items: any[] }> = {
@@ -471,11 +589,79 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                 {sectionId === 'projects' && (
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.projects?.map((proj, projIdx) => (
-                                      <div key={projIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
+                                      <div key={projIdx} className="p-3 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
                                         <ArrayItemControls array={data.content.projects || []} index={projIdx} path="content.projects" updateNested={updateNested} />
-                                        <input placeholder="Project Name" value={proj.name} onChange={e => updateNested(`content.projects[${projIdx}].name`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold pt-4 pr-4" />
+                                        <div className="grid grid-cols-1 gap-2 pt-4 pr-4 w-full">
+                                          <input
+                                            placeholder="Project Name"
+                                            value={proj.name || ''}
+                                            onChange={e => updateNested(`content.projects[${projIdx}].name`, e.target.value)}
+                                            className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all"
+                                            style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }}
+                                          />
+                                          {/* Technologies tag input */}
+                                          <div className="flex flex-col gap-1">
+                                            <label className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>Technologies</label>
+                                            <div
+                                              className="flex flex-wrap gap-1.5 p-2 rounded-md min-h-[36px]"
+                                              style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)" }}
+                                            >
+                                              {(Array.isArray(proj.technologies) ? proj.technologies : []).map((tech: string, tIdx: number) => (
+                                                <span
+                                                  key={tIdx}
+                                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                                  style={{ background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}
+                                                >
+                                                  {tech}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const techs = [...(proj.technologies || [])];
+                                                      techs.splice(tIdx, 1);
+                                                      updateNested(`content.projects[${projIdx}].technologies`, techs);
+                                                    }}
+                                                    className="hover:opacity-70 transition-opacity"
+                                                  >
+                                                    <X className="w-2.5 h-2.5" />
+                                                  </button>
+                                                </span>
+                                              ))}
+                                              <input
+                                                type="text"
+                                                placeholder={proj.technologies?.length ? 'Add more...' : 'e.g. React, Node.js, AWS'}
+                                                className="flex-1 min-w-[120px] text-[11px] font-semibold focus:outline-none bg-transparent"
+                                                style={{ color: 'var(--app-text)' }}
+                                                onKeyDown={e => {
+                                                  if ((e.key === 'Enter' || e.key === ',') && (e.target as HTMLInputElement).value.trim()) {
+                                                    e.preventDefault();
+                                                    const val = (e.target as HTMLInputElement).value.trim().replace(/,$/, '');
+                                                    if (val) {
+                                                      const techs = [...(proj.technologies || []), val];
+                                                      updateNested(`content.projects[${projIdx}].technologies`, techs);
+                                                      (e.target as HTMLInputElement).value = '';
+                                                    }
+                                                  }
+                                                  if (e.key === 'Backspace' && !(e.target as HTMLInputElement).value && proj.technologies?.length) {
+                                                    const techs = [...(proj.technologies || [])];
+                                                    techs.pop();
+                                                    updateNested(`content.projects[${projIdx}].technologies`, techs);
+                                                  }
+                                                }}
+                                                onBlur={e => {
+                                                  const val = e.target.value.trim().replace(/,$/, '');
+                                                  if (val) {
+                                                    const techs = [...(proj.technologies || []), val];
+                                                    updateNested(`content.projects[${projIdx}].technologies`, techs);
+                                                    e.target.value = '';
+                                                  }
+                                                }}
+                                              />
+                                            </div>
+                                            <p className="text-[9px]" style={{ color: 'var(--app-text-muted)' }}>Press Enter or comma to add a technology</p>
+                                          </div>
+                                        </div>
                                         <div className="border border-gray-200 rounded-md overflow-hidden bg-white w-full text-[11px]">
-                                          <RichTextEditor value={proj.description} onChange={val => updateNested(`content.projects[${projIdx}].description`, val)} />
+                                          <RichTextEditor value={proj.description || ''} onChange={val => updateNested(`content.projects[${projIdx}].description`, val)} />
                                         </div>
                                       </div>
                                     ))}
@@ -653,6 +839,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         activeSections={data.activeSections}
         onSelect={addSection}
       />
+      {confirmModal}
         </div>
       )}
     </div>

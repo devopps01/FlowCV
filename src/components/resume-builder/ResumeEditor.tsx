@@ -83,9 +83,51 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     }
   };
 
+  // Capture a screenshot of the resume and save it to the server
+  const captureScreenshot = useCallback(async () => {
+    const el = document.getElementById('resume-preview');
+    if (!el) return;
+    try {
+      // Dynamically import html2canvas to avoid SSR issues
+      const html2canvas = (await import('html2canvas')).default;
+      // Wait for fonts/layout to settle
+      await document.fonts.ready;
+      await new Promise(r => setTimeout(r, 300));
+
+      const canvas = await html2canvas(el, {
+        scale: 0.5,           // 50% scale — enough for a thumbnail, small file size
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        windowWidth: el.offsetWidth,
+        windowHeight: el.offsetHeight,
+      });
+
+      const imageData = canvas.toDataURL('image/png');
+
+      // POST to screenshot API — fire and forget
+      fetch(`/api/resumes/${id}/screenshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData }),
+      }).catch(() => {/* silent fail */});
+    } catch {
+      // Screenshot capture is non-critical — fail silently
+    }
+  }, [id]);
+
   useEffect(() => {
     // Auto-save with 500ms delay
     const timeoutId = setTimeout(() => handleSave(false), 500);
+    return () => clearTimeout(timeoutId);
+  }, [data, id]);
+
+  // Screenshot capture — debounced at 4s after last change (non-blocking)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => captureScreenshot(), 4000);
     return () => clearTimeout(timeoutId);
   }, [data, id]);
 
@@ -95,26 +137,42 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     if (!el) return;
 
     const A4_PX = 1122; // 297mm at 96dpi
-    // Only create a new page if content overflows by more than 80px (about 21mm)
-    // This prevents near-empty second pages from appearing
-    const PAGE_THRESHOLD = 80;
+    const PAGE_GAP = 24; // gap between pages in preview
+    // Threshold: only add a page if content overflows by more than 20px
+    const PAGE_THRESHOLD = 20;
 
     const measure = () => {
+      // Measure the CONTENT inside the resume paper, not the paper itself
+      // The paper has minHeight set to numPages * A4_PX which would cause circular measurement
+      // Instead, temporarily remove minHeight, measure, then restore
+      const originalMinHeight = el.style.minHeight;
+      el.style.minHeight = 'auto';
+
       // Walk all child elements to find the true bottom of content
       let maxBottom = 0;
       const elRect = el.getBoundingClientRect();
 
       el.querySelectorAll('*').forEach(child => {
-        const rect = (child as HTMLElement).getBoundingClientRect();
+        // Skip page spacers and overlay elements
+        const c = child as HTMLElement;
+        if (c.dataset?.pageSpacer) return;
+        const rect = c.getBoundingClientRect();
         const bottom = rect.bottom - elRect.top;
         if (bottom > maxBottom) maxBottom = bottom;
       });
 
-      // Also check the element itself
-      const elHeight = elRect.height;
-      const contentHeight = Math.max(elHeight, maxBottom);
+      // Restore minHeight
+      el.style.minHeight = originalMinHeight;
 
-      // Only add a page if content meaningfully overflows
+      const contentHeight = maxBottom;
+
+      if (contentHeight <= 0) {
+        setNumPages(1);
+        return;
+      }
+
+      // Calculate pages: each page is A4_PX tall
+      // Content that overflows page 1 by more than PAGE_THRESHOLD creates page 2
       const pages = contentHeight > A4_PX + PAGE_THRESHOLD
         ? Math.ceil(contentHeight / A4_PX)
         : 1;
@@ -123,15 +181,20 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     };
 
     // Delay first measure to let fonts/images/layout settle
-    const t = setTimeout(measure, 200);
+    const t = setTimeout(measure, 300);
 
     const ro = new ResizeObserver(() => {
-      clearTimeout(t);
-      setTimeout(measure, 50);
+      // Debounce resize measurements
+      clearTimeout((ro as any)._timer);
+      (ro as any)._timer = setTimeout(measure, 100);
     });
     ro.observe(el);
 
-    return () => { clearTimeout(t); ro.disconnect(); };
+    return () => {
+      clearTimeout(t);
+      clearTimeout((ro as any)._timer);
+      ro.disconnect();
+    };
   }, [data]);
 
   // History management

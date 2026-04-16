@@ -194,11 +194,35 @@ const COLOR_PRESETS = [
 ];
 
 const LAYOUT_OPTIONS = [
-  { id: 'single', label: 'Single', icon: Rows },
-  { id: 'sidebar-left', label: 'Sidebar L', icon: Columns },
-  { id: 'sidebar-right', label: 'Sidebar R', icon: Columns },
-  { id: 'modern-header', label: 'Modern', icon: Layers },
-  { id: 'double-header', label: 'Double', icon: LayoutTemplate },
+  // Single column variants
+  { id: 'single',              label: 'Classic',      group: 'Single Column' },
+  { id: 'single-centered',     label: 'Centered',     group: 'Single Column' },
+  { id: 'single-compact',      label: 'Compact',      group: 'Single Column' },
+  { id: 'single-minimal',      label: 'Minimal',      group: 'Single Column' },
+  // Sidebar left variants
+  { id: 'sidebar-left',        label: 'Sidebar L',    group: 'Sidebar' },
+  { id: 'sidebar-left-wide',   label: 'Sidebar L+',   group: 'Sidebar' },
+  { id: 'sidebar-left-narrow', label: 'Sidebar L−',   group: 'Sidebar' },
+  // Sidebar right variants
+  { id: 'sidebar-right',       label: 'Sidebar R',    group: 'Sidebar' },
+  { id: 'sidebar-right-wide',  label: 'Sidebar R+',   group: 'Sidebar' },
+  { id: 'sidebar-right-narrow',label: 'Sidebar R−',   group: 'Sidebar' },
+  // Modern header variants
+  { id: 'modern-header',       label: 'Modern',       group: 'Header' },
+  { id: 'modern-header-dark',  label: 'Modern Dark',  group: 'Header' },
+  { id: 'modern-header-split', label: 'Modern Split', group: 'Header' },
+  // Double header variants
+  { id: 'double-header',       label: 'Double',       group: 'Header' },
+  { id: 'double-header-bold',  label: 'Double Bold',  group: 'Header' },
+  // Two column variants
+  { id: 'two-column',          label: 'Two Col',      group: 'Multi-Column' },
+  { id: 'two-column-reverse',  label: 'Two Col Rev',  group: 'Multi-Column' },
+  // Timeline variants
+  { id: 'timeline',            label: 'Timeline',     group: 'Special' },
+  { id: 'timeline-left',       label: 'Timeline L',   group: 'Special' },
+  // Card/infographic
+  { id: 'card-header',         label: 'Card',         group: 'Special' },
+  { id: 'infographic',         label: 'Infographic',  group: 'Special' },
 ];
 
 const HEADING_SIZE_OPTIONS = ['s', 'm', 'l', 'xl'] as const;
@@ -488,27 +512,122 @@ export default function DesignEditor({
         <SectionBlock title="Layout" icon={Layout} defaultOpen>
           <div>
             <Label>Page Layout</Label>
-            <div className="grid grid-cols-5 gap-1.5">
-              {LAYOUT_OPTIONS.map(opt => {
-                const Icon = opt.icon;
-                const active = d.layout === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => updateDesign('layout', opt.id)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${
-                      active ? 'text-[#ff4d7d]' : ''
-                    }`}
-                    style={active
-                      ? { border: '1px solid var(--app-primary)', background: 'var(--app-primary-light)', color: 'var(--app-primary)' }
-                      : { border: '1px solid var(--app-border)', background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[8px] font-black uppercase tracking-wide leading-tight">{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Group layouts by category */}
+            {['Single Column', 'Sidebar', 'Header', 'Multi-Column', 'Special'].map(group => {
+              const groupLayouts = LAYOUT_OPTIONS.filter(o => o.group === group);
+              return (
+                <div key={group} className="mb-3">
+                  <p className="text-[8px] font-black uppercase tracking-widest mb-1.5" style={{ color: 'var(--app-text-muted)' }}>{group}</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {groupLayouts.map(opt => {
+                      const active = d.layout === opt.id;
+                      // Visual mini-preview icon based on layout type
+                      const preview = (() => {
+                        const id = opt.id;
+                        if (id.includes('sidebar-left')) return (
+                          <div className="flex gap-0.5 w-full h-full items-stretch">
+                            <div className="rounded-sm" style={{ width: id.includes('wide') ? '40%' : id.includes('narrow') ? '25%' : '32%', background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.7 }} />
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.4 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.2 }} />
+                            </div>
+                          </div>
+                        );
+                        if (id.includes('sidebar-right')) return (
+                          <div className="flex gap-0.5 w-full h-full items-stretch">
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.4 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.2 }} />
+                            </div>
+                            <div className="rounded-sm" style={{ width: id.includes('wide') ? '40%' : id.includes('narrow') ? '25%' : '32%', background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.7 }} />
+                          </div>
+                        );
+                        if (id.includes('modern-header')) return (
+                          <div className="flex flex-col gap-0.5 w-full">
+                            <div className="rounded-sm h-2.5 w-full" style={{ background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.8 }} />
+                            <div className="rounded-sm h-1 w-3/4" style={{ background: 'currentColor', opacity: 0.4 }} />
+                            <div className="rounded-sm h-1 w-full" style={{ background: 'currentColor', opacity: 0.3 }} />
+                          </div>
+                        );
+                        if (id.includes('double-header')) return (
+                          <div className="flex flex-col gap-0.5 w-full">
+                            <div className="rounded-sm h-1.5 w-full" style={{ background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.8 }} />
+                            <div className="rounded-sm h-1 w-full" style={{ background: 'currentColor', opacity: 0.5 }} />
+                            <div className="rounded-sm h-1 w-3/4" style={{ background: 'currentColor', opacity: 0.3 }} />
+                          </div>
+                        );
+                        if (id.includes('two-column')) return (
+                          <div className="flex gap-0.5 w-full h-full items-stretch">
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.5 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                            </div>
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.5 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                            </div>
+                          </div>
+                        );
+                        if (id.includes('timeline')) return (
+                          <div className="flex gap-0.5 w-full h-full items-stretch">
+                            <div className="rounded-full" style={{ width: '2px', background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.6 }} />
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.4 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.2 }} />
+                            </div>
+                          </div>
+                        );
+                        if (id.includes('card')) return (
+                          <div className="flex flex-col gap-0.5 w-full">
+                            <div className="rounded-md h-3 w-full" style={{ background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.7 }} />
+                            <div className="rounded-sm h-1 w-2/3" style={{ background: 'currentColor', opacity: 0.4 }} />
+                          </div>
+                        );
+                        if (id.includes('infographic')) return (
+                          <div className="flex gap-0.5 w-full h-full">
+                            <div className="flex flex-col gap-0.5 flex-1">
+                              <div className="rounded-full w-3 h-3 mx-auto" style={{ background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.7 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                            </div>
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.4 }} />
+                              <div className="rounded-sm h-1" style={{ background: 'currentColor', opacity: 0.3 }} />
+                            </div>
+                          </div>
+                        );
+                        // Default: single column
+                        return (
+                          <div className="flex flex-col gap-0.5 w-full">
+                            <div className="rounded-sm h-1.5 w-1/2 mx-auto" style={{ background: active ? 'var(--app-primary)' : 'currentColor', opacity: 0.7 }} />
+                            <div className="rounded-sm h-1 w-full" style={{ background: 'currentColor', opacity: 0.4 }} />
+                            <div className="rounded-sm h-1 w-3/4" style={{ background: 'currentColor', opacity: 0.3 }} />
+                            <div className="rounded-sm h-1 w-full" style={{ background: 'currentColor', opacity: 0.2 }} />
+                          </div>
+                        );
+                      })();
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => updateDesign('layout', opt.id)}
+                          className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all hover:scale-105"
+                          style={active
+                            ? { border: '1.5px solid var(--app-primary)', background: 'var(--app-primary-light)', color: 'var(--app-primary)' }
+                            : { border: '1px solid var(--app-border)', background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}
+                        >
+                          <div className="w-10 h-7 flex items-center justify-center">
+                            {preview}
+                          </div>
+                          <span className="text-[7px] font-black uppercase tracking-wide leading-tight text-center">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SectionBlock>
 

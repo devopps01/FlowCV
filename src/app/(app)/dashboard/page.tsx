@@ -13,6 +13,7 @@ import ResumePreview from '@/components/resume-builder/ResumePreview';
 import { ResumeData } from '@/components/resume-builder/types';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { DUMMY_PROFILES, DUMMY_CONTENT_BASE } from '@/components/resume-builder/constants';
+import { useConfirm } from '@/components/ui/ConfirmModal';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Resume extends ResumeData {
@@ -20,6 +21,7 @@ interface Resume extends ResumeData {
   updatedAt: string;
   isPublic: boolean;
   shareSlug: string;
+  previewImage?: string;
 }
 
 interface TemplateData {
@@ -28,16 +30,59 @@ interface TemplateData {
 }
 
 // â”€â”€â”€ Resume Thumbnail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function ResumeThumbnail({ data }: { data: ResumeData }) {
-  const ref = useRef<HTMLDivElement>(null);
+// --- Resume Thumbnail -----------------------------------------------------------
+// Shows the saved screenshot if available, otherwise falls back to live render
+function ResumeThumbnail({ data }: { data: Resume }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.3);
+  const [imgError, setImgError] = useState(false);
+
+  // A4 dimensions at 96dpi
+  const A4_W = 794;
+  const A4_H = 1122;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerW = el.offsetWidth || 200;
+    setScale(containerW / A4_W);
+  }, []);
+
+  const bgColor = (data as any).design?.backgroundColor || '#ffffff';
+
+  // If we have a saved screenshot, show it as an image (fast, accurate)
+  const screenshotUrl = (data as any).previewImage;
+  if (screenshotUrl && !imgError) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: bgColor }}>
+        <img
+          src={screenshotUrl}
+          alt={data.title || 'Resume preview'}
+          className="w-full h-full object-cover object-top"
+          onError={() => setImgError(true)}
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  // Fallback: live render — scale the full A4 page to fit the card
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none bg-white">
+    <div
+      ref={containerRef}
+      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+      style={{ background: bgColor }}
+    >
       <div
-        ref={ref}
         style={{
-          transform: 'scale(0.34)',
+          transform: `scale(${scale})`,
           transformOrigin: 'top left',
-          width: '210mm',
+          width: `${A4_W}px`,
+          height: `${A4_H}px`,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
         }}
       >
         <ResumePreview
@@ -51,11 +96,24 @@ function ResumeThumbnail({ data }: { data: ResumeData }) {
       </div>
     </div>
   );
-}
-
-// â”€â”€â”€ Template Thumbnail (larger scale for modal) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+}// â”€â”€â”€ Template Thumbnail (larger scale for modal) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TemplateThumbnail({ template, index }: { template: TemplateData; index: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.25);
+
+  const A4_W = 794;
+  const A4_H = 1122;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerW = el.offsetWidth || 200;
+    setScale(containerW / A4_W);
+  }, []);
+
   const profile = DUMMY_PROFILES[index % DUMMY_PROFILES.length];
+  const bgColor = template.secondary.style?.backgroundColor || '#ffffff';
+
   const mockData: ResumeData = {
     title: template.mainsection.name,
     template: template.mainsection.id,
@@ -70,7 +128,7 @@ function TemplateThumbnail({ template, index }: { template: TemplateData; index:
         phone: '+1 (555) 000-0000',
         location: profile.location,
         image: profile.image,
-        summary: 'A highly motivated professional with extensive experience in leading complex projects and delivering exceptional results.',
+        summary: 'Results-driven professional with 8+ years of experience leading cross-functional teams and delivering high-impact solutions. Proven track record of driving growth and exceeding targets.',
       },
     } as any,
     design: template.secondary.style as any,
@@ -78,14 +136,30 @@ function TemplateThumbnail({ template, index }: { template: TemplateData; index:
   };
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none select-none bg-white flex items-start justify-center">
-      <div className="origin-top" style={{ transform: 'scale(0.55)', width: '210mm', transformOrigin: 'top center' }}>
+    <div
+      ref={containerRef}
+      className="absolute inset-0 overflow-hidden pointer-events-none select-none"
+      style={{ background: bgColor }}
+    >
+      <div
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          width: `${A4_W}px`,
+          height: `${A4_H}px`,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          overflow: 'hidden',
+        }}
+      >
         <ResumePreview
           data={mockData}
           numPages={1}
           previewRef={{ current: null } as any}
           zoomLevel={100}
           isThumbnail={true}
+          isExporting={true}
         />
       </div>
     </div>
@@ -205,8 +279,26 @@ function TemplateBrowser({ onClose, onSelect, currentTemplateId }: TemplateBrows
         {/* Grid */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar" style={{ background: 'var(--app-bg-gray)' }}>
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--app-primary)' }} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <div
+                    className="relative rounded-xl overflow-hidden"
+                    style={{ aspectRatio: '210/297', background: 'var(--app-bg-card)', border: '1px solid var(--app-border)' }}
+                  >
+                    <div className="absolute inset-0 animate-shimmer" />
+                    <div className="absolute inset-0 p-4 flex flex-col gap-2">
+                      <div className="h-3 rounded-full w-2/3" style={{ background: 'var(--app-bg-gray)' }} />
+                      <div className="h-2 rounded-full w-1/2" style={{ background: 'var(--app-bg-gray)' }} />
+                      <div className="h-px w-full mt-2" style={{ background: 'var(--app-border)' }} />
+                      <div className="h-2 rounded-full w-full" style={{ background: 'var(--app-bg-gray)' }} />
+                      <div className="h-2 rounded-full w-5/6" style={{ background: 'var(--app-bg-gray)' }} />
+                      <div className="h-2 rounded-full w-4/6" style={{ background: 'var(--app-bg-gray)' }} />
+                    </div>
+                  </div>
+                  <div className="h-2.5 rounded-full w-3/4 mx-auto" style={{ background: 'var(--app-bg-card)' }} />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -224,11 +316,11 @@ function TemplateBrowser({ onClose, onSelect, currentTemplateId }: TemplateBrows
                     className="group flex flex-col gap-2 cursor-pointer"
                     onClick={() => onSelect(template)}
                   >
-                    <div
-                      className={`relative rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-1 ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
+                  <div
+                      className={`relative rounded-xl overflow-hidden transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-xl ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
                       style={{
                         aspectRatio: '210/297',
-                        background: '#fff',
+                        background: template.secondary.style?.backgroundColor || '#ffffff',
                         border: isSelected ? '2px solid var(--app-primary)' : '1px solid var(--app-border)',
                         boxShadow: isSelected ? '0 0 0 3px var(--app-primary-light)' : 'var(--app-shadow)',
                         '--tw-ring-color': 'var(--app-primary)',
@@ -238,8 +330,8 @@ function TemplateBrowser({ onClose, onSelect, currentTemplateId }: TemplateBrows
 
                       {/* Selected badge */}
                       {isSelected && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: 'var(--app-primary-light)' }}>
-                          <div className="p-2.5 rounded-full text-white" style={{ background: 'var(--app-primary)' }}>
+                        <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                          <div className="p-2.5 rounded-full text-white shadow-lg" style={{ background: 'var(--app-primary)' }}>
                             <Check className="w-5 h-5 stroke-[3]" />
                           </div>
                         </div>
@@ -248,24 +340,35 @@ function TemplateBrowser({ onClose, onSelect, currentTemplateId }: TemplateBrows
                       {/* Premium badge */}
                       {template.mainsection.resumeinfo?.isPremium && (
                         <div className="absolute top-2 right-2 z-20">
-                          <span className="bg-amber-500 text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">PRO</span>
+                          <span className="bg-amber-500 text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest shadow">PRO</span>
                         </div>
                       )}
 
                       {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <span className="px-3 py-1.5 rounded-lg text-xs font-black text-white shadow-lg" style={{ background: 'var(--app-primary)' }}>
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <span
+                          className="px-4 py-2 rounded-xl text-xs font-black text-white shadow-xl scale-90 group-hover:scale-100 transition-transform"
+                          style={{ background: 'var(--app-primary)' }}
+                        >
                           {isCreating ? 'Applying...' : 'Use Template'}
                         </span>
                       </div>
                     </div>
 
-                    <p
-                      className="text-[11px] font-bold text-center truncate px-1 transition-colors"
-                      style={{ color: isSelected ? 'var(--app-primary)' : 'var(--app-text-secondary)' }}
-                    >
-                      {template.mainsection.name}
-                    </p>
+                    {/* Template name */}
+                    <div className="px-1">
+                      <p
+                        className="text-[11px] font-bold truncate transition-colors"
+                        style={{ color: isSelected ? 'var(--app-primary)' : 'var(--app-text)' }}
+                      >
+                        {template.mainsection.name}
+                      </p>
+                      {template.secondary.style?.layout && (
+                        <p className="text-[10px] capitalize mt-0.5" style={{ color: 'var(--app-text-muted)' }}>
+                          {String(template.secondary.style.layout).replace(/-/g, ' ')}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -287,6 +390,7 @@ export default function DashboardPage() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [showTemplateBrowser, setShowTemplateBrowser] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
+  const { confirmModal, askConfirm } = useConfirm();
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
@@ -337,7 +441,14 @@ export default function DashboardPage() {
   };
 
   const deleteResume = async (id: string) => {
-    if (!confirm('Delete this resume?')) return;
+    const confirmed = await askConfirm({
+      title: 'Delete Resume',
+      message: 'This will permanently delete this resume. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await fetch(`/api/resumes/${id}`, { method: 'DELETE' });
       setResumes(prev => prev.filter(r => r._id !== id));
@@ -363,13 +474,39 @@ export default function DashboardPage() {
     }
   };
 
-  // Filter resumes by template category
+  // Categorize a resume based on its design properties
+  const categorizeResume = (resume: Resume): string => {
+    const layout = resume.design?.layout || 'single';
+    const font = (resume.design?.fontFamily || '').toLowerCase();
+    const primary = (resume.design?.primaryColor || '').toLowerCase();
+    const template = (resume.template || '').toLowerCase();
+
+    // Sidebar layouts → Creative
+    if (layout.includes('sidebar')) return 'Creative';
+    // Modern/double header → Modern
+    if (layout === 'modern-header' || layout === 'double-header') return 'Modern';
+    // Serif fonts → Professional
+    if (['merriweather', 'lora', 'playfair', 'georgia', 'times'].some(f => font.includes(f))) return 'Professional';
+    // Mono fonts → Simple
+    if (['fira code', 'mono', 'courier', 'consolas'].some(f => font.includes(f))) return 'Simple';
+    // Dark/neutral colors → Professional
+    if (['#111827', '#1f2937', '#0f172a', '#374151'].includes(primary)) return 'Professional';
+    // Bright/vivid colors → Creative
+    if (['#ff4d7d', '#ef4444', '#f59e0b', '#8b5cf6'].includes(primary)) return 'Creative';
+    // Blues/greens → Modern
+    if (['#2563eb', '#0ea5e9', '#06b6d4', '#10b981'].includes(primary)) return 'Modern';
+    // Single column with sans font → Simple
+    if (layout === 'single') return 'Simple';
+    return 'Professional';
+  };
+
+  // Filter resumes by category
   const FILTERS = ['All', 'Simple', 'Modern', 'Creative', 'Professional'];
   const filteredResumes = activeFilter === 'All'
     ? resumes
-    : resumes.filter(r => r.template?.toLowerCase().includes(activeFilter.toLowerCase()));
+    : resumes.filter(r => categorizeResume(r) === activeFilter);
 
-  if (status === 'loading' || loading) {
+  if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
         <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--app-primary)' }} />
@@ -391,7 +528,7 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--app-text)' }}>My Resumes</h1>
               <p className="text-sm" style={{ color: 'var(--app-text-secondary)' }}>
-                {resumes.length} resume{resumes.length !== 1 ? 's' : ''} Â· Click to edit
+                {loading ? 'Loading...' : `${resumes.length} resume${resumes.length !== 1 ? 's' : ''} · Click to edit`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -468,14 +605,52 @@ export default function DashboardPage() {
               </p>
             </button>
 
+            {/* Skeleton loading cards */}
+            {loading && Array.from({ length: 7 }).map((_, i) => (
+              <div key={`skeleton-${i}`} className="flex flex-col gap-2">
+                <div
+                  className="relative rounded-xl overflow-hidden"
+                  style={{
+                    aspectRatio: '210/297',
+                    background: '#f8fafc',
+                    border: '1px solid var(--app-border)',
+                  }}
+                >
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div className="absolute inset-0 animate-shimmer" />
+                  </div>
+                  {/* Fake content lines */}
+                  <div className="absolute inset-0 p-4 flex flex-col gap-2">
+                    <div className="h-3 rounded-full w-3/4" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-2 rounded-full w-1/2" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-px w-full mt-1" style={{ background: 'var(--app-border)' }} />
+                    <div className="h-2 rounded-full w-full" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-2 rounded-full w-5/6" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-2 rounded-full w-4/6" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-px w-full mt-1" style={{ background: 'var(--app-border)' }} />
+                    <div className="h-2 rounded-full w-full" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-2 rounded-full w-5/6" style={{ background: 'var(--app-bg-gray)' }} />
+                    <div className="h-2 rounded-full w-3/4" style={{ background: 'var(--app-bg-gray)' }} />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 px-0.5">
+                  <div className="h-2.5 rounded-full w-3/4" style={{ background: 'var(--app-bg-card)' }} />
+                  <div className="h-2 rounded-full w-1/2" style={{ background: 'var(--app-bg-card)' }} />
+                </div>
+              </div>
+            ))}
+
             {/* Resume cards */}
-            {filteredResumes.map(resume => (
+            {!loading && filteredResumes.map(resume => {
+              const cardBg = resume.design?.backgroundColor || '#ffffff';
+              return (
               <div key={resume._id} className="group flex flex-col gap-2">
                 <div
                   className="relative rounded-xl overflow-hidden transition-all duration-200 hover:-translate-y-1"
                   style={{
                     aspectRatio: '210/297',
-                    background: 'var(--app-bg-card)',
+                    background: cardBg,
                     border: '1px solid var(--app-border)',
                     boxShadow: 'var(--app-shadow)',
                   }}
@@ -554,7 +729,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
 
           {/* Empty state */}
@@ -592,6 +767,9 @@ export default function DashboardPage() {
       {menuOpen && (
         <div className="fixed inset-0 z-[5]" onClick={() => setMenuOpen(null)} />
       )}
+
+      {/* Confirm modal */}
+      {confirmModal}
     </div>
   );
 }
