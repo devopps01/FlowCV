@@ -213,15 +213,9 @@ export async function generateWithAI(
     return enhanced;
   }
 
-  // For resume/cover-letter generation — return empty, caller handles gracefully
-  if (options.fieldType === 'resume' || options.fieldType === 'cover-letter') {
-    console.log('❌ No fallback for resume/cover-letter generation');
-    return '';
-  }
-
-  // For field enhancement with no text at all
-  console.log('❌ No text provided for enhancement');
-  throw new Error('AI service temporarily unavailable. Please try again in a moment.');
+  // All providers failed — return empty string so caller handles fallback
+  console.log('❌ All providers failed, returning empty for caller to handle');
+  return '';
 }
 
 // Backward-compatible alias

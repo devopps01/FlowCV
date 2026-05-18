@@ -6,7 +6,8 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals = [...(config.externals || []), 'next-auth', '@next-auth/prisma-adapter', '@prisma/client'];
+      // Only puppeteer must be external — next-auth MUST be bundled by webpack in Next.js 14
+      config.externals = [...(config.externals || []), 'puppeteer', 'puppeteer-core'];
     }
     return config;
   },
