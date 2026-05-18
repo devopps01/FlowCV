@@ -1,1 +1,8 @@
 node_modules
+.next
+.gitignore
+.env
+
+.vscode
+*.md
+*.pdf   
