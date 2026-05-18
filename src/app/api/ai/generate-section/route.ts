@@ -212,6 +212,22 @@ function localFallback(section: string, prompt: string): any[] | object {
     ].slice(0, count);
   }
 
+  if (section === 'declaration') {
+    return {
+      text: 'I hereby declare that all the details furnished above are true and correct to the best of my knowledge and belief.',
+      date: new Date().toISOString().split('T')[0],
+      place: 'San Francisco, CA'
+    };
+  }
+
+  if (section === 'custom') {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `custom_local_${Date.now()}_${i}`,
+      title: ['Key Achievement', 'Volunteer Project', 'Extra-curricular Activity', 'Featured Contribution'][i % 4],
+      content: `<p>Co-founded a regional community group for tech enthusiasts, organizing 10+ local meetups and workshops for over 200 members. Designed learning tracks and facilitated hands-on coding sessions.</p>`,
+    }));
+  }
+
   return [];
 }
 
@@ -331,6 +347,20 @@ Return ONLY raw JSON array, no markdown.`,
       socials: `Generate social media/link entries based on: "${prompt}"
 Return ONLY a valid JSON array:
 [{"platform": "LinkedIn|GitHub|Portfolio|Twitter|Website", "label": "Display Label", "url": "https://..."}]
+Return ONLY raw JSON array, no markdown.`,
+
+      declaration: `You are an expert resume writer. Generate a professional resume declaration statement based on: "${prompt}"
+Return ONLY a valid JSON object:
+{
+  "text": "The declaration statement string",
+  "date": "YYYY-MM-DD",
+  "place": "City, State or Country"
+}
+Return ONLY raw JSON, no markdown, no explanation.`,
+
+      custom: `Generate ${prompt.match(/\d+/)?.[0] || 2} custom section/extra content entries based on: "${prompt}"
+Return ONLY a valid JSON array:
+[{"title": "Section Title or Subsection Header", "content": "1-2 paragraph description or details of this custom section item. Highlight key highlights, details or activities using bullet points or paragraphs."}]
 Return ONLY raw JSON array, no markdown.`,
     };
 

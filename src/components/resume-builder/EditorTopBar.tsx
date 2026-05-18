@@ -181,6 +181,7 @@ export function EditorTopBar({
   const d = data.design;
   const [showPresets, setShowPresets] = useState(false);
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+  const [showSpacings, setShowSpacings] = useState(false);
 
   const applyPreset = (preset: typeof STYLE_PRESETS[0]) => {
     Object.entries(preset.design).forEach(([k, v]) => {
@@ -211,7 +212,7 @@ export function EditorTopBar({
       {/* ── Pre-built Styles ── */}
       <div className="relative">
         <button
-          onClick={() => { setShowPresets(p => !p); setShowLayoutPicker(false); }}
+          onClick={() => { setShowPresets(p => !p); setShowLayoutPicker(false); setShowSpacings(false); }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
           style={{ color: 'var(--app-text)', background: showPresets ? 'var(--app-bg-gray)' : 'transparent' }}
           onMouseEnter={e => { if (!showPresets) (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; }}
@@ -264,7 +265,7 @@ export function EditorTopBar({
       {/* ── Layout ── */}
       <div className="relative">
         <button
-          onClick={() => { setShowLayoutPicker(p => !p); setShowPresets(false); }}
+          onClick={() => { setShowLayoutPicker(p => !p); setShowPresets(false); setShowSpacings(false); }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
           style={{ color: 'var(--app-text)', background: showLayoutPicker ? 'var(--app-bg-gray)' : 'transparent' }}
           onMouseEnter={e => { if (!showLayoutPicker) (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; }}
@@ -342,6 +343,134 @@ export function EditorTopBar({
         >
           <Plus className="w-3 h-3" />
         </button>
+      </div>
+
+      <TBDivider />
+
+      {/* ── Spacings & Auto-Fit Dropdown ── */}
+      <div className="relative">
+        <button
+          onClick={() => { setShowSpacings(s => !s); setShowPresets(false); setShowLayoutPicker(false); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all animate-pulse"
+          style={{ color: 'var(--app-text)', background: showSpacings ? 'var(--app-bg-gray)' : 'transparent' }}
+          onMouseEnter={e => { if (!showSpacings) (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; }}
+          onMouseLeave={e => { if (!showSpacings) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+        >
+          <Layers className="w-3.5 h-3.5" style={{ color: 'var(--app-primary)' }} />
+          Spacing
+          <ChevronDown className={`w-3 h-3 transition-transform ${showSpacings ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showSpacings && (
+          <div
+            className="absolute top-full left-0 mt-1 z-50 rounded-xl shadow-2xl p-4 flex flex-col gap-4"
+            style={{
+              background: 'var(--app-bg-card)',
+              border: '1px solid var(--app-border)',
+              width: '260px',
+              boxShadow: 'var(--app-shadow-lg)',
+            }}
+          >
+            <div className="flex items-center justify-between pb-1.5 border-b" style={{ borderColor: 'var(--app-border)' }}>
+              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>
+                Page Spacings
+              </span>
+              <button
+                onClick={() => {
+                  // Heuristic auto-fit spacing
+                  if (numPages > 1) {
+                    updateDesign('marginTB', 10);
+                    updateDesign('sectionSpacing', 6);
+                    updateDesign('entrySpacing', 4);
+                    updateDesign('fontSize', 9.5);
+                  } else {
+                    updateDesign('marginTB', 18);
+                    updateDesign('sectionSpacing', 12);
+                    updateDesign('entrySpacing', 8);
+                    updateDesign('fontSize', 11);
+                  }
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-500 hover:bg-indigo-600 text-[10px] font-black text-white uppercase tracking-wider transition-colors shadow-sm shadow-indigo-500/20"
+              >
+                <Sparkles className="w-3 h-3" /> Auto-Fit
+              </button>
+            </div>
+
+            {/* Margin TB */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold" style={{ color: 'var(--app-text-secondary)' }}>
+                <span>Page Margin</span>
+                <span className="opacity-75">{d.marginTB ?? 14}mm</span>
+              </div>
+              <input
+                type="range"
+                min="8"
+                max="28"
+                value={d.marginTB ?? 14}
+                onChange={e => updateDesign('marginTB', Number(e.target.value))}
+                className="w-full accent-indigo-500 h-1 bg-gray-200 dark:bg-white/10 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Section Spacing */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold" style={{ color: 'var(--app-text-secondary)' }}>
+                <span>Section Gap</span>
+                <span className="opacity-75">{d.sectionSpacing ?? 10}mm</span>
+              </div>
+              <input
+                type="range"
+                min="4"
+                max="20"
+                value={d.sectionSpacing ?? 10}
+                onChange={e => updateDesign('sectionSpacing', Number(e.target.value))}
+                className="w-full accent-indigo-500 h-1 bg-gray-200 dark:bg-white/10 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Entry Spacing */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold" style={{ color: 'var(--app-text-secondary)' }}>
+                <span>Item Gap</span>
+                <span className="opacity-75">{d.entrySpacing ?? 6}mm</span>
+              </div>
+              <input
+                type="range"
+                min="2"
+                max="16"
+                value={d.entrySpacing ?? 6}
+                onChange={e => updateDesign('entrySpacing', Number(e.target.value))}
+                className="w-full accent-indigo-500 h-1 bg-gray-200 dark:bg-white/10 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Reset to Default */}
+            <button
+              onClick={() => {
+                updateDesign('marginTB', 14);
+                updateDesign('sectionSpacing', 10);
+                updateDesign('entrySpacing', 6);
+                updateDesign('fontSize', 10.5);
+              }}
+              className="w-full py-1.5 text-center rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors border"
+              style={{
+                borderColor: 'var(--app-border)',
+                color: 'var(--app-text-secondary)',
+                background: 'transparent',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)';
+                (e.currentTarget as HTMLElement).style.color = 'var(--app-text)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = 'transparent';
+                (e.currentTarget as HTMLElement).style.color = 'var(--app-text-secondary)';
+              }}
+            >
+              Reset Spacing
+            </button>
+          </div>
+        )}
       </div>
 
       <TBDivider />
@@ -434,10 +563,10 @@ export function EditorTopBar({
       </button>
 
       {/* Close dropdowns on outside click */}
-      {(showPresets || showLayoutPicker) && (
+      {(showPresets || showLayoutPicker || showSpacings) && (
         <div
           className="fixed inset-0 z-40"
-          onClick={() => { setShowPresets(false); setShowLayoutPicker(false); }}
+          onClick={() => { setShowPresets(false); setShowLayoutPicker(false); setShowSpacings(false); }}
         />
       )}
     </div>

@@ -21,19 +21,19 @@ interface ContentEditorProps {
 }
 
 // Helper component for reordering and deleting mapped array items
-const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[], index: number, path: string, updateNested: any }) => {
+const ArrayItemControls = ({ array, index, path, updateNested, askConfirm }: { array: any[], index: number, path: string, updateNested: any, askConfirm: any }) => {
   const item = array[index];
   const isHidden = item?.hidden === true;
   
-  const toggleItemVisibility = () => {
+  const toggleItemVisibility = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const updatedArray = [...array];
     updatedArray[index] = { ...updatedArray[index], hidden: !isHidden };
     updateNested(path, updatedArray);
   };
 
-  const { askConfirm } = useConfirm();
-
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     const confirmed = await askConfirm({
       title: 'Delete Item',
       message: 'Are you sure you want to delete this item? This action cannot be undone.',
@@ -46,7 +46,7 @@ const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[],
   };
 
   return (
-    <div className="absolute top-2 right-2 flex items-center gap-1 rounded-xl p-1 z-10 transition-all shadow-sm" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)" }}>
+    <div className="absolute top-2 right-2 flex items-center gap-1 rounded-xl p-1 z-10 transition-all shadow-lg opacity-0 group-hover/item:opacity-100 duration-200 pointer-events-auto scale-95 hover:scale-100" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)" }}>
       {/* Eye Icon - Show/Hide in Resume */}
       <button 
         onClick={toggleItemVisibility}
@@ -60,7 +60,8 @@ const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[],
       </button>
       <div className="w-px h-3 bg-gray-200 mx-0.5" />
       <button 
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           const arr = [...array];
           if (index > 0) { [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]]; updateNested(path, arr); }
         }} 
@@ -71,7 +72,8 @@ const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[],
         <ArrowUp className="w-3.5 h-3.5" />
       </button>
       <button 
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           const arr = [...array];
           if (index < arr.length - 1) { [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]]; updateNested(path, arr); }
         }} 
@@ -121,6 +123,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       publications: 'content.publications',
       references: 'content.references',
       socials: 'content.socials',
+      declaration: 'content.declaration',
+      custom: 'content.custom',
     };
 
     const path = sectionPath[section];
@@ -128,13 +132,33 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
     if (section === 'personalInfo') {
       if (mode === 'replace') {
-        updateNested(path, generatedData);
+        const existing = data.content.personalInfo || {};
+        const replacement = {
+          ...generatedData,
+          image: existing.image || '',
+          photo: existing.photo || '',
+        };
+        updateNested(path, replacement);
       } else {
         // Merge: only fill empty fields
         const existing = data.content.personalInfo || {};
         const merged = { ...existing };
         Object.entries(generatedData).forEach(([key, val]) => {
           if (key === 'id' || key === 'image' || key === 'photo') return;
+          const cur = (existing as any)[key];
+          if (!cur || (typeof cur === 'string' && cur.trim() === '')) {
+            (merged as any)[key] = val;
+          }
+        });
+        updateNested(path, merged);
+      }
+    } else if (section === 'declaration') {
+      if (mode === 'replace') {
+        updateNested(path, generatedData);
+      } else {
+        const existing = data.content.declaration || {};
+        const merged = { ...existing };
+        Object.entries(generatedData).forEach(([key, val]) => {
           const cur = (existing as any)[key];
           if (!cur || (typeof cur === 'string' && cur.trim() === '')) {
             (merged as any)[key] = val;
@@ -692,7 +716,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                             opacity: isHidden ? 0.5 : 1
                                           }}
                                         >
-                                          <ArrayItemControls array={data.content.experience || []} index={expIdx} path="content.experience" updateNested={updateNested} />
+                                          <ArrayItemControls array={data.content.experience || []} index={expIdx} path="content.experience" updateNested={updateNested} askConfirm={askConfirm} />
                                           {isHidden && (
                                             <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider z-10" style={{ background: 'var(--app-bg-card)', color: 'var(--app-text-muted)', border: '1px solid var(--app-border)' }}>
                                               Hidden
@@ -717,7 +741,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.education?.map((edu, eduIdx) => (
                                       <div key={eduIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.education || []} index={eduIdx} path="content.education" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.education || []} index={eduIdx} path="content.education" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input type="text" placeholder="School" value={edu.school} onChange={e => updateNested(`content.education[${eduIdx}].school`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input type="text" placeholder="Degree" value={edu.degree} onChange={e => updateNested(`content.education[${eduIdx}].degree`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -802,7 +826,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                           placeholder="Proficiency"
                                           className="flex-1"
                                         />
-                                        <ArrayItemControls array={data.content.languages || []} index={langIdx} path="content.languages" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.languages || []} index={langIdx} path="content.languages" updateNested={updateNested} askConfirm={askConfirm} />
                                       </div>
                                     ))}
                                   </div>
@@ -817,7 +841,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                           <input placeholder="Label" value={soc.label} onChange={e => updateNested(`content.socials[${socIdx}].label`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="URL" value={soc.url} onChange={e => updateNested(`content.socials[${socIdx}].url`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                         </div>
-                                        <ArrayItemControls array={data.content.socials || []} index={socIdx} path="content.socials" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.socials || []} index={socIdx} path="content.socials" updateNested={updateNested} askConfirm={askConfirm} />
                                       </div>
                                     ))}
                                   </div>
@@ -827,7 +851,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.certifications?.map((cert, certIdx) => (
                                       <div key={certIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.certifications || []} index={certIdx} path="content.certifications" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.certifications || []} index={certIdx} path="content.certifications" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Name" value={cert.name} onChange={e => updateNested(`content.certifications[${certIdx}].name`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Issuer" value={cert.issuer} onChange={e => updateNested(`content.certifications[${certIdx}].issuer`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -842,7 +866,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.projects?.map((proj, projIdx) => (
                                       <div key={projIdx} className="p-3 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.projects || []} index={projIdx} path="content.projects" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.projects || []} index={projIdx} path="content.projects" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 gap-2 pt-4 pr-4 w-full">
                                           <input
                                             placeholder="Project Name"
@@ -924,7 +948,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.awards?.map((award, aIdx) => (
                                       <div key={aIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.awards || []} index={aIdx} path="content.awards" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.awards || []} index={aIdx} path="content.awards" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Award Title" value={award.title} onChange={e => updateNested(`content.awards[${aIdx}].title`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Issuer" value={award.issuer} onChange={e => updateNested(`content.awards[${aIdx}].issuer`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -999,7 +1023,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.courses?.map((course, cIdx) => (
                                       <div key={cIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.courses || []} index={cIdx} path="content.courses" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.courses || []} index={cIdx} path="content.courses" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Course Title" value={course.title} onChange={e => updateNested(`content.courses[${cIdx}].title`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Provider (e.g. Coursera)" value={course.provider} onChange={e => updateNested(`content.courses[${cIdx}].provider`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -1017,7 +1041,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.organisations?.map((org, oIdx) => (
                                       <div key={oIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.organisations || []} index={oIdx} path="content.organisations" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.organisations || []} index={oIdx} path="content.organisations" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Organisation Name" value={org.name} onChange={e => updateNested(`content.organisations[${oIdx}].name`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Role" value={org.role} onChange={e => updateNested(`content.organisations[${oIdx}].role`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -1036,7 +1060,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.publications?.map((pub, pIdx) => (
                                       <div key={pIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.publications || []} index={pIdx} path="content.publications" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.publications || []} index={pIdx} path="content.publications" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Title" value={pub.title} onChange={e => updateNested(`content.publications[${pIdx}].title`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Publisher" value={pub.publisher} onChange={e => updateNested(`content.publications[${pIdx}].publisher`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -1055,7 +1079,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.references?.map((ref, rIdx) => (
                                       <div key={rIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.references || []} index={rIdx} path="content.references" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.references || []} index={rIdx} path="content.references" updateNested={updateNested} askConfirm={askConfirm} />
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-4 pr-4 w-full">
                                           <input placeholder="Name" value={ref.name} onChange={e => updateNested(`content.references[${rIdx}].name`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
                                           <input placeholder="Position" value={ref.position} onChange={e => updateNested(`content.references[${rIdx}].position`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
@@ -1085,7 +1109,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <div className="flex flex-col gap-2 w-full">
                                     {data.content.custom?.map((cus, cIdx) => (
                                       <div key={cIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.custom || []} index={cIdx} path="content.custom" updateNested={updateNested} />
+                                        <ArrayItemControls array={data.content.custom || []} index={cIdx} path="content.custom" updateNested={updateNested} askConfirm={askConfirm} />
                                         <input placeholder="Custom Section Item Title" value={cus.title} onChange={e => updateNested(`content.custom[${cIdx}].title`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold pt-4 pr-4" />
                                         <div className="border border-gray-200 rounded-md overflow-hidden bg-white w-full text-[11px]">
                                           <RichTextEditor value={cus.content || ''} onChange={val => updateNested(`content.custom[${cIdx}].content`, val)} />

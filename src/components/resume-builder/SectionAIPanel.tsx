@@ -74,6 +74,16 @@ const SECTION_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
     { label: 'Sports', prompt: 'Running, cycling, team sports, fitness' },
     { label: 'Creative', prompt: 'Photography, music, painting, writing' },
   ],
+  declaration: [
+    { label: 'Standard', prompt: 'Standard formal declaration statement' },
+    { label: 'Short', prompt: 'Short, clean, professional declaration' },
+    { label: 'Detailed', prompt: 'Detailed declaration with place and date' },
+  ],
+  custom: [
+    { label: 'Volunteering', prompt: '2 volunteer project entries: chapters led, mentor events organized, and tech training provided' },
+    { label: 'Extra-Curricular', prompt: '2 extra-curricular activities: hackathons co-organized, student clubs led' },
+    { label: 'Achievements', prompt: '2 key achievements: industry speaker invites, patent applications, or coding contest ranks' },
+  ],
 };
 
 // Preview renderer for generated data
@@ -87,6 +97,16 @@ function DataPreview({ section, data }: { section: string; data: any }) {
         {data.professionalTitle && <p><span className="font-bold" style={{ color: 'var(--app-text)' }}>Title:</span> {data.professionalTitle}</p>}
         {data.email && <p><span className="font-bold" style={{ color: 'var(--app-text)' }}>Email:</span> {data.email}</p>}
         {data.summary && <p className="line-clamp-2"><span className="font-bold" style={{ color: 'var(--app-text)' }}>Summary:</span> {data.summary.replace(/<[^>]+>/g, '')}</p>}
+      </div>
+    );
+  }
+
+  if (section === 'declaration' && typeof data === 'object' && !Array.isArray(data)) {
+    return (
+      <div className="space-y-1 text-[11px]" style={{ color: 'var(--app-text-secondary)' }}>
+        {data.text && <p><span className="font-bold" style={{ color: 'var(--app-text)' }}>Text:</span> {data.text}</p>}
+        {data.place && <p><span className="font-bold" style={{ color: 'var(--app-text)' }}>Place:</span> {data.place}</p>}
+        {data.date && <p><span className="font-bold" style={{ color: 'var(--app-text)' }}>Date:</span> {data.date}</p>}
       </div>
     );
   }
@@ -140,7 +160,13 @@ function DataPreview({ section, data }: { section: string; data: any }) {
             {section === 'interests' && (
               <span className="font-medium" style={{ color: 'var(--app-text)' }}>{typeof item === 'string' ? item : item.name}</span>
             )}
-            {!['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'awards', 'interests'].includes(section) && (
+            {section === 'custom' && (
+              <div className="space-y-0.5" style={{ color: 'var(--app-text)' }}>
+                <p className="font-bold">{item.title}</p>
+                {item.content && <p className="text-[10px] line-clamp-2" style={{ color: 'var(--app-text-secondary)' }}>{item.content.replace(/<[^>]+>/g, '')}</p>}
+              </div>
+            )}
+            {!['experience', 'education', 'skills', 'projects', 'certifications', 'languages', 'awards', 'interests', 'custom'].includes(section) && (
               <p className="font-medium" style={{ color: 'var(--app-text)' }}>
                 {item.name || item.title || item.platform || item.language || (typeof item === 'string' ? item : JSON.stringify(item))}
               </p>

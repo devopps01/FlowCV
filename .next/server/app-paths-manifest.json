@@ -1,9 +1,8 @@
 {
   "/(app)/resume/[id]/page": "app/(app)/resume/[id]/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
   "/api/resumes/[id]/route": "app/api/resumes/[id]/route.js",
   "/api/templates/route": "app/api/templates/route.js",
-  "/api/resumes/[id]/screenshot/route": "app/api/resumes/[id]/screenshot/route.js"
+  "/api/resumes/[id]/screenshot/route": "app/api/resumes/[id]/screenshot/route.js",
+  "/api/export/pdf/route": "app/api/export/pdf/route.js"
 }

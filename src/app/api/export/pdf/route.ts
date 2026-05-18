@@ -23,20 +23,21 @@ export async function POST(req: NextRequest) {
 
     const page = await browser.newPage();
 
-    // 96 DPI, deviceScaleFactor=1 → 210mm = 794px exactly (A4 width at 96dpi)
-    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
+    // Width = 794px (A4 at 96dpi). Height = 10000px so ALL pages render before PDF generation.
+    await page.setViewport({ width: 794, height: 10000, deviceScaleFactor: 1 });
 
-    // Load the HTML — networkidle0 waits for Google Fonts to finish loading
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+    // Load HTML — networkidle2 is faster than networkidle0 while still waiting for fonts
+    await page.setContent(html, { waitUntil: 'networkidle2', timeout: 30000 });
 
-    // Wait for fonts to fully render
+    // Wait for Google Fonts to load and layout to stabilise
     await page.evaluate(() => document.fonts.ready);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 800));
 
-    // Generate PDF at A4, no margins (resume already has its own padding)
+    // Generate PDF — format:A4 + page-break-after:always on each .resume-page = correct pagination
     const pdfBuffer = await page.pdf({
       format: 'A4',
       printBackground: true,
+      preferCSSPageSize: false,
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
     });
 

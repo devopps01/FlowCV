@@ -198,18 +198,16 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
 
   // Export PDF — uses server-side Puppeteer for pixel-perfect output matching the preview
   const exportPDF = useCallback(async () => {
-    const el = document.getElementById('resume-preview');
-    if (!el) return;
+    const pageElements = document.querySelectorAll('.resume-page');
+    if (pageElements.length === 0) return;
 
     setIsExporting(true);
     toast.loading('Generating PDF...', { id: 'pdf' });
 
     try {
-      // Wait for fonts and re-render
       await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 600)); // Longer delay for full re-render without scale
+      await new Promise(r => setTimeout(r, 600));
 
-      // Collect all fonts used (base + overrides)
       const usedFonts = new Set<string>();
       usedFonts.add(data.design.fontFamily || 'Inter');
       if (data.styleOverrides) {
@@ -223,7 +221,6 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${query}:wght@400;500;600;700;900&display=swap">`;
       }).join('\n');
 
-      // Collect all computed CSS rules from the page (Tailwind + custom styles)
       const allStyles = Array.from(document.styleSheets)
         .map(sheet => {
           try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); }
@@ -231,73 +228,50 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         })
         .join('\n');
 
-      // Helper to convert relative URLs to absolute URLs for Puppeteer
       const getAbsoluteUrl = (url: string) => {
         if (!url) return '';
         if (url.startsWith('http') || url.startsWith('data:')) return url;
         return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
       };
 
-      // Clone the resume element — preserve ALL existing inline styles
-      const clone = el.cloneNode(true) as HTMLElement;
-      clone.style.transform = 'none';
-      clone.style.boxShadow = 'none';
-      clone.style.minHeight = 'auto';
-      clone.style.height = 'auto';
-      clone.style.overflow = 'visible';
-      clone.style.margin = '0';
-      
-      // FIX: Ensure the profile image uses an absolute URL for Puppeteer
-      clone.querySelectorAll('img').forEach(img => {
-        const src = img.getAttribute('src');
-        if (src) img.setAttribute('src', getAbsoluteUrl(src));
-      });
+      const container = document.createElement('div');
+      pageElements.forEach((el, index) => {
+        const clone = el.cloneNode(true) as HTMLElement;
+        clone.style.transform = 'none';
+        clone.style.boxShadow = 'none';
+        clone.style.margin = '0 auto 20px auto';
+        clone.style.pageBreakAfter = index === pageElements.length - 1 ? 'auto' : 'always';
+        
+        clone.querySelectorAll('img').forEach(img => {
+          const src = img.getAttribute('src');
+          if (src) img.setAttribute('src', getAbsoluteUrl(src));
+        });
 
-      // Remove interactive UI elements
-      clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
-      clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
-      // Ensure all children overflow visible so no text is clipped
-      clone.querySelectorAll('*').forEach(child => {
-        const c = child as HTMLElement;
-        if (c.style?.overflow === 'hidden') c.style.overflow = 'visible';
-        if (c.style?.maxHeight) c.style.maxHeight = 'none';
+        clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
+        clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
+        
+        container.appendChild(clone);
       });
 
       const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   ${fontLinks}
   <style>
     ${allStyles}
-    *, *::before, *::after {
-      box-sizing: border-box;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      background: white !important;
+    body { margin: 0; background: #eee; }
+    .resume-page {
       width: 794px;
-    }
-    @page { size: A4 portrait; margin: 0; }
-    #resume-preview {
-      transform: none !important;
-      box-shadow: none !important;
-      min-height: auto !important;
-      height: auto !important;
-      overflow: visible !important;
-    }
-    #resume-preview * {
-      overflow: visible !important;
-      max-height: none !important;
+      margin: 0 auto;
+      background: white;
+      box-sizing: border-box;
+      overflow: hidden;
+      page-break-after: always;
     }
   </style>
 </head>
-<body>${clone.outerHTML}</body>
+<body>${container.innerHTML}</body>
 </html>`;
 
       const response = await fetch('/api/export/pdf', {
@@ -306,25 +280,18 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         body: JSON.stringify({ html: fullHtml, title: data.title }),
       });
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(err.error || 'PDF generation failed');
-      }
+      if (!response.ok) throw new Error('PDF generation failed');
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${data.title || 'Resume'}.pdf`;
-      document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
       toast.success('PDF downloaded!', { id: 'pdf' });
     } catch (err: any) {
-      console.error('PDF export error:', err);
-      toast.error(err.message || 'Failed to export PDF', { id: 'pdf' });
+      toast.error('Failed to export PDF', { id: 'pdf' });
     } finally {
       setIsExporting(false);
     }

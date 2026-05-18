@@ -199,30 +199,72 @@ const LAYOUT_OPTIONS = [
   { id: 'single-centered',     label: 'Centered',     group: 'Single Column' },
   { id: 'single-compact',      label: 'Compact',      group: 'Single Column' },
   { id: 'single-minimal',      label: 'Minimal',      group: 'Single Column' },
+  { id: 'single-elegant',      label: 'Elegant',      group: 'Single Column' },
+  { id: 'single-modern',       label: 'Modern',       group: 'Single Column' },
+  { id: 'single-executive',    label: 'Executive',    group: 'Single Column' },
+  { id: 'single-bold',         label: 'Bold',         group: 'Single Column' },
+  { id: 'single-clean',        label: 'Clean',        group: 'Single Column' },
+  { id: 'single-playful',      label: 'Playful',      group: 'Single Column' },
+  { id: 'single-boxed',        label: 'Boxed',        group: 'Single Column' },
+
   // Sidebar left variants
   { id: 'sidebar-left',        label: 'Sidebar L',    group: 'Sidebar' },
   { id: 'sidebar-left-wide',   label: 'Sidebar L+',   group: 'Sidebar' },
   { id: 'sidebar-left-narrow', label: 'Sidebar L−',   group: 'Sidebar' },
+  { id: 'sidebar-left-elegant',label: 'Elegant L',    group: 'Sidebar' },
+  { id: 'sidebar-left-modern', label: 'Modern L',     group: 'Sidebar' },
+  { id: 'sidebar-left-bold',   label: 'Bold L',       group: 'Sidebar' },
+  { id: 'sidebar-left-clean',  label: 'Clean L',      group: 'Sidebar' },
+  { id: 'sidebar-left-boxed',  label: 'Boxed L',      group: 'Sidebar' },
+
   // Sidebar right variants
   { id: 'sidebar-right',       label: 'Sidebar R',    group: 'Sidebar' },
   { id: 'sidebar-right-wide',  label: 'Sidebar R+',   group: 'Sidebar' },
   { id: 'sidebar-right-narrow',label: 'Sidebar R−',   group: 'Sidebar' },
+  { id: 'sidebar-right-elegant',label:'Elegant R',    group: 'Sidebar' },
+  { id: 'sidebar-right-modern',label: 'Modern R',     group: 'Sidebar' },
+  { id: 'sidebar-right-bold',  label: 'Bold R',       group: 'Sidebar' },
+  { id: 'sidebar-right-clean', label: 'Clean R',      group: 'Sidebar' },
+  { id: 'sidebar-right-boxed', label: 'Boxed R',      group: 'Sidebar' },
+
   // Modern header variants
   { id: 'modern-header',       label: 'Modern',       group: 'Header' },
   { id: 'modern-header-dark',  label: 'Modern Dark',  group: 'Header' },
   { id: 'modern-header-split', label: 'Modern Split', group: 'Header' },
+  { id: 'modern-header-elegant',label:'Elegant',      group: 'Header' },
+  { id: 'modern-header-bold',  label: 'Bold',         group: 'Header' },
+  { id: 'modern-header-clean', label: 'Clean',        group: 'Header' },
+  { id: 'modern-header-minimal',label:'Minimal',      group: 'Header' },
+
   // Double header variants
   { id: 'double-header',       label: 'Double',       group: 'Header' },
   { id: 'double-header-bold',  label: 'Double Bold',  group: 'Header' },
+  { id: 'double-header-clean', label: 'Double Clean', group: 'Header' },
+  { id: 'double-header-elegant',label:'Double Eleg',  group: 'Header' },
+  { id: 'double-header-dark',  label: 'Double Dark',  group: 'Header' },
+
   // Two column variants
   { id: 'two-column',          label: 'Two Col',      group: 'Multi-Column' },
   { id: 'two-column-reverse',  label: 'Two Col Rev',  group: 'Multi-Column' },
+  { id: 'two-column-elegant',  label: 'Elegant Col',  group: 'Multi-Column' },
+  { id: 'two-column-modern',   label: 'Modern Col',   group: 'Multi-Column' },
+  { id: 'two-column-bold',     label: 'Bold Col',     group: 'Multi-Column' },
+  { id: 'two-column-clean',    label: 'Clean Col',    group: 'Multi-Column' },
+
   // Timeline variants
   { id: 'timeline',            label: 'Timeline',     group: 'Special' },
   { id: 'timeline-left',       label: 'Timeline L',   group: 'Special' },
+  { id: 'timeline-elegant',    label: 'Time Eleg',    group: 'Special' },
+  { id: 'timeline-modern',     label: 'Time Mod',     group: 'Special' },
+  { id: 'timeline-bold',       label: 'Time Bold',    group: 'Special' },
+
   // Card/infographic
   { id: 'card-header',         label: 'Card',         group: 'Special' },
   { id: 'infographic',         label: 'Infographic',  group: 'Special' },
+  { id: 'card-elegant',        label: 'Card Eleg',    group: 'Special' },
+  { id: 'card-modern',         label: 'Card Mod',     group: 'Special' },
+  { id: 'infographic-bold',    label: 'Info Bold',    group: 'Special' },
+  { id: 'infographic-clean',   label: 'Info Clean',   group: 'Special' },
 ];
 
 const HEADING_SIZE_OPTIONS = ['s', 'm', 'l', 'xl'] as const;
@@ -611,7 +653,34 @@ export default function DesignEditor({
                       return (
                         <button
                           key={opt.id}
-                          onClick={() => updateDesign('layout', opt.id)}
+                          onClick={() => {
+                            updateDesign('layout', opt.id);
+                            const id = opt.id;
+                            if (id.includes('elegant')) {
+                              updateDesign('fontFamily', 'Merriweather');
+                              updateDesign('headingStyle', 'double-side_t1');
+                              updateDesign('headingCapitalization', 'capitalize');
+                              updateDesign('entrySpacing', 6);
+                            } else if (id.includes('bold')) {
+                              updateDesign('fontFamily', 'Montserrat');
+                              updateDesign('headingStyle', 'strikethrough_t3');
+                              updateDesign('headingCapitalization', 'uppercase');
+                              updateDesign('entrySpacing', 4);
+                            } else if (id.includes('clean')) {
+                              updateDesign('fontFamily', 'Inter');
+                              updateDesign('headingStyle', 'line-bottom_t1');
+                              updateDesign('headingCapitalization', 'none');
+                              updateDesign('entrySpacing', 5);
+                            } else if (id.includes('playful')) {
+                              updateDesign('fontFamily', 'Outfit');
+                              updateDesign('headingStyle', 'dot_s8');
+                              updateDesign('headingCapitalization', 'lowercase');
+                            } else if (id.includes('boxed') || id.includes('modern-header-dark') || id.includes('double-header-dark')) {
+                              updateDesign('fontFamily', 'Roboto');
+                              updateDesign('headingStyle', 'box_filled');
+                              updateDesign('headingCapitalization', 'uppercase');
+                            }
+                          }}
                           className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition-all hover:scale-105"
                           style={active
                             ? { border: '1.5px solid var(--app-primary)', background: 'var(--app-primary-light)', color: 'var(--app-primary)' }
