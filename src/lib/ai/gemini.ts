@@ -181,29 +181,46 @@ export async function generateWithAI(
   prompt: string,
   options: { fieldType?: string; fallbackText?: string } = {}
 ): Promise<string> {
+  console.log('🤖 AI Request:', { fieldType: options.fieldType, hasText: !!options.fallbackText });
+  
   // Try all AI providers in order — first one that works wins
-  const providers = [tryGroq, tryGemini, tryOpenAI];
+  const providers = [
+    { name: 'Groq', fn: tryGroq },
+    { name: 'Gemini', fn: tryGemini },
+    { name: 'OpenAI', fn: tryOpenAI }
+  ];
 
   for (const provider of providers) {
     try {
-      const result = await provider(prompt);
-      if (result && result.trim().length > 0) return result;
-    } catch {
-      // provider threw — try next
+      console.log(`🔄 Trying ${provider.name}...`);
+      const result = await provider.fn(prompt);
+      if (result && result.trim().length > 0) {
+        console.log(`✅ ${provider.name} succeeded!`);
+        return result;
+      }
+      console.log(`❌ ${provider.name} returned empty`);
+    } catch (error: any) {
+      console.log(`❌ ${provider.name} failed:`, error.message);
     }
   }
 
+  console.log('⚠️ All AI providers failed, using local enhancement');
+
   // All AI providers failed — use local enhancement if we have text
   if (options.fallbackText) {
-    return localEnhanceText(options.fallbackText, options.fieldType || 'default');
+    const enhanced = localEnhanceText(options.fallbackText, options.fieldType || 'default');
+    console.log('✅ Local enhancement succeeded');
+    return enhanced;
   }
 
   // For resume/cover-letter generation — return empty, caller handles gracefully
   if (options.fieldType === 'resume' || options.fieldType === 'cover-letter') {
+    console.log('❌ No fallback for resume/cover-letter generation');
     return '';
   }
 
   // For field enhancement with no text at all
+  console.log('❌ No text provided for enhancement');
   throw new Error('AI service temporarily unavailable. Please try again in a moment.');
 }
 

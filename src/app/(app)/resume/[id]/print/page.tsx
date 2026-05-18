@@ -13,7 +13,7 @@ const defaultDesign = {
   entrySpacing: 4, sectionSpacing: 8,
   primaryColor: '#ff4d7d', secondaryColor: '#c026d3', accentColor: '#c026d3',
   textColor: '#1f2937', backgroundColor: '#ffffff',
-  accentType: 'basic' as const, applyAccentTo: ['headings', 'headingLine'] as const,
+  accentType: 'basic' as const, applyAccentTo: ['headings', 'headingLine'],
   fontFamily: 'Outfit', fontCategory: 'sans' as const,
   headingStyle: 'underline', headingCapitalization: 'uppercase' as const,
   headingSize: 'm' as const, headingIconType: 'none' as const,

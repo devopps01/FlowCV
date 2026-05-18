@@ -2,344 +2,408 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { motion, useScroll, useTransform, AnimatePresence, useInView } from 'framer-motion';
 import {
   FileText, Sparkles, ArrowRight, Star, Users, Trophy,
   Download, Shield, Zap, Globe, Eye, Check, Brain, Award,
-  ChevronRight, Play, Briefcase, GraduationCap, Palette,
+  ChevronRight, Play, Briefcase, GraduationCap, Palette, Quote,
+  Layout, Search, Lock, MousePointer2, Smartphone, Cpu, BarChart3,
+  Rocket, MessageSquare, Heart, Bookmark
 } from 'lucide-react';
 import { HomeHeader } from '@/components/layout/HomeHeader';
 
-// ─── Intersection Observer hook for scroll animations ────────────────────────
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setInView(true); }, { threshold });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, inView };
-}
+// ─── Animation Config ────────────────────────────────────────────────────────
+const sectionVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      duration: 0.8, 
+      ease: 'easeOut' as const,
+      staggerChildren: 0.2
+    } 
+  }
+};
 
-// ─── Animated section wrapper ────────────────────────────────────────────────
-function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const { ref, inView } = useInView();
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+};
+
+// ─── Components ─────────────────────────────────────────────────────────────
+
+function SectionWrapper({ children, className = "", id = "" }: { children: React.ReactNode, className?: string, id?: string }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: false, amount: 0.3 });
+
   return (
-    <div
+    <motion.section
+      id={id}
       ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? 'translateY(0)' : 'translateY(28px)',
-        transition: `opacity 0.65s ease ${delay}ms, transform 0.65s ease ${delay}ms`,
-      }}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={sectionVariants}
+      className={`min-h-screen flex flex-col items-center justify-center relative py-20 px-4 sm:px-6 lg:px-8 overflow-hidden ${className}`}
     >
       {children}
-    </div>
+    </motion.section>
   );
 }
 
-// ─── Data ────────────────────────────────────────────────────────────────────
-const STATS = [
-  { value: '4.3M+', label: 'Happy Users', icon: Users },
-  { value: '200+', label: 'Templates', icon: FileText },
-  { value: '99.9%', label: 'Uptime', icon: Trophy },
-  { value: '4.9★', label: 'Avg Rating', icon: Star },
-];
-
-const FEATURES = [
-  { icon: Sparkles, title: 'AI-Powered Writing', desc: 'Gemini AI suggests bullet points, summaries, and improvements tailored to your role.' },
-  { icon: Palette, title: '200+ Templates', desc: 'Industry-tested designs that pass ATS systems and impress hiring managers.' },
-  { icon: Download, title: 'Unlimited PDF Export', desc: 'High-quality PDF downloads with no watermarks, no limits, no hidden fees.' },
-  { icon: Shield, title: 'Privacy First', desc: 'Your data is yours. We never sell or share your personal information.' },
-  { icon: Zap, title: 'Real-Time Preview', desc: 'See every change instantly on a pixel-perfect A4 preview as you type.' },
-  { icon: Globe, title: 'Multi-Language', desc: 'Create resumes in any language to apply for jobs anywhere in the world.' },
-];
-
-const STEPS = [
-  { icon: FileText, step: '01', title: 'Add Your Info', desc: 'Fill in your details with smart form guidance. Import from LinkedIn or upload an existing resume.' },
-  { icon: Palette, step: '02', title: 'Pick a Design', desc: 'Choose from 200+ templates. Customize colors, fonts, layout, and spacing to match your style.' },
-  { icon: Download, step: '03', title: 'Download & Apply', desc: 'Export a pixel-perfect PDF and share your resume link directly with recruiters.' },
-];
-
-const TESTIMONIALS = [
-  { name: 'Sarah Johnson', role: 'Software Engineer at Google', img: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face', quote: 'FlowCV helped me create a resume that stood out. I landed my dream job at Google within 2 weeks!' },
-  { name: 'Michael Chen', role: 'Marketing Manager at Microsoft', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face', quote: 'The AI suggestions helped me highlight my achievements perfectly. I got multiple offers!' },
-  { name: 'Emily Davis', role: 'Product Designer at Apple', img: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face', quote: 'Beautiful templates and easy customization. My resume looks incredibly professional now.' },
-];
-
-const TIPS = [
-  { icon: Brain, title: 'Tailor Each Application', tip: 'Use keywords from the job description to pass ATS filters.' },
-  { icon: Award, title: 'Quantify Achievements', tip: '"Increased sales by 30%" beats "Improved sales" every time.' },
-  { icon: Shield, title: 'Keep It Concise', tip: 'Recruiters spend ~7 seconds per resume. One page is ideal.' },
-  { icon: Zap, title: 'Use Action Verbs', tip: 'Start bullets with Led, Built, Launched, Optimized, Delivered.' },
-];
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    const onScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const [docHeight, setDocHeight] = useState(1);
-  useEffect(() => {
-    const update = () => setDocHeight(document.documentElement.scrollHeight - window.innerHeight || 1);
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  const scrollProgress = Math.min(100, (scrollY / docHeight) * 100);
+  const { scrollYProgress } = useScroll();
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
-      {/* Scroll progress bar */}
-      <div className="fixed top-0 left-0 z-[60] h-0.5 bg-gradient-to-r from-[#41017d] to-[#ee14ff] transition-all duration-100" style={{ width: `${scrollProgress}%` }} />
+    <div className="bg-[var(--app-bg)] text-[var(--app-text)] font-sans selection:bg-[var(--app-primary-light)] selection:text-[var(--app-primary)]">
+      {/* Progress Bar */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1.5 z-[100] bg-gradient-to-r from-[var(--app-primary)] via-[var(--app-secondary)] to-[var(--app-primary)] origin-left"
+        style={{ scaleX: scrollYProgress }}
+      />
 
       <HomeHeader />
 
-      <main>
-        {/* ── Hero ── */}
-        <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#f8f0ff] via-white to-[#fdf0ff]">
-          {/* Decorative blobs */}
-          <div className="absolute top-20 left-10 w-72 h-72 rounded-full bg-[#41017d]/10 blur-3xl animate-float pointer-events-none" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-[#ee14ff]/10 blur-3xl animate-float pointer-events-none" style={{ animationDelay: '2s' }} />
+      <main className="relative">
+        {/* Floating Decorative Elements */}
+        <div className="fixed inset-0 pointer-events-none z-0">
+          <motion.div style={{ y: backgroundY }} className="absolute top-[10%] left-[5%] w-96 h-96 bg-[var(--app-primary-light)] rounded-full blur-[120px] opacity-20" />
+          <motion.div style={{ y: backgroundY }} className="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[var(--app-secondary)] rounded-full blur-[150px] opacity-10" />
+        </div>
 
-          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-24">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#41017d]/10 border border-[#41017d]/20 text-[#41017d] text-sm font-semibold mb-8">
-              <Sparkles className="w-4 h-4" />
-              AI-Powered Resume Builder — Free Forever
-            </div>
+        {/* 1. HERO SECTION */}
+        <SectionWrapper className="pt-32">
+          <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--app-primary-light)] border border-[var(--app-primary)] text-[var(--app-primary)] text-sm font-black mb-8">
+            <Sparkles className="w-4 h-4" />
+            <span>AI-POWERED CAREER PLATFORM</span>
+          </motion.div>
+          
+          <motion.h1 variants={itemVariants} className="text-6xl sm:text-8xl md:text-9xl font-black text-center leading-[0.9] tracking-tighter mb-8 max-w-5xl">
+            BUILD <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--app-primary)] to-[var(--app-secondary)]">IMPACT</span><br />
+            NOT JUST A RESUME
+          </motion.h1>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-tight mb-6 tracking-tight">
-              Build Your{' '}
-              <span className="gradient-text animate-gradient">Dream Resume</span>
-              <br />in Minutes
-            </h1>
+          <motion.p variants={itemVariants} className="text-xl sm:text-2xl text-center text-[var(--app-text-secondary)] max-w-2xl mb-12 leading-relaxed font-medium">
+            Join 4.3M+ professionals using our neural design engine to land jobs at the world&apos;s most innovative companies.
+          </motion.p>
 
-            <p className="text-lg sm:text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Join 4.3 million professionals who landed their dream jobs with our AI-powered resume builder. No credit card. No watermarks. Free forever.
-            </p>
+          <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+            <Link href="/register" className="flex-1 text-center py-5 rounded-2xl bg-[var(--app-primary)] text-white font-black text-xl shadow-2xl hover:scale-105 active:scale-95 transition-all">
+              Get Started — Free
+            </Link>
+            <Link href="/templates" className="flex-1 text-center py-5 rounded-2xl bg-[var(--app-bg-card)] border border-[var(--app-border)] font-black text-xl shadow-xl hover:bg-[var(--app-bg-gray)] transition-all">
+              Templates
+            </Link>
+          </motion.div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-              <Link href="/register" className="btn-primary text-white px-8 py-4 text-base rounded-xl">
-                Start Building Free
-                <ArrowRight className="inline-block ml-2 w-5 h-5" />
-              </Link>
-              <Link href="/templates" className="btn-ghost px-8 py-4 text-base rounded-xl">
-                <Eye className="inline-block mr-2 w-5 h-5" />
-                Browse Templates
-              </Link>
-            </div>
+          <motion.div variants={itemVariants} className="mt-20 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-40 grayscale">
+            {['Google', 'Netflix', 'Tesla', 'Apple', 'Meta'].map(brand => (
+              <span key={brand} className="text-2xl font-black tracking-tighter">{brand}</span>
+            ))}
+          </motion.div>
+        </SectionWrapper>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-              {STATS.map((s, i) => {
-                const Icon = s.icon;
-                return (
-                  <div key={i} className="glass-card p-4 text-center hover-lift">
-                    <Icon className="w-5 h-5 mx-auto mb-1 text-[#41017d]" />
-                    <div className="text-2xl font-black gradient-text">{s.value}</div>
-                    <div className="text-xs text-gray-500 font-medium">{s.label}</div>
+        {/* 2. HOW IT WORKS SECTION */}
+        <SectionWrapper className="bg-[var(--app-bg-gray)]/50">
+          <motion.div variants={itemVariants} className="text-center mb-20">
+            <h2 className="text-5xl sm:text-7xl font-black mb-6">Simple As <span className="text-[var(--app-primary)]">1-2-3</span></h2>
+            <p className="text-xl text-[var(--app-text-secondary)]">Your path to a professional career, streamlined.</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl w-full">
+            {[
+              { icon: MessageSquare, title: "Input Content", desc: "Type your info or import from LinkedIn. Our AI handles the phrasing." },
+              { icon: Layout, title: "Pick a Masterpiece", desc: "Select from 200+ industry-tested templates that recruiters love." },
+              { icon: Rocket, title: "Apply Instantly", desc: "Export pixel-perfect PDFs or share your live resume link." }
+            ].map((step, i) => (
+              <motion.div key={i} variants={itemVariants} className="p-10 app-card group">
+                <div className="w-20 h-20 rounded-[2rem] bg-[var(--app-primary-light)] flex items-center justify-center mb-8 group-hover:bg-[var(--app-primary)] transition-colors duration-500">
+                  <step.icon className="w-10 h-10 text-[var(--app-primary)] group-hover:text-white" />
+                </div>
+                <div className="text-xs font-black text-[var(--app-primary)] uppercase tracking-widest mb-4">Step 0{i+1}</div>
+                <h3 className="text-3xl font-black mb-4">{step.title}</h3>
+                <p className="text-[var(--app-text-secondary)] font-medium leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </SectionWrapper>
+
+        {/* 3. AI ENGINE SECTION */}
+        <SectionWrapper>
+          <div className="grid lg:grid-cols-2 gap-16 items-center max-w-7xl w-full">
+            <motion.div variants={itemVariants} className="relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[var(--app-primary)] to-[var(--app-secondary)] rounded-[4rem] blur-2xl opacity-20" />
+              <div className="relative app-card p-8 !rounded-[3rem]">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                    <Cpu className="w-6 h-6" />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ── How It Works ── */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-[#f8fafc]">
-          <div className="max-w-6xl mx-auto">
-            <FadeIn className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">How It Works</h2>
-              <p className="text-lg text-gray-500 max-w-xl mx-auto">Create a professional resume in three simple steps</p>
-            </FadeIn>
-
-            <div className="grid md:grid-cols-3 gap-8 relative">
-              {/* Connector line */}
-              <div className="hidden md:block absolute top-12 left-1/3 right-1/3 h-0.5 bg-gradient-to-r from-[#41017d]/30 to-[#ee14ff]/30" />
-
-              {STEPS.map((step, i) => {
-                const Icon = step.icon;
-                return (
-                  <FadeIn key={i} delay={i * 150} className="relative">
-                    <div className="glass-card p-8 text-center hover-lift h-full">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#41017d] to-[#ee14ff] flex items-center justify-center mx-auto mb-4 shadow-lg">
-                        <Icon className="w-8 h-8 text-white" />
-                      </div>
-                      <div className="text-xs font-black text-[#41017d] uppercase tracking-widest mb-2">{step.step}</div>
-                      <h3 className="text-xl font-black text-gray-900 mb-3">{step.title}</h3>
-                      <p className="text-gray-500 leading-relaxed text-sm">{step.desc}</p>
-                    </div>
-                  </FadeIn>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Features ── */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-          <div className="max-w-6xl mx-auto">
-            <FadeIn className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">Everything You Need</h2>
-              <p className="text-lg text-gray-500 max-w-xl mx-auto">Powerful tools to create a resume that gets you hired</p>
-            </FadeIn>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {FEATURES.map((f, i) => {
-                const Icon = f.icon;
-                return (
-                  <FadeIn key={i} delay={i * 80}>
-                    <div className="group p-6 rounded-2xl border border-gray-100 hover:border-[#41017d]/30 hover:shadow-xl transition-all duration-300 bg-white hover:-translate-y-1 h-full">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#41017d]/10 to-[#ee14ff]/10 flex items-center justify-center mb-4 group-hover:from-[#41017d] group-hover:to-[#ee14ff] transition-all duration-300">
-                        <Icon className="w-6 h-6 text-[#41017d] group-hover:text-white transition-colors duration-300" />
-                      </div>
-                      <h3 className="text-lg font-black text-gray-900 mb-2">{f.title}</h3>
-                      <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
-                    </div>
-                  </FadeIn>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Testimonials ── */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-[#f8f0ff] to-white">
-          <div className="max-w-6xl mx-auto">
-            <FadeIn className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">Success Stories</h2>
-              <p className="text-lg text-gray-500 max-w-xl mx-auto">Thousands of professionals landed their dream jobs with FlowCV</p>
-            </FadeIn>
-
-            <div className="grid md:grid-cols-3 gap-6">
-              {TESTIMONIALS.map((t, i) => (
-                <FadeIn key={i} delay={i * 120}>
-                  <div className="glass-card p-6 hover-lift h-full flex flex-col">
-                    <div className="flex items-center gap-3 mb-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={t.img} alt={t.name} className="w-12 h-12 rounded-full object-cover ring-2 ring-[#41017d]/20" />
-                      <div>
-                        <div className="font-black text-gray-900 text-sm">{t.name}</div>
-                        <div className="text-xs text-gray-500">{t.role}</div>
-                      </div>
-                    </div>
-                    <p className="text-gray-600 text-sm leading-relaxed italic flex-1">&ldquo;{t.quote}&rdquo;</p>
-                    <div className="flex gap-0.5 mt-4">
-                      {[...Array(5)].map((_, j) => <Star key={j} className="w-4 h-4 fill-yellow-400 text-yellow-400" />)}
-                    </div>
+                  <div>
+                    <h4 className="font-black">Neural Content Assistant</h4>
+                    <p className="text-xs text-[var(--app-text-muted)]">Powered by Gemini Pro</p>
                   </div>
-                </FadeIn>
+                </div>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-[var(--app-bg-gray)] border-l-4 border-blue-500 italic">
+                    &quot;I managed a team of developers...&quot;
+                  </div>
+                  <motion.div 
+                    animate={{ x: [0, 10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="flex justify-center"
+                  >
+                    <ArrowRight className="text-[var(--app-primary)]" />
+                  </motion.div>
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border-l-4 border-emerald-500 font-bold">
+                    &quot;Spearheaded a cross-functional engineering team of 12, increasing sprint velocity by 40%...&quot;
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div variants={itemVariants}>
+              <h2 className="text-5xl sm:text-7xl font-black mb-8 leading-tight">Write Like a <span className="text-blue-500">Pro</span> with AI</h2>
+              <p className="text-xl text-[var(--app-text-secondary)] mb-10 leading-relaxed">
+                Struggling with bullet points? Our AI understands your industry and suggests powerful, action-oriented descriptions that pass ATS filters.
+              </p>
+              <ul className="space-y-6">
+                {['Smart Action Verbs', 'Context-Aware Summaries', 'Industry Keyword Injection'].map(item => (
+                  <li key={item} className="flex items-center gap-4 text-xl font-bold">
+                    <div className="p-2 rounded-full bg-emerald-500 text-white"><Check className="w-5 h-5" /></div>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+        </SectionWrapper>
+
+        {/* 4. TEMPLATE SHOWCASE */}
+        <SectionWrapper className="bg-black text-white">
+          <motion.div variants={itemVariants} className="text-center mb-20">
+            <h2 className="text-5xl sm:text-7xl font-black mb-6">Built for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">Winning</span></h2>
+            <p className="text-xl text-gray-400">200+ battle-tested templates for every industry.</p>
+          </motion.div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl w-full">
+            {[1, 2, 3, 4].map(i => (
+              <motion.div 
+                key={i} 
+                variants={itemVariants}
+                whileHover={{ scale: 1.05, rotate: 2 }}
+                className="aspect-[3/4] rounded-3xl bg-gray-900 border border-gray-800 overflow-hidden shadow-2xl relative group"
+              >
+                <img 
+                  src={`https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400&h=600&fit=crop`} 
+                  alt="Template" 
+                  className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-6 flex flex-col justify-end">
+                  <h4 className="text-xl font-black">Modern Slate</h4>
+                  <p className="text-xs text-gray-400 uppercase tracking-widest">Executive Design</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <motion.div variants={itemVariants} className="mt-16">
+            <Link href="/templates" className="px-10 py-4 rounded-2xl bg-white text-black font-black text-xl hover:scale-105 transition-all inline-block">
+              View All Templates
+            </Link>
+          </motion.div>
+        </SectionWrapper>
+
+        {/* 5. DESIGN ENGINE */}
+        <SectionWrapper>
+          <div className="grid lg:grid-cols-2 gap-16 items-center max-w-7xl w-full">
+            <motion.div variants={itemVariants} className="order-2 lg:order-1">
+              <h2 className="text-5xl sm:text-7xl font-black mb-8 leading-tight">Your Design, <span className="text-[var(--app-primary)]">Infinite</span> Control</h2>
+              <p className="text-xl text-[var(--app-text-secondary)] mb-10 leading-relaxed">
+                Change fonts, adjust spacing, reorder sections, and pick custom colors. Our pixel-perfect engine ensures your resume looks stunning on any device.
+              </p>
+              <div className="grid grid-cols-2 gap-6">
+                {[
+                  { icon: Palette, text: "Custom Colors" },
+                  { icon: MousePointer2, text: "Drag & Drop" },
+                  { icon: Smartphone, text: "Live Preview" },
+                  { icon: Bookmark, text: "Version Control" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 app-card !rounded-2xl">
+                    <item.icon className="w-6 h-6 text-[var(--app-primary)]" />
+                    <span className="font-bold">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+            
+            <motion.div variants={itemVariants} className="order-1 lg:order-2">
+               <div className="relative group">
+                 <div className="absolute -inset-10 bg-[var(--app-primary-light)] rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity" />
+                 <img src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=600&fit=crop" className="relative rounded-[3rem] shadow-2xl border border-[var(--app-border)]" alt="Interface" />
+               </div>
+            </motion.div>
+          </div>
+        </SectionWrapper>
+
+        {/* 6. ATS OPTIMIZATION */}
+        <SectionWrapper className="bg-[var(--app-primary)] text-white">
+          <div className="max-w-4xl text-center">
+            <motion.div variants={itemVariants} className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-10">
+              <BarChart3 className="w-12 h-12" />
+            </motion.div>
+            <motion.h2 variants={itemVariants} className="text-5xl sm:text-8xl font-black mb-8">99% ATS SCORE</motion.h2>
+            <motion.p variants={itemVariants} className="text-2xl font-medium mb-12 opacity-90">
+              Don&apos;t let robots reject your dreams. Our templates are architected to be 100% readable by Applicant Tracking Systems used by 95% of Fortune 500 companies.
+            </motion.p>
+            <motion.div variants={itemVariants} className="flex flex-wrap justify-center gap-4">
+              {['Optimized Headers', 'Standard Fonts', 'Clean Hierarchies', 'Smart Metadata'].map(tag => (
+                <span key={tag} className="px-6 py-3 rounded-full bg-white/10 border border-white/20 font-black text-sm uppercase tracking-widest">
+                  {tag}
+                </span>
               ))}
-            </div>
+            </motion.div>
           </div>
-        </section>
+        </SectionWrapper>
 
-        {/* ── Resume Tips ── */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-          <div className="max-w-6xl mx-auto">
-            <FadeIn className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">Expert Resume Tips</h2>
-              <p className="text-lg text-gray-500 max-w-xl mx-auto">Professional advice to make your resume stand out</p>
-            </FadeIn>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {TIPS.map((tip, i) => {
-                const Icon = tip.icon;
-                return (
-                  <FadeIn key={i} delay={i * 100}>
-                    <div className="text-center p-6 rounded-2xl border border-gray-100 hover:border-[#41017d]/30 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white h-full">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#41017d] to-[#ee14ff] flex items-center justify-center mx-auto mb-4 shadow-md">
-                        <Icon className="w-6 h-6 text-white" />
-                      </div>
-                      <h3 className="font-black text-gray-900 mb-2">{tip.title}</h3>
-                      <p className="text-sm text-gray-500 leading-relaxed">{tip.tip}</p>
-                    </div>
-                  </FadeIn>
-                );
-              })}
-            </div>
+        {/* 7. CLOUD SYNC SECTION */}
+        <SectionWrapper>
+          <div className="text-center mb-16">
+            <motion.div variants={itemVariants} className="flex justify-center gap-6 mb-10">
+              <Smartphone className="w-16 h-16 text-[var(--app-primary)]" />
+              <Globe className="w-16 h-16 text-[var(--app-secondary)]" />
+            </motion.div>
+            <motion.h2 variants={itemVariants} className="text-5xl sm:text-7xl font-black mb-8 leading-tight">Access <span className="text-[var(--app-secondary)]">Anywhere</span>, Sync Everything</motion.h2>
+            <motion.p variants={itemVariants} className="text-xl text-[var(--app-text-secondary)] max-w-2xl mx-auto mb-16 font-medium leading-relaxed">
+              Start on your laptop, tweak on your phone, and download on a tablet. Your career progress is always saved and synchronized in real-time.
+            </motion.p>
           </div>
-        </section>
+          
+          <motion.div variants={itemVariants} className="w-full max-w-5xl aspect-video rounded-[3rem] bg-[var(--app-bg-gray)] border border-[var(--app-border)] overflow-hidden shadow-2xl flex items-center justify-center">
+             <div className="text-center">
+               <Play className="w-20 h-20 text-[var(--app-primary)] mx-auto mb-4" />
+               <p className="font-black uppercase tracking-widest">Watch how it syncs</p>
+             </div>
+          </motion.div>
+        </SectionWrapper>
 
-        {/* ── CTA ── */}
-        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-[#41017d] to-[#ee14ff]">
-          <FadeIn className="max-w-3xl mx-auto text-center">
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-6">Ready to Land Your Dream Job?</h2>
-            <p className="text-lg text-white/80 mb-10">Join millions of professionals who built their careers with FlowCV. It&apos;s free, always.</p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/register" className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#41017d] rounded-xl font-black text-base hover:bg-gray-50 transition-all hover:scale-105 shadow-xl">
-                Start Free Today
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link href="/login" className="inline-flex items-center gap-2 px-8 py-4 border-2 border-white/40 text-white rounded-xl font-bold text-base hover:bg-white/10 transition-all">
-                Sign In
-                <ChevronRight className="w-5 h-5" />
-              </Link>
-            </div>
-          </FadeIn>
-        </section>
+        {/* 8. PRIVACY & SECURITY */}
+        <SectionWrapper className="bg-gray-50 dark:bg-gray-900/50">
+          <div className="grid lg:grid-cols-2 gap-16 items-center max-w-7xl w-full">
+            <motion.div variants={itemVariants}>
+               <div className="grid grid-cols-2 gap-4">
+                 {[1, 2, 3, 4].map(i => (
+                   <div key={i} className="aspect-square rounded-3xl bg-[var(--app-bg-card)] border border-[var(--app-border)] flex items-center justify-center">
+                     <Lock className="w-12 h-12 text-[var(--app-primary)] opacity-20" />
+                   </div>
+                 ))}
+               </div>
+            </motion.div>
+            
+            <motion.div variants={itemVariants}>
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center mb-8 text-white">
+                <Shield className="w-10 h-10" />
+              </div>
+              <h2 className="text-5xl sm:text-7xl font-black mb-8 leading-tight">Your Data is <span className="text-emerald-500">Private</span></h2>
+              <p className="text-xl text-[var(--app-text-secondary)] mb-10 leading-relaxed font-medium">
+                We don&apos;t sell your data to recruiters or third parties. Your personal information is encrypted and only accessible by you. Your privacy is our core value.
+              </p>
+              <div className="flex items-center gap-4 text-[var(--app-text)] font-black uppercase tracking-widest">
+                <Globe className="w-5 h-5 text-emerald-500" />
+                GDPR & CCPA COMPLIANT
+              </div>
+            </motion.div>
+          </div>
+        </SectionWrapper>
+
+        {/* 9. TESTIMONIALS */}
+        <SectionWrapper className="bg-[var(--app-bg)] relative">
+          <motion.div variants={itemVariants} className="text-center mb-20">
+            <h2 className="text-5xl sm:text-7xl font-black mb-6">4.3M+ <span className="text-[var(--app-secondary)]">Wins</span></h2>
+            <p className="text-xl text-[var(--app-text-secondary)]">Real success stories from our global community.</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-7xl w-full">
+            {[
+              { name: "Alex Rivera", role: "Product Manager at Airbnb", text: "The AI suggestions were a game changer. I doubled my response rate in just one week." },
+              { name: "Jordan Smith", role: "UX Designer at Spotify", text: "Finally, a resume builder that actually cares about design. The templates are gorgeous." },
+              { name: "Sarah Chen", role: "Software Lead at Stripe", text: "Pixel-perfect PDF export that works every time. No more formatting nightmares." }
+            ].map((t, i) => (
+              <motion.div key={i} variants={itemVariants} className="p-10 rounded-[3rem] bg-[var(--app-bg-card)] border border-[var(--app-border)] shadow-xl relative group">
+                <Quote className="w-10 h-10 text-[var(--app-primary-light)] mb-6 opacity-40 group-hover:scale-125 transition-transform" />
+                <p className="text-xl font-medium italic mb-10 leading-relaxed">&quot;{t.text}&quot;</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--app-primary)] to-[var(--app-secondary)]" />
+                  <div>
+                    <h5 className="font-black">{t.name}</h5>
+                    <p className="text-xs text-[var(--app-text-muted)] uppercase font-bold tracking-widest">{t.role}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </SectionWrapper>
+
+        {/* 10. FINAL CTA */}
+        <SectionWrapper className="bg-[var(--app-bg)] pb-40">
+           <div className="relative w-full max-w-5xl rounded-[4rem] bg-gradient-to-br from-[var(--app-primary)] via-[var(--app-secondary)] to-[var(--app-primary)] p-12 sm:p-24 text-center overflow-hidden shadow-2xl">
+              <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]" />
+              <motion.div 
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-1/2 -left-1/4 w-full h-full bg-white/10 rounded-full blur-[100px]" 
+              />
+              
+              <div className="relative z-10">
+                <motion.h2 variants={itemVariants} className="text-5xl sm:text-8xl font-black text-white mb-8 leading-[0.9] tracking-tighter">
+                  READY TO LAND<br />YOUR DREAM JOB?
+                </motion.h2>
+                <motion.p variants={itemVariants} className="text-xl sm:text-2xl text-white/90 mb-16 font-medium max-w-2xl mx-auto">
+                  Stop settling for mediocre resumes. Start your professional journey with the world&apos;s most powerful career platform.
+                </motion.p>
+                <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                  <Link href="/register" className="px-12 py-6 rounded-[2rem] bg-white text-[var(--app-primary)] font-black text-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
+                    Build My Resume
+                  </Link>
+                  <Link href="/login" className="px-12 py-6 rounded-[2rem] bg-white/10 border border-white/20 text-white font-black text-2xl backdrop-blur-md hover:bg-white/20 transition-all w-full sm:w-auto">
+                    Sign In
+                  </Link>
+                </motion.div>
+              </div>
+           </div>
+        </SectionWrapper>
       </main>
 
-      {/* ── Footer ── */}
-      <footer className="bg-gray-950 text-gray-400 py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            {/* Brand */}
+      {/* FOOTER */}
+      <footer className="bg-black text-white py-24 px-4 sm:px-6 lg:px-8 border-t border-gray-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-16 mb-20">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#41017d] to-[#ee14ff] flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-white" />
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-r from-[var(--app-primary)] to-[var(--app-secondary)] flex items-center justify-center">
+                  <FileText className="text-white w-6 h-6" />
                 </div>
-                <span className="text-xl font-black text-white">FlowCV</span>
+                <span className="text-3xl font-black tracking-tighter">FlowCV</span>
               </div>
-              <p className="text-sm leading-relaxed">The world&apos;s most advanced free resume builder.</p>
+              <p className="text-gray-400 font-medium leading-relaxed">The next generation career platform for the modern workforce.</p>
             </div>
-
-            {/* Product */}
-            <div>
-              <h4 className="text-white font-black text-sm uppercase tracking-widest mb-4">Product</h4>
-              <ul className="space-y-2 text-sm">
-                {[['Resume Builder', '/dashboard'], ['Templates', '/templates'], ['Cover Letters', '/cover-letters'], ['AI Generator', '/ai-resume-generator']].map(([label, href]) => (
-                  <li key={label}><Link href={href} className="hover:text-white transition-colors">{label}</Link></li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h4 className="text-white font-black text-sm uppercase tracking-widest mb-4">Company</h4>
-              <ul className="space-y-2 text-sm">
-                {[['About', '/about'], ['Pricing', '/pricing'], ['Blog', '#'], ['Careers', '#']].map(([label, href]) => (
-                  <li key={label}><Link href={href} className="hover:text-white transition-colors">{label}</Link></li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <h4 className="text-white font-black text-sm uppercase tracking-widest mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm">
-                {[['Privacy Policy', '/privacy-policy'], ['Terms of Service', '/terms-of-service'], ['Help Center', '#'], ['Contact', '#']].map(([label, href]) => (
-                  <li key={label}><Link href={href} className="hover:text-white transition-colors">{label}</Link></li>
-                ))}
-              </ul>
-            </div>
+            {['Product', 'Company', 'Support', 'Legal'].map(group => (
+              <div key={group}>
+                <h5 className="text-xs font-black uppercase tracking-widest mb-8 text-gray-500">{group}</h5>
+                <ul className="space-y-4 font-bold text-gray-400">
+                  <li><Link href="#" className="hover:text-white transition-colors">Resume Builder</Link></li>
+                  <li><Link href="#" className="hover:text-white transition-colors">Templates</Link></li>
+                  <li><Link href="#" className="hover:text-white transition-colors">Cover Letters</Link></li>
+                  <li><Link href="#" className="hover:text-white transition-colors">AI Writing</Link></li>
+                </ul>
+              </div>
+            ))}
           </div>
-
-          <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm">© {new Date().getFullYear()} FlowCV. All rights reserved.</p>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              All systems operational
+          <div className="pt-12 border-t border-gray-900 flex flex-col md:flex-row justify-between items-center gap-8 text-gray-500 font-bold">
+            <p>© {new Date().getFullYear()} FlowCV. Built with ❤️ for the future of work.</p>
+            <div className="flex gap-8">
+              <Link href="#" className="hover:text-white transition-colors">Twitter</Link>
+              <Link href="#" className="hover:text-white transition-colors">LinkedIn</Link>
+              <Link href="#" className="hover:text-white transition-colors">Instagram</Link>
             </div>
           </div>
         </div>
@@ -347,3 +411,4 @@ export default function HomePage() {
     </div>
   );
 }
+

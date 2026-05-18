@@ -4,8 +4,12 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com', 'prod.flowcvassets.com', 'assets.flowcvassets.com'],
   },
-  // Puppeteer must run server-side only
-  serverExternalPackages: ['puppeteer', 'puppeteer-core'],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'next-auth', '@next-auth/prisma-adapter', '@prisma/client'];
+    }
+    return config;
+  },
 }
 
 module.exports = nextConfig

@@ -509,7 +509,7 @@ export default function DesignEditor({
         </div>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Layout Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Layout" icon={Layout} defaultOpen>
+        <SectionBlock title="Layout" icon={Layout} defaultOpen={false}>
           <div>
             <Label>Page Layout</Label>
             {/* Group layouts by category */}
@@ -632,7 +632,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Colors Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Colors" icon={Palette} defaultOpen>
+        <SectionBlock title="Colors" icon={Palette} defaultOpen={false}>
           <div>
             <Label>Accent Color</Label>
             <div className="flex flex-wrap gap-2 mb-2">
@@ -731,7 +731,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Typography Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Typography" icon={Type} defaultOpen>
+        <SectionBlock title="Typography" icon={Type} defaultOpen={false}>
           {/* Font Family Picker */}
           <div>
             <Label>Font Family</Label>
@@ -859,7 +859,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Spacing Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Spacing" icon={Sliders}>
+        <SectionBlock title="Spacing" icon={Sliders} defaultOpen={false}>
           <SliderRow label="Left & Right Margin" value={d.marginLR ?? 12} min={6} max={25} unit="mm" onChange={v => updateDesign('marginLR', v)} />
           <SliderRow label="Top & Bottom Margin" value={d.marginTB ?? 16} min={6} max={25} unit="mm" onChange={v => updateDesign('marginTB', v)} />
           <SliderRow label="Entry Spacing" value={d.entrySpacing ?? 4} min={1} max={10} unit="mm" onChange={v => updateDesign('entrySpacing', v)} />
@@ -867,7 +867,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Section Headings Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Section Headings" icon={BookOpen}>
+        <SectionBlock title="Section Headings" icon={BookOpen} defaultOpen={false}>
           <div>
             <Label>Heading Style</Label>
             <input
@@ -914,7 +914,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Entry Layout Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Entry Layout" icon={LayoutTemplate}>
+        <SectionBlock title="Entry Layout" icon={LayoutTemplate} defaultOpen={false}>
           <div>
             <Label>Entry Style</Label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -974,7 +974,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Personal Details Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Personal Details" icon={Settings2}>
+        <SectionBlock title="Personal Details" icon={Settings2} defaultOpen={false}>
           <div>
             <Label>Alignment</Label>
             <div className="flex gap-1.5">
@@ -1036,7 +1036,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Photo Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Photo" icon={Image}>
+        <SectionBlock title="Photo" icon={Image} defaultOpen={false}>
           <BoolToggle label="Show Photo" value={d.photoShow ?? true} onChange={v => updateDesign('photoShow', v)} />
 
           {d.photoShow && (
@@ -1082,7 +1082,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Skills & Languages Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Skills & Languages" icon={Grid}>
+        <SectionBlock title="Skills & Languages" icon={Grid} defaultOpen={false}>
           <div>
             <Label>Skills Style</Label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -1144,7 +1144,7 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Work & Education Order Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Content Order" icon={List}>
+        <SectionBlock title="Content Order" icon={List} defaultOpen={false}>
           <div>
             <Label>Work Entry Order</Label>
             <div className="flex gap-1.5">
@@ -1172,14 +1172,14 @@ export default function DesignEditor({
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Links Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Links" icon={Wand2}>
+        <SectionBlock title="Links" icon={Wand2} defaultOpen={false}>
           <BoolToggle label="Underline Links" value={d.linkUnderline ?? true} onChange={v => updateDesign('linkUnderline', v)} />
           <BoolToggle label="Blue Link Color" value={d.linkBlueColor ?? false} onChange={v => updateDesign('linkBlueColor', v)} />
           <BoolToggle label="Show Link Icons" value={d.linkIcon ?? true} onChange={v => updateDesign('linkIcon', v)} />
         </SectionBlock>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Footer Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <SectionBlock title="Footer" icon={Eye}>
+        <SectionBlock title="Footer" icon={Eye} defaultOpen={false}>
           <BoolToggle label="Show Page Numbers" value={d.showPageNumbers ?? true} onChange={v => updateDesign('showPageNumbers', v)} />
           <BoolToggle label="Show Email in Footer" value={d.showEmailInFooter ?? false} onChange={v => updateDesign('showEmailInFooter', v)} />
           <BoolToggle label="Show Name in Footer" value={d.showNameInFooter ?? false} onChange={v => updateDesign('showNameInFooter', v)} />

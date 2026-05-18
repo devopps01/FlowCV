@@ -78,25 +78,29 @@ export default function FeaturesPage() {
       icon: Brain,
       title: 'Smart Content Analysis',
       description: 'Analyze your resume content with AI-powered insights to improve your chances of getting hired.',
-      features: ['Content Scoring', 'Keyword Analysis', 'Readability Check', 'Impact Assessment']
+      features: ['Content Scoring', 'Keyword Analysis', 'Readability Check', 'Impact Assessment'],
+      gradient: 'linear-gradient(135deg, #41017d, #ee14ff)'
     },
     {
       icon: Palette,
       title: 'Custom Design Tools',
       description: 'Personalize every aspect of your resume with our advanced design and formatting tools.',
-      features: ['Color Themes', 'Font Selection', 'Layout Options', 'Custom Sections']
+      features: ['Color Themes', 'Font Selection', 'Layout Options', 'Custom Sections'],
+      gradient: 'linear-gradient(135deg, #ee14ff, #41017d)'
     },
     {
       icon: Share2,
       title: 'Easy Sharing & Collaboration',
       description: 'Share your resume with others and get feedback before applying to your dream job.',
-      features: ['Share Links', 'Feedback System', 'Version Control', 'Team Collaboration']
+      features: ['Share Links', 'Feedback System', 'Version Control', 'Team Collaboration'],
+      gradient: 'linear-gradient(135deg, #41017d, #5a1fa8)'
     },
     {
       icon: Cloud,
       title: 'Cloud Storage & Sync',
       description: 'Access your resumes from anywhere with automatic cloud synchronization across all devices.',
-      features: ['Auto-Save', 'Cross-Device Sync', 'Version History', 'Offline Mode']
+      features: ['Auto-Save', 'Cross-Device Sync', 'Version History', 'Offline Mode'],
+      gradient: 'linear-gradient(135deg, #5a1fa8, #ee14ff)'
     }
   ];
 
@@ -105,25 +109,29 @@ export default function FeaturesPage() {
       icon: Cpu,
       title: 'Performance Optimized',
       description: 'Lightning-fast performance with optimized rendering and instant updates.',
-      features: ['Fast Loading', 'Real-time Updates', 'Optimized Code', 'Smooth Animations']
+      features: ['Fast Loading', 'Real-time Updates', 'Optimized Code', 'Smooth Animations'],
+      gradient: 'linear-gradient(135deg, #41017d, #ee14ff)'
     },
     {
       icon: Code,
       title: 'Developer Friendly',
       description: 'Clean, maintainable code with modern development practices and comprehensive documentation.',
-      features: ['Clean Architecture', 'TypeScript', 'Modern Stack', 'Well Documented']
+      features: ['Clean Architecture', 'TypeScript', 'Modern Stack', 'Well Documented'],
+      gradient: 'linear-gradient(135deg, #ee14ff, #41017d)'
     },
     {
       icon: Database,
       title: 'Robust Infrastructure',
       description: 'Scalable infrastructure built with the latest technologies for reliability and performance.',
-      features: ['Scalable Backend', 'Database Optimization', 'API Integration', 'Load Balancing']
+      features: ['Scalable Backend', 'Database Optimization', 'API Integration', 'Load Balancing'],
+      gradient: 'linear-gradient(135deg, #41017d, #5a1fa8)'
     },
     {
       icon: Lock,
       title: 'Enterprise Security',
       description: 'Enterprise-grade security with comprehensive protection for your data and privacy.',
-      features: ['End-to-End Encryption', 'Secure Authentication', 'Regular Audits', 'Compliance Standards']
+      features: ['End-to-End Encryption', 'Secure Authentication', 'Regular Audits', 'Compliance Standards'],
+      gradient: 'linear-gradient(135deg, #5a1fa8, #ee14ff)'
     }
   ];
 

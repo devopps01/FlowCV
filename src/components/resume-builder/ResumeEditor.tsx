@@ -131,71 +131,7 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     return () => clearTimeout(timeoutId);
   }, [data, id]);
 
-  // A4 Pagination Logic — measure actual rendered content height
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-
-    const A4_PX = 1122; // 297mm at 96dpi
-    const PAGE_GAP = 24; // gap between pages in preview
-    // Threshold: only add a page if content overflows by more than 20px
-    const PAGE_THRESHOLD = 20;
-
-    const measure = () => {
-      // Measure the CONTENT inside the resume paper, not the paper itself
-      // The paper has minHeight set to numPages * A4_PX which would cause circular measurement
-      // Instead, temporarily remove minHeight, measure, then restore
-      const originalMinHeight = el.style.minHeight;
-      el.style.minHeight = 'auto';
-
-      // Walk all child elements to find the true bottom of content
-      let maxBottom = 0;
-      const elRect = el.getBoundingClientRect();
-
-      el.querySelectorAll('*').forEach(child => {
-        // Skip page spacers and overlay elements
-        const c = child as HTMLElement;
-        if (c.dataset?.pageSpacer) return;
-        const rect = c.getBoundingClientRect();
-        const bottom = rect.bottom - elRect.top;
-        if (bottom > maxBottom) maxBottom = bottom;
-      });
-
-      // Restore minHeight
-      el.style.minHeight = originalMinHeight;
-
-      const contentHeight = maxBottom;
-
-      if (contentHeight <= 0) {
-        setNumPages(1);
-        return;
-      }
-
-      // Calculate pages: each page is A4_PX tall
-      // Content that overflows page 1 by more than PAGE_THRESHOLD creates page 2
-      const pages = contentHeight > A4_PX + PAGE_THRESHOLD
-        ? Math.ceil(contentHeight / A4_PX)
-        : 1;
-
-      setNumPages(Math.max(1, pages));
-    };
-
-    // Delay first measure to let fonts/images/layout settle
-    const t = setTimeout(measure, 300);
-
-    const ro = new ResizeObserver(() => {
-      // Debounce resize measurements
-      clearTimeout((ro as any)._timer);
-      (ro as any)._timer = setTimeout(measure, 100);
-    });
-    ro.observe(el);
-
-    return () => {
-      clearTimeout(t);
-      clearTimeout((ro as any)._timer);
-      ro.disconnect();
-    };
-  }, [data]);
+  // numPages is now synced from ResumePreview via onPageCountChange
 
   // History management
   const addToHistory = useCallback((newData: ResumeData) => {
@@ -269,13 +205,23 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     toast.loading('Generating PDF...', { id: 'pdf' });
 
     try {
-      const fontFamily = data.design.fontFamily || 'Inter';
-      const fontQuery = fontFamily.replace(/\s+/g, '+');
-      const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
-
-      // Wait for fonts to be ready
+      // Wait for fonts and re-render
       await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 600)); // Longer delay for full re-render without scale
+
+      // Collect all fonts used (base + overrides)
+      const usedFonts = new Set<string>();
+      usedFonts.add(data.design.fontFamily || 'Inter');
+      if (data.styleOverrides) {
+        Object.values(data.styleOverrides).forEach((style: any) => {
+          if (style.fontFamily) usedFonts.add(style.fontFamily);
+        });
+      }
+      
+      const fontLinks = Array.from(usedFonts).map(font => {
+        const query = font.replace(/\s+/g, '+');
+        return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${query}:wght@400;500;600;700;900&display=swap">`;
+      }).join('\n');
 
       // Collect all computed CSS rules from the page (Tailwind + custom styles)
       const allStyles = Array.from(document.styleSheets)
@@ -285,8 +231,14 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         })
         .join('\n');
 
+      // Helper to convert relative URLs to absolute URLs for Puppeteer
+      const getAbsoluteUrl = (url: string) => {
+        if (!url) return '';
+        if (url.startsWith('http') || url.startsWith('data:')) return url;
+        return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+      };
+
       // Clone the resume element — preserve ALL existing inline styles
-      // Only override the properties that would break PDF rendering
       const clone = el.cloneNode(true) as HTMLElement;
       clone.style.transform = 'none';
       clone.style.boxShadow = 'none';
@@ -294,6 +246,13 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
       clone.style.height = 'auto';
       clone.style.overflow = 'visible';
       clone.style.margin = '0';
+      
+      // FIX: Ensure the profile image uses an absolute URL for Puppeteer
+      clone.querySelectorAll('img').forEach(img => {
+        const src = img.getAttribute('src');
+        if (src) img.setAttribute('src', getAbsoluteUrl(src));
+      });
+
       // Remove interactive UI elements
       clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
       clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
@@ -304,15 +263,13 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
         if (c.style?.maxHeight) c.style.maxHeight = 'none';
       });
 
-      // A4 at 96dpi = 794px wide. We tell Puppeteer to use 96dpi (deviceScaleFactor=1)
-      // so that 210mm = 794px exactly — matching the browser's rendering.
       const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-  <link rel="stylesheet" href="${fontUrl}">
+  ${fontLinks}
   <style>
     ${allStyles}
     *, *::before, *::after {
@@ -651,6 +608,8 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
                 data={data}
                 updateNested={updateNested}
                 setData={setData}
+                onExport={exportPDF}
+                isExporting={isExporting}
               />
             ) : (
               <DesignEditor
@@ -667,8 +626,12 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
 
         {/* ── Preview Area ── */}
         <div
-          className="flex-1 min-h-0 flex flex-col relative"
-          style={{ background: 'var(--app-bg-medium)', overflow: 'hidden' }}
+          className="flex-1 min-h-0 flex flex-col relative overflow-auto custom-scrollbar"
+          style={{ 
+            background: 'var(--app-bg-medium)',
+            padding: '40px 0',
+            scrollBehavior: 'smooth'
+          }}
           ref={previewContainerRef}
         >
           <InlineEditor
@@ -689,6 +652,7 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
                 setActiveTab('design');
               }}
               onReorderSections={(newOrder) => updateNested('activeSections', newOrder)}
+              onPageCountChange={setNumPages}
             />
           </InlineEditor>
         </div>

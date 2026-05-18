@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, X, Search, ChevronDown, Loader2 } from 'lucide-react';
+import { Eye, X, Search, ChevronDown, Loader2, Sparkles, Filter, Layout as LayoutIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ResumePreview from '@/components/resume-builder/ResumePreview';
 import { TemplatesHeader } from '@/components/layout/TemplatesHeader';
+import { Footer } from '@/components/layout/footer';
 import { ResumeData } from '@/components/resume-builder/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -28,44 +30,29 @@ const PREVIEW_CONTENT: ResumeData['content'] = {
   experience: [
     { id: 'e1', company: 'Meta Platforms', position: 'Senior Specialist', startDate: '2020-03', endDate: 'Present', current: true, description: 'Led cross-functional teams delivering high-impact features for 2B+ users. Optimized core algorithms resulting in 15% performance increase.' },
     { id: 'e2', company: 'Startup Hub', position: 'Founding Member', startDate: '2016-06', endDate: '2020-02', current: false, description: 'Scaled platform from zero to 100k active users within 18 months. Architected MVP using React and Node.js.' },
-    { id: 'e3', company: 'Design Co.', position: 'Junior Architect', startDate: '2014-01', endDate: '2016-05', current: false, description: 'Collaborated on large-scale infrastructure projects focused on sustainable design.' },
   ],
   education: [
     { id: 'ed1', school: 'Stanford University', degree: 'MS', field: 'Computer Science', graduationYear: '2016' },
-    { id: 'ed2', school: 'UC Berkeley', degree: 'BS', field: 'Engineering', graduationYear: '2014' },
   ],
   skills: [
     { id: 's1', name: 'Leadership' }, { id: 's2', name: 'Product Management' },
-    { id: 's3', name: 'Data Analysis' }, { id: 's4', name: 'React' },
-    { id: 's5', name: 'TypeScript' }, { id: 's6', name: 'Agile' },
-    { id: 's7', name: 'Cloud Computing' }, { id: 's8', name: 'System Architecture' },
+    { id: 's3', name: 'React' }, { id: 's4', name: 'TypeScript' },
   ],
   languages: [
     { id: 'l1', language: 'English', proficiency: 'Native' },
-    { id: 'l2', language: 'Spanish', proficiency: 'Fluent' },
   ],
   certifications: [
     { id: 'c1', name: 'PMP Certified', issuer: 'PMI', date: '2020', description: '' },
-    { id: 'c2', name: 'AWS Solutions Architect', issuer: 'Amazon', date: '2021', description: '' },
   ],
-  projects: [
-    { id: 'pr1', name: 'AI Analytics Dashboard', description: 'Real-time analytics platform with ML predictions', technologies: ['React', 'Python', 'TensorFlow'] },
-  ],
-  awards: [
-    { id: 'aw1', title: 'PM of the Year', issuer: 'TechCorp', date: '2022', description: 'Outstanding product leadership' },
-  ],
-  interests: [
-    { id: 'i1', name: 'Technology' }, { id: 'i2', name: 'Travel' }, { id: 'i3', name: 'Photography' },
-  ],
-  socials: [], courses: [], organisations: [], publications: [], references: [], custom: [],
+  projects: [], awards: [], socials: [], courses: [], organisations: [], publications: [], references: [], custom: [], interests: [],
 };
 
 const CATEGORIES = [
-  { id: 'professional', label: 'Professional Resume Templates', desc: 'Clean, ATS-friendly designs trusted by recruiters worldwide. Stand out with a polished, structured layout.' },
-  { id: 'creative', label: 'Creative Resume Templates', desc: 'Express your personality with colorful, bold templates that turn your resume into a visual story.' },
-  { id: 'executive', label: 'Executive Resume Templates', desc: 'Authoritative, sophisticated designs for senior leadership and C-suite roles.' },
-  { id: 'academic', label: 'Academic Resume Templates', desc: 'Scholarly formats for research positions, professorships, and academic applications.' },
-  { id: 'entry-level', label: 'Entry Level Resume Templates', desc: 'Perfect for students and recent graduates entering the workforce for the first time.' },
+  { id: 'professional', label: 'Professional', desc: 'Clean, ATS-friendly designs trusted by recruiters worldwide.' },
+  { id: 'creative', label: 'Creative', desc: 'Express your personality with colorful, bold templates.' },
+  { id: 'executive', label: 'Executive', desc: 'Authoritative designs for senior leadership and C-suite roles.' },
+  { id: 'academic', label: 'Academic', desc: 'Scholarly formats for research and academic positions.' },
+  { id: 'entry-level', label: 'Entry Level', desc: 'Perfect for students and recent graduates.' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -81,9 +68,9 @@ function categorize(t: TemplateData): string {
 function buildDesign(t: TemplateData): ResumeData['design'] {
   const s = t.secondary?.style || {};
   return {
-    primaryColor: s.primaryColor || '#ff4d7d',
+    primaryColor: s.primaryColor || '#41017d',
     secondaryColor: s.secondaryColor || '#f8fafc',
-    accentColor: s.accentColor || s.primaryColor || '#ff4d7d',
+    accentColor: s.accentColor || s.primaryColor || '#41017d',
     textColor: s.textColor || '#1f2937',
     backgroundColor: s.backgroundColor || '#ffffff',
     fontFamily: s.fontFamily || 'Inter',
@@ -148,23 +135,14 @@ function buildResumeData(t: TemplateData): ResumeData {
     template: t.mainsection.id,
     content: PREVIEW_CONTENT,
     design: buildDesign(t),
-    activeSections: ['summary', 'experience', 'education', 'skills', 'languages', 'certifications', 'projects', 'awards', 'interests'],
+    activeSections: ['summary', 'experience', 'education', 'skills'],
   };
 }
 
 // ─── TemplateCard ─────────────────────────────────────────────────────────────
-interface TemplateCardProps {
-  template: TemplateData;
-  selected: boolean;
-  creating: boolean;
-  onUse: (t: TemplateData) => void;
-  onPreview: (t: TemplateData) => void;
-}
-
-function TemplateCard({ template, selected, creating, onUse, onPreview }: TemplateCardProps) {
+function TemplateCard({ template, selected, creating, onUse, onPreview }: any) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.22);
+  const [scale, setScale] = useState(0.25);
   const resumeData = buildResumeData(template);
 
   useEffect(() => {
@@ -178,16 +156,20 @@ function TemplateCard({ template, selected, creating, onUse, onPreview }: Templa
   }, []);
 
   return (
-    <div className="group flex flex-col gap-2">
-      {/* Card shell */}
+    <motion.div 
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      className="group flex flex-col gap-4"
+    >
       <div
         ref={cardRef}
-        className={`relative rounded-xl overflow-hidden bg-white cursor-pointer transition-all duration-200
-          hover:shadow-2xl hover:-translate-y-1
-          ${selected ? 'ring-2 ring-[#41017d] shadow-lg' : 'ring-1 ring-gray-200 shadow-sm'}`}
-        style={{ aspectRatio: '210/297' }}
+        className={`relative rounded-3xl overflow-hidden cursor-pointer transition-all duration-500
+          shadow-md hover:shadow-2xl hover:-translate-y-2
+          ${selected ? 'ring-4 ring-[var(--app-primary)]' : 'ring-1 ring-[var(--app-border)]'}`}
+        style={{ aspectRatio: '210/297', backgroundColor: 'var(--app-bg-card)' }}
       >
-        {/* Scaled live preview */}
         <div
           style={{
             width: '794px',
@@ -202,197 +184,36 @@ function TemplateCard({ template, selected, creating, onUse, onPreview }: Templa
           <ResumePreview
             data={resumeData}
             numPages={1}
-            previewRef={previewRef}
             zoomLevel={100}
             isThumbnail={true}
           />
         </div>
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 backdrop-blur-[2px]">
           <button
             onClick={(e) => { e.stopPropagation(); onUse(template); }}
             disabled={creating}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg transition-all disabled:opacity-60 flex items-center gap-1.5"
-            style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
+            className="px-6 py-2.5 rounded-2xl text-sm font-black text-white shadow-xl transition-all active:scale-95 disabled:opacity-60 flex items-center gap-2"
+            style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
           >
-            {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutIcon className="w-4 h-4" />}
             Use Template
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onPreview(template); }}
-            className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-gray-700 shadow-lg transition-all"
-            title="Preview"
+            className="p-3 rounded-2xl bg-white/90 hover:bg-white text-gray-900 shadow-xl transition-all active:scale-95"
+            title="Full Preview"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Name */}
-      <p className="text-xs font-semibold text-gray-600 text-center truncate px-1 group-hover:text-gray-900 transition-colors">
-        {template.mainsection.name}
-      </p>
-    </div>
-  );
-}
-
-// ─── PreviewModal ─────────────────────────────────────────────────────────────
-interface PreviewModalProps {
-  template: TemplateData;
-  creating: boolean;
-  onUse: (t: TemplateData) => void;
-  onClose: () => void;
-}
-
-function PreviewModal({ template, creating, onUse, onClose }: PreviewModalProps) {
-  const previewRef = useRef<HTMLDivElement>(null);
-  const resumeData = buildResumeData(template);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  // Prevent body scroll
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, []);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-white rounded-2xl shadow-2xl flex flex-col w-full max-w-5xl overflow-hidden"
-        style={{ maxHeight: '95vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{template.mainsection.name}</h2>
-            {template.mainsection.description && (
-              <p className="text-xs text-gray-500 mt-0.5">{template.mainsection.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onUse(template)}
-              disabled={creating}
-              className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all disabled:opacity-60 flex items-center gap-2 hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
-            >
-              {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-              Use This Template
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Body — scrollable, centered A4 preview */}
-        <div className="flex-1 overflow-auto bg-[#f1f5f9] flex justify-center py-8 px-4">
-          <div
-            style={{
-              width: '794px',
-              transform: 'scale(0.68)',
-              transformOrigin: 'top center',
-              marginBottom: 'calc((0.68 - 1) * 1122px)',
-            }}
-          >
-            <ResumePreview
-              data={resumeData}
-              numPages={1}
-              previewRef={previewRef}
-              zoomLevel={100}
-              isThumbnail={false}
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 shrink-0 bg-white">
-          <p className="text-xs text-gray-400">Click &ldquo;Use This Template&rdquo; to start editing with your own content.</p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors border border-gray-200"
-            >
-              Close
-            </button>
-            <button
-              onClick={() => onUse(template)}
-              disabled={creating}
-              className="px-5 py-2 rounded-xl text-sm font-bold text-white shadow-md transition-all disabled:opacity-60 flex items-center gap-2 hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #41017d, #ee14ff)' }}
-            >
-              {creating && <Loader2 className="w-4 h-4 animate-spin" />}
-              Use This Template
-            </button>
-          </div>
-        </div>
+      <div className="px-2 text-center">
+        <h4 className="font-bold text-[var(--app-text)] truncate">{template.mainsection.name}</h4>
+        <p className="text-[10px] font-black uppercase tracking-widest text-[var(--app-text-muted)] mt-0.5">{categorize(template)}</p>
       </div>
-    </div>
-  );
-}
-
-// ─── CategorySection ──────────────────────────────────────────────────────────
-interface CategorySectionProps {
-  label: string;
-  desc: string;
-  templates: TemplateData[];
-  selectedId: string | null;
-  creatingId: string | null;
-  onUse: (t: TemplateData) => void;
-  onPreview: (t: TemplateData) => void;
-}
-
-function CategorySection({ label, desc, templates, selectedId, creatingId, onUse, onPreview }: CategorySectionProps) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? templates : templates.slice(0, 6);
-
-  return (
-    <section className="bg-white rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-8 pt-8 pb-2">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">{label}</h2>
-        <p className="text-sm text-gray-500 max-w-2xl">{desc}</p>
-      </div>
-
-      <div className="px-8 pb-8 pt-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-6">
-          {visible.map((t) => (
-            <TemplateCard
-              key={t.mainsection.id}
-              template={t}
-              selected={selectedId === t.mainsection.id}
-              creating={creatingId === t.mainsection.id}
-              onUse={onUse}
-              onPreview={onPreview}
-            />
-          ))}
-        </div>
-
-        {templates.length > 6 && (
-          <div className="mt-8 flex justify-center">
-            <button
-              onClick={() => setShowAll((v) => !v)}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all"
-            >
-              {showAll ? 'Show Less' : `See More`}
-              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showAll ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
+    </motion.div>
   );
 }
 
@@ -401,10 +222,8 @@ export default function TemplatesPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<TemplateData | null>(null);
 
@@ -413,25 +232,22 @@ export default function TemplatesPage() {
       .then((r) => r.json())
       .then((json) => {
         if (json.success) setTemplates(json.data?.templates || []);
-        else setError('Failed to load templates.');
       })
-      .catch(() => setError('Failed to load templates.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleUseTemplate = useCallback(async (template: TemplateData) => {
-    setSelectedId(template.mainsection.id);
+  const handleUseTemplate = async (template: TemplateData) => {
     setCreatingId(template.mainsection.id);
     try {
       const res = await fetch('/api/resumes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `${template.mainsection.name} Resume`,
+          title: `My ${template.mainsection.name} Resume`,
           template: template.mainsection.id,
           design: buildDesign(template),
           content: PREVIEW_CONTENT,
-          activeSections: ['summary', 'experience', 'education', 'skills', 'languages', 'certifications', 'projects', 'awards', 'interests'],
+          activeSections: ['summary', 'experience', 'education', 'skills'],
         }),
       });
       const data = await res.json();
@@ -440,130 +256,184 @@ export default function TemplatesPage() {
     } finally {
       setCreatingId(null);
     }
-  }, [router]);
+  };
 
-  // Group templates by category, filtered by search + active category
-  const grouped = (() => {
-    const q = search.toLowerCase();
-    const filtered = templates.filter((t) => {
-      const matchesSearch = !q || t.mainsection.name.toLowerCase().includes(q);
-      const cat = categorize(t);
-      const matchesCat = !activeCategory || cat === activeCategory;
-      return matchesSearch && matchesCat;
-    });
-    const map: Record<string, TemplateData[]> = {};
-    for (const t of filtered) {
-      const cat = categorize(t);
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(t);
-    }
-    return map;
-  })();
-
-  const totalVisible = Object.values(grouped).reduce((s, a) => s + a.length, 0);
+  const filteredTemplates = templates.filter((t) => {
+    const matchesSearch = !search || t.mainsection.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCat = !activeCategory || categorize(t) === activeCategory;
+    return matchesSearch && matchesCat;
+  });
 
   return (
-    <div className="min-h-screen bg-[#f4f6f8]">
+    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}>
       <TemplatesHeader />
 
-      {/* Hero / Search */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Resume Templates</h1>
-          <p className="text-gray-500 mb-8 max-w-xl mx-auto text-sm">
-            {templates.length > 0 ? `${templates.length} professionally designed templates` : 'Professionally designed templates'} — pick one and start editing instantly.
-          </p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--app-primary-light)] text-[var(--app-primary)] text-sm font-black mb-6"
+          >
+            <Sparkles className="w-4 h-4" />
+            200+ Premium Templates
+          </motion.div>
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-4xl sm:text-6xl font-black mb-6 tracking-tight"
+          >
+            Choose Your <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--app-primary)] to-[var(--app-secondary)]">Perfect</span> Design
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-lg text-[var(--app-text-secondary)] max-w-2xl mx-auto"
+          >
+            Pick a template that matches your career level and industry. All designs are recruiter-approved and ATS-friendly.
+          </motion.p>
+        </div>
 
-          {/* Search */}
-          <div className="relative max-w-md mx-auto mb-6">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* Filters & Search */}
+        <div className="flex flex-col md:flex-row gap-6 mb-12 items-center justify-between sticky top-20 z-30 py-4 px-6 rounded-[2rem] bg-[var(--app-bg-card)] border border-[var(--app-border)] shadow-xl backdrop-blur-xl">
+          <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+            <button
+              onClick={() => setActiveCategory(null)}
+              className={`px-5 py-2 rounded-2xl text-xs font-black transition-all ${!activeCategory ? 'bg-[var(--app-primary)] text-white shadow-lg' : 'hover:bg-[var(--app-bg-gray)] text-[var(--app-text-secondary)]'}`}
+            >
+              All Designs
+            </button>
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-5 py-2 rounded-2xl text-xs font-black transition-all ${activeCategory === cat.id ? 'bg-[var(--app-primary)] text-white shadow-lg' : 'hover:bg-[var(--app-bg-gray)] text-[var(--app-text-secondary)]'}`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--app-text-muted)]" />
             <input
               type="text"
               placeholder="Search templates..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent"
-              style={{ '--tw-ring-color': '#41017d' } as any}
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[var(--app-bg-gray)] border-none text-sm font-medium focus:ring-2 focus:ring-[var(--app-primary)] transition-all"
             />
-          </div>
-
-          {/* Category pills */}
-          <div className="flex flex-wrap justify-center gap-2">
-            <button
-              onClick={() => setActiveCategory(null)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                activeCategory === null
-                  ? 'text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-              style={activeCategory === null ? { background: 'linear-gradient(135deg, #41017d, #ee14ff)' } : {}}
-            >
-              All Templates
-            </button>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setActiveCategory(activeCategory === c.id ? null : c.id)}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                  activeCategory === c.id
-                    ? 'text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                style={activeCategory === c.id ? { background: 'linear-gradient(135deg, #41017d, #ee14ff)' } : {}}
-              >
-                {c.label.replace(' Resume Templates', '')}
-              </button>
-            ))}
           </div>
         </div>
-      </div>
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-        {loading && (
-          <div className="flex items-center justify-center py-32">
-            <Loader2 className="w-8 h-8 animate-spin text-[#41017d]" />
+        {/* Templates Grid */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <Loader2 className="w-12 h-12 animate-spin text-[var(--app-primary)]" />
+            <p className="font-black uppercase tracking-widest text-[10px] text-[var(--app-text-muted)]">Loading Masterpieces...</p>
+          </div>
+        ) : (
+          <motion.div 
+            layout
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 lg:gap-10"
+          >
+            <AnimatePresence mode="popLayout">
+              {filteredTemplates.map((t) => (
+                <TemplateCard
+                  key={t.mainsection.id}
+                  template={t}
+                  creating={creatingId === t.mainsection.id}
+                  onUse={handleUseTemplate}
+                  onPreview={setPreviewTemplate}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
+
+        {/* Empty State */}
+        {!loading && filteredTemplates.length === 0 && (
+          <div className="text-center py-32">
+            <div className="w-20 h-20 bg-[var(--app-bg-gray)] rounded-full flex items-center justify-center mx-auto mb-6">
+              <Filter className="w-10 h-10 text-[var(--app-text-muted)]" />
+            </div>
+            <h3 className="text-2xl font-black mb-2">No templates found</h3>
+            <p className="text-[var(--app-text-secondary)]">Try adjusting your filters or search terms.</p>
           </div>
         )}
+      </main>
 
-        {error && (
-          <div className="text-center py-32 text-red-500 font-medium">{error}</div>
+      {/* Full Screen Preview Modal */}
+      <AnimatePresence>
+        {previewTemplate && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 bg-black/80 backdrop-blur-md"
+            onClick={() => setPreviewTemplate(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-5xl h-full bg-[var(--app-bg-card)] rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 sm:px-10 flex items-center justify-between border-b border-[var(--app-border)]">
+                <div>
+                  <h3 className="text-2xl font-black">{previewTemplate.mainsection.name}</h3>
+                  <p className="text-xs font-bold text-[var(--app-text-muted)] uppercase tracking-widest">{categorize(previewTemplate)} Design</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => handleUseTemplate(previewTemplate)}
+                    disabled={creatingId === previewTemplate.mainsection.id}
+                    className="hidden sm:flex items-center gap-2 px-8 py-3 rounded-2xl font-black text-white shadow-xl hover:scale-105 active:scale-95 transition-all"
+                    style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
+                  >
+                    {creatingId === previewTemplate.mainsection.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <LayoutIcon className="w-5 h-5" />}
+                    Use Template
+                  </button>
+                  <button 
+                    onClick={() => setPreviewTemplate(null)}
+                    className="p-3 rounded-2xl bg-[var(--app-bg-gray)] hover:bg-[var(--app-border)] transition-all"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto bg-[var(--app-bg-medium)] p-8 flex justify-center">
+                 <div className="w-[794px] bg-white shadow-2xl origin-top" style={{ transform: 'scale(0.85)' }}>
+                    <ResumePreview
+                      data={buildResumeData(previewTemplate)}
+                      numPages={1}
+                      zoomLevel={100}
+                    />
+                 </div>
+              </div>
+
+              <div className="p-6 sm:hidden border-t border-[var(--app-border)]">
+                 <button
+                    onClick={() => handleUseTemplate(previewTemplate)}
+                    disabled={creatingId === previewTemplate.mainsection.id}
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white shadow-xl"
+                    style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
+                  >
+                    Use Template
+                  </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        {!loading && !error && totalVisible === 0 && (
-          <div className="text-center py-32 text-gray-400">
-            <p className="text-lg font-medium mb-2">No templates found</p>
-            <p className="text-sm">Try a different search term or category.</p>
-          </div>
-        )}
-
-        {!loading && !error && CATEGORIES.map((cat) => {
-          const list = grouped[cat.id];
-          if (!list || list.length === 0) return null;
-          return (
-            <CategorySection
-              key={cat.id}
-              label={cat.label}
-              desc={cat.desc}
-              templates={list}
-              selectedId={selectedId}
-              creatingId={creatingId}
-              onUse={handleUseTemplate}
-              onPreview={setPreviewTemplate}
-            />
-          );
-        })}
-      </div>
-
-      {/* Preview Modal */}
-      {previewTemplate && (
-        <PreviewModal
-          template={previewTemplate}
-          creating={creatingId === previewTemplate.mainsection.id}
-          onUse={handleUseTemplate}
-          onClose={() => setPreviewTemplate(null)}
-        />
-      )}
+      <Footer />
     </div>
   );
 }
+

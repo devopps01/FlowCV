@@ -153,13 +153,16 @@ Return ONLY the raw JSON array, no markdown.`,
 
     const parsed = JSON.parse(rawJson);
 
-    // Add IDs to array items
+    // Add IDs to array items and ensure object format
     let result = parsed;
     if (Array.isArray(parsed)) {
-      result = parsed.map((item: any, i: number) => ({
-        id: `${section}_ai_${Date.now()}_${i}`,
-        ...item,
-      }));
+      result = parsed.map((item: any, i: number) => {
+        const base = typeof item === 'string' ? { name: item } : item;
+        return {
+          id: `${section}_ai_${Date.now()}_${i}`,
+          ...base,
+        };
+      });
     }
 
     return NextResponse.json({ data: result, section });

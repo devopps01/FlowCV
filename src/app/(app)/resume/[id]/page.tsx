@@ -23,7 +23,7 @@ const defaultDesign = {
   textColor: '#1f2937',
   backgroundColor: '#ffffff',
   accentType: 'basic' as const,
-  applyAccentTo: ['headings', 'headingLine'] as const,
+  applyAccentTo: ['headings', 'headingLine'],
   fontFamily: 'Outfit',
   fontCategory: 'sans' as const,
   headingStyle: 'underline',

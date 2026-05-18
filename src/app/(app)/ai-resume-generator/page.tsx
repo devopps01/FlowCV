@@ -42,13 +42,14 @@ export default function AIResumeGenerator() {
       summary: '',
       image: ''
     },
-    experience: [],
-    education: [],
-    skills: [],
-    languages: [],
-    projects: [],
-    certifications: [],
-    awards: []
+    experience: [] as any[],
+    education: [] as any[],
+    skills: [] as any[],
+    languages: [] as any[],
+    projects: [] as any[],
+    certifications: [] as any[],
+    awards: [] as any[],
+    interests: [] as any[]
   });
   
   const [activeTab, setActiveTab] = useState('personal');

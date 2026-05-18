@@ -7,6 +7,7 @@ export interface Experience {
   endDate: string;
   current?: boolean;
   description: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Education {
@@ -17,17 +18,20 @@ export interface Education {
   location?: string;
   graduationYear: string;
   description?: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Skill {
   id: string;
   name: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Language {
   id: string;
   language: string;
   proficiency: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Certification {
@@ -36,6 +40,7 @@ export interface Certification {
   issuer: string;
   date: string;
   description?: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Project {
@@ -43,6 +48,7 @@ export interface Project {
   name: string;
   description: string;
   technologies: string[];
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Award {
@@ -51,11 +57,13 @@ export interface Award {
   issuer: string;
   date: string;
   description?: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Interest {
   id: string;
   name: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Course {
@@ -64,6 +72,7 @@ export interface Course {
   provider: string;
   date: string;
   description: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Organisation {
@@ -73,6 +82,7 @@ export interface Organisation {
   startDate: string;
   endDate: string;
   description: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Publication {
@@ -82,6 +92,7 @@ export interface Publication {
   date: string;
   url: string;
   description: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Reference {
@@ -92,6 +103,7 @@ export interface Reference {
   email: string;
   phone: string;
   relationship: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Social {
@@ -99,12 +111,14 @@ export interface Social {
   platform: string;
   url: string;
   label: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Custom {
   id: string;
   title: string;
   content: string;
+  hidden?: boolean; // Show/hide in resume
 }
 
 export interface Declaration {

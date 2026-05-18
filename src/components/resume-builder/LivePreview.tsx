@@ -238,7 +238,7 @@ const LivePreview: React.FC<LivePreviewProps> = ({
 
       <div className="flex flex-1 overflow-hidden">
         {/* Main preview area */}
-        <div className="flex-1 overflow-auto bg-gray-100">
+        <div className="flex-1 overflow-auto bg-gray-100 py-10">
           <ResumePreview
             data={previewState.data}
             isThumbnail={false}

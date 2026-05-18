@@ -21,6 +21,7 @@
   /* ── Light mode ─────────────────────────────────────────────────────── */
   :root {
     --app-bg:            #ffffff;
+    --app-bg-gradient:   radial-gradient(circle at 50% -20%, #f1f5f9 0%, #ffffff 100%);
     --app-bg-gray:       #f8fafc;
     --app-bg-medium:     #f1f5f9;
     --app-bg-sidebar:    #ffffff;
@@ -37,33 +38,53 @@
     --app-success:       #10b981;
     --app-error:         #ef4444;
     --app-warning:       #f59e0b;
-    --app-shadow:        0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-    --app-shadow-md:     0 4px 16px rgba(0,0,0,0.08);
-    --app-shadow-lg:     0 8px 32px rgba(0,0,0,0.10);
+    --app-shadow:        0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+    --app-shadow-md:     0 4px 20px -2px rgba(0,0,0,0.05);
+    --app-shadow-lg:     0 20px 40px -4px rgba(0,0,0,0.07);
+    --app-lite-shadow:   inset 0 0 100px rgba(0,0,0,0.02);
   }
 
   /* ── Dark mode ──────────────────────────────────────────────────────── */
   .dark {
-    --app-bg:            #0f172a;
-    --app-bg-gray:       #1e293b;
-    --app-bg-medium:     #334155;
-    --app-bg-sidebar:    #1e293b;
-    --app-bg-card:       #1e293b;
-    --app-text:          #f1f5f9;
+    --app-bg:            #0a0f1d;
+    --app-bg-gradient:   radial-gradient(circle at 50% -20%, #1e293b 0%, #0a0f1d 100%);
+    --app-bg-gray:       #111827;
+    --app-bg-medium:     #1e293b;
+    --app-bg-sidebar:    #111827;
+    --app-bg-card:       #111827;
+    --app-text:          #f8fafc;
     --app-text-secondary:#94a3b8;
-    --app-text-muted:    #64748b;
-    --app-border:        #334155;
-    --app-border-light:  #1e293b;
+    --app-text-muted:    #4b5563;
+    --app-border:        #1f2937;
+    --app-border-light:  #111827;
     --app-primary:       #a855f7;
-    --app-primary-light: rgba(168,85,247,0.12);
+    --app-primary-light: rgba(168,85,247,0.15);
     --app-secondary:     #ee14ff;
     --app-accent:        #ee14ff;
     --app-success:       #34d399;
     --app-error:         #f87171;
     --app-warning:       #fbbf24;
     --app-shadow:        0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-    --app-shadow-md:     0 4px 16px rgba(0,0,0,0.3);
-    --app-shadow-lg:     0 8px 32px rgba(0,0,0,0.4);
+    --app-shadow-md:     0 10px 30px -5px rgba(0,0,0,0.4);
+    --app-shadow-lg:     0 20px 50px -10px rgba(0,0,0,0.5);
+    --app-lite-shadow:   inset 0 0 120px rgba(0,0,0,0.2);
+  }
+}
+
+@layer base {
+  body {
+    background-image: var(--app-bg-gradient);
+    background-attachment: fixed;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    box-shadow: var(--app-lite-shadow);
+    pointer-events: none;
+    z-index: 100;
   }
 }
 
@@ -130,42 +151,59 @@
   .app-card {
     background: var(--app-bg-card);
     border: 1px solid var(--app-border);
-    border-radius: 1rem;
-    box-shadow: var(--app-shadow);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    border-radius: 1.5rem;
+    box-shadow: var(--app-shadow-md);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
   }
-  .app-card:hover { box-shadow: var(--app-shadow-md); }
+  .app-card:hover { 
+    box-shadow: var(--app-shadow-lg);
+    transform: translateY(-4px);
+  }
 
   .glass-card {
-    @apply relative overflow-hidden rounded-2xl;
+    @apply relative overflow-hidden rounded-[2rem];
     background: var(--app-bg-card);
     border: 1px solid var(--app-border);
-    box-shadow: var(--app-shadow-md);
-    backdrop-filter: blur(12px);
+    box-shadow: var(--app-shadow-lg);
+    backdrop-filter: blur(16px);
   }
   .dark .glass-card {
-    background: rgba(30,41,59,0.8);
+    background: rgba(17,24,39,0.8);
     border-color: var(--app-border);
   }
 
   /* ── Sidebar ─────────────────────────────────────────────────────────── */
   .app-sidebar {
-    background: var(--app-bg-sidebar);
-    border-right: 1px solid var(--app-border);
+    @apply transition-all duration-300;
+    box-shadow: 1px 0 0 var(--app-border), 10px 0 50px rgba(0,0,0,0.02);
+  }
+  .dark .app-sidebar {
+    box-shadow: 1px 0 0 var(--app-border), 20px 0 60px rgba(0,0,0,0.2);
   }
   .app-sidebar-link {
-    @apply flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all;
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold
+           transition-all duration-200 relative overflow-hidden mb-1;
     color: var(--app-text-secondary);
   }
   .app-sidebar-link:hover {
-    background: var(--app-bg-gray);
     color: var(--app-text);
+    background: var(--app-bg-gray);
+    transform: translateX(4px);
   }
   .app-sidebar-link.active {
-    background: var(--app-bg-card);
-    color: var(--app-text);
-    border: 1px solid var(--app-border);
-    box-shadow: var(--app-shadow);
+    color: white;
+    background: linear-gradient(135deg, var(--app-primary), var(--app-secondary));
+    box-shadow: 0 4px 12px var(--app-primary-light);
+  }
+  .app-sidebar-link.active::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 3px;
+    background: white;
+    border-radius: 4px 0 0 4px;
   }
   .app-sidebar-link.active svg { color: var(--app-primary); }
 
@@ -314,39 +352,55 @@
   /* Force all color properties to use the resume's own inline styles */
   color-scheme: light !important;
 }
+
 .resume-paper {
   background-color: #ffffff !important;
-  color: #1f2937 !important;
+  color: #000000 !important;
 }
-/* Ensure text inside resume paper is never overridden by dark mode */
-.dark .resume-paper { background-color: #ffffff !important; color: #1f2937 !important; }
+
+/* Force all text elements in the resume to be pure black for ultimate readability in both light & dark mode */
+.resume-paper p,
+.resume-paper li,
+.resume-paper span:not(.accent-icon),
+.resume-paper h1,
+.resume-paper h2,
+.resume-paper h3,
+.resume-paper h4,
+.resume-paper a,
+.resume-paper .rich-content,
+.resume-paper .rich-content * {
+  color: #000000 !important;
+  opacity: 1 !important;
+  --tw-text-opacity: 1 !important;
+}
+
+/* Ensure background is strictly white and text is strictly black in dark mode as well */
+.dark .resume-paper {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
 .dark .resume-paper .bg-white { background-color: #ffffff !important; }
-.dark .resume-paper .bg-gray-50 { background-color: #f8fafc !important; }
-.dark .resume-paper .bg-gray-100 { background-color: #f1f5f9 !important; }
-.dark .resume-paper .bg-slate-50 { background-color: #f8fafc !important; }
-.dark .resume-paper .bg-slate-100 { background-color: #f1f5f9 !important; }
-.dark .resume-paper .text-gray-900 { color: #111827 !important; }
-.dark .resume-paper .text-gray-800 { color: #1f2937 !important; }
-.dark .resume-paper .text-gray-700 { color: #374151 !important; }
-.dark .resume-paper .text-gray-600 { color: #4b5563 !important; }
-.dark .resume-paper .text-gray-500 { color: #6b7280 !important; }
-.dark .resume-paper .text-gray-400 { color: #9ca3af !important; }
-.dark .resume-paper .text-slate-900 { color: #0f172a !important; }
-.dark .resume-paper .text-slate-800 { color: #1e293b !important; }
-.dark .resume-paper .text-slate-700 { color: #334155 !important; }
-.dark .resume-paper .text-slate-600 { color: #475569 !important; }
-.dark .resume-paper .text-slate-500 { color: #64748b !important; }
-.dark .resume-paper .text-slate-400 { color: #94a3b8 !important; }
-.dark .resume-paper .text-slate-300 { color: #cbd5e1 !important; }
-.dark .resume-paper .border-gray-100 { border-color: #f3f4f6 !important; }
-.dark .resume-paper .border-gray-200 { border-color: #e5e7eb !important; }
-.dark .resume-paper .border-slate-100 { border-color: #f1f5f9 !important; }
-.dark .resume-paper .border-slate-200 { border-color: #e2e8f0 !important; }
-.dark .resume-paper .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
-.dark .resume-paper .shadow-lg { box-shadow: 0 10px 15px rgba(0,0,0,0.1) !important; }
+.dark .resume-paper .bg-gray-50 { background-color: #ffffff !important; }
+.dark .resume-paper .bg-gray-100 { background-color: #ffffff !important; }
+.dark .resume-paper .bg-slate-50 { background-color: #ffffff !important; }
+.dark .resume-paper .bg-slate-100 { background-color: #ffffff !important; }
+.dark .resume-paper p,
+.dark .resume-paper li,
+.dark .resume-paper span:not(.accent-icon),
+.dark .resume-paper h1,
+.dark .resume-paper h2,
+.dark .resume-paper h3,
+.dark .resume-paper h4,
+.dark .resume-paper a,
+.dark .resume-paper .rich-content,
+.dark .resume-paper .rich-content * {
+  color: #000000 !important;
+  opacity: 1 !important;
+  --tw-text-opacity: 1 !important;
+}
 .dark .resume-paper input,
 .dark .resume-paper textarea {
   background-color: #ffffff !important;
-  color: #1f2937 !important;
+  color: #000000 !important;
   border-color: #e5e7eb !important;
 }

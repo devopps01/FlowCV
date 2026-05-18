@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { User, Mail, Phone, MapPin, Briefcase, GraduationCap, BadgeCheck, Languages, FolderGit2, Award, Plus, Trash2, GripVertical, Settings2, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Image as ImageIcon, X, UploadCloud, FileText, Sparkles } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Briefcase, GraduationCap, BadgeCheck, Languages, FolderGit2, Award, Plus, Trash2, GripVertical, Settings2, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Image as ImageIcon, X, UploadCloud, FileText, Sparkles, Eye, EyeOff, FileDown, Loader2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import RichTextEditor from './RichTextEditor';
 import { LanguageDropdown, ProficiencyDropdown } from './LanguageDropdown';
@@ -16,26 +16,85 @@ interface ContentEditorProps {
   data: ResumeData;
   updateNested: (path: string, value: any) => void;
   setData: React.Dispatch<React.SetStateAction<ResumeData>>;
+  onExport?: () => void;
+  isExporting?: boolean;
 }
 
 // Helper component for reordering and deleting mapped array items
-const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[], index: number, path: string, updateNested: any }) => (
-  <div className="absolute -top-1 -right-1 flex items-center gap-1 rounded-lg p-1 opacity-0 group-hover/item:opacity-100 transition-opacity z-10 shadow-md" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)" }}>
-    <button onClick={() => {
-      const arr = [...array];
-      if (index > 0) { [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]]; updateNested(path, arr); }
-    }} className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors disabled:opacity-30" disabled={index === 0} title="Move Up"><ArrowUp className="w-3.5 h-3.5" /></button>
-    <button onClick={() => {
-      const arr = [...array];
-      if (index < arr.length - 1) { [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]]; updateNested(path, arr); }
-    }} className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors disabled:opacity-30" disabled={index === array.length - 1} title="Move Down"><ArrowDown className="w-3.5 h-3.5" /></button>
-    <div className="w-px h-3 bg-gray-200 mx-1" />
-    <button onClick={() => updateNested(path, array.filter((_: any, i: number) => i !== index))} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-  </div>
-);
+const ArrayItemControls = ({ array, index, path, updateNested }: { array: any[], index: number, path: string, updateNested: any }) => {
+  const item = array[index];
+  const isHidden = item?.hidden === true;
+  
+  const toggleItemVisibility = () => {
+    const updatedArray = [...array];
+    updatedArray[index] = { ...updatedArray[index], hidden: !isHidden };
+    updateNested(path, updatedArray);
+  };
+
+  const { askConfirm } = useConfirm();
+
+  const handleDelete = async () => {
+    const confirmed = await askConfirm({
+      title: 'Delete Item',
+      message: 'Are you sure you want to delete this item? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    });
+    if (confirmed) {
+      updateNested(path, array.filter((_: any, i: number) => i !== index));
+    }
+  };
+
+  return (
+    <div className="absolute top-2 right-2 flex items-center gap-1 rounded-xl p-1 z-10 transition-all shadow-sm" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)" }}>
+      {/* Eye Icon - Show/Hide in Resume */}
+      <button 
+        onClick={toggleItemVisibility}
+        className="p-1.5 transition-all rounded-lg"
+        style={isHidden 
+          ? { color: 'var(--app-text-muted)', background: 'var(--app-bg-gray)' }
+          : { color: 'var(--app-primary)', background: 'var(--app-primary-light)' }}
+        title={isHidden ? 'Show in resume' : 'Hide from resume'}
+      >
+        {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+      </button>
+      <div className="w-px h-3 bg-gray-200 mx-0.5" />
+      <button 
+        onClick={() => {
+          const arr = [...array];
+          if (index > 0) { [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]]; updateNested(path, arr); }
+        }} 
+        className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors disabled:opacity-30 rounded-lg" 
+        disabled={index === 0} 
+        title="Move Up"
+      >
+        <ArrowUp className="w-3.5 h-3.5" />
+      </button>
+      <button 
+        onClick={() => {
+          const arr = [...array];
+          if (index < arr.length - 1) { [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]]; updateNested(path, arr); }
+        }} 
+        className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors disabled:opacity-30 rounded-lg" 
+        disabled={index === array.length - 1} 
+        title="Move Down"
+      >
+        <ArrowDown className="w-3.5 h-3.5" />
+      </button>
+      <div className="w-px h-3 bg-gray-200 mx-0.5" />
+      <button 
+        onClick={handleDelete} 
+        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors rounded-lg" 
+        title="Delete"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+};
 
 const ContentEditor: React.FC<ContentEditorProps> = ({
-  data, updateNested, setData
+  data, updateNested, setData, onExport, isExporting
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>('personalInfo');
@@ -136,6 +195,73 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       variant: 'warning',
     });
     if (confirmed) removeSection(id);
+  };
+
+  // Toggle section visibility (show/hide in resume without removing data)
+  const toggleSectionVisibility = (id: string) => {
+    setData(prev => {
+      const isVisible = prev.activeSections.includes(id);
+      if (isVisible) {
+        // Hide: remove from activeSections
+        return { ...prev, activeSections: prev.activeSections.filter(sid => sid !== id) };
+      } else {
+        // Show: add to activeSections
+        return { ...prev, activeSections: [...prev.activeSections, id] };
+      }
+    });
+  };
+
+  // Check if section is visible in resume
+  const isSectionVisible = (id: string) => {
+    return data.activeSections.includes(id);
+  };
+
+  // Get all sections that have data (to show in editor even if hidden from resume)
+  const getAllSectionsWithData = () => {
+    const sectionsWithData: string[] = [];
+    
+    // Check each possible section for data
+    const sectionChecks: Record<string, () => boolean> = {
+      experience: () => !!data.content.experience?.length,
+      education: () => !!data.content.education?.length,
+      skills: () => !!data.content.skills?.length,
+      languages: () => !!data.content.languages?.length,
+      projects: () => !!data.content.projects?.length,
+      certifications: () => !!data.content.certifications?.length,
+      awards: () => !!data.content.awards?.length,
+      interests: () => !!data.content.interests?.length,
+      courses: () => !!data.content.courses?.length,
+      organisations: () => !!data.content.organisations?.length,
+      publications: () => !!data.content.publications?.length,
+      references: () => !!data.content.references?.length,
+      socials: () => !!data.content.socials?.length,
+      custom: () => !!data.content.custom?.length,
+      declaration: () => !!data.content.declaration?.text,
+    };
+
+    // Add sections that have data OR are in activeSections
+    Object.entries(sectionChecks).forEach(([sectionId, hasData]) => {
+      if (hasData() || data.activeSections.includes(sectionId)) {
+        sectionsWithData.push(sectionId);
+      }
+    });
+
+    // Maintain order from activeSections, then add any new ones
+    const orderedSections: string[] = [];
+    data.activeSections.forEach(sid => {
+      if (sectionsWithData.includes(sid) && sid !== 'summary') {
+        orderedSections.push(sid);
+      }
+    });
+    
+    // Add sections with data that aren't in activeSections yet
+    sectionsWithData.forEach(sid => {
+      if (!orderedSections.includes(sid) && sid !== 'summary') {
+        orderedSections.push(sid);
+      }
+    });
+
+    return orderedSections;
   };
 
   const addSection = (id: string) => {
@@ -279,23 +405,35 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             <div className="flex flex-col gap-2 mt-2 w-full">
               {/* Photo upload row */}
               <div
-                className="flex items-center justify-between gap-3 rounded-xl p-3"
-                style={{ background: 'var(--app-bg-gray)', border: '1px solid var(--app-border)' }}
+                className="flex items-center justify-between gap-3 rounded-xl p-4"
+                style={{ 
+                  background: 'var(--app-bg-card)', 
+                  border: '1px solid var(--app-border)',
+                  boxShadow: 'var(--app-shadow-sm)'
+                }}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <div
-                    className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center"
-                    style={{ background: 'var(--app-bg-card)', border: '1px solid var(--app-border)' }}
+                    className="w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center relative shrink-0"
+                    style={{ 
+                      background: 'var(--app-bg-gray)', 
+                      border: '2px solid var(--app-border)',
+                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                    }}
                   >
                     {data.content.personalInfo.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={data.content.personalInfo.image} alt="Profile" className="w-full h-full object-cover" />
+                      <img 
+                        src={data.content.personalInfo.image} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover absolute inset-0" 
+                      />
                     ) : (
-                      <ImageIcon className="w-5 h-5" style={{ color: 'var(--app-text-muted)' }} />
+                      <ImageIcon className="w-6 h-6" style={{ color: 'var(--app-text-muted)' }} />
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text)' }}>Profile Photo</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text)' }}>Profile Photo</span>
                     <span className="text-[10px] font-bold" style={{ color: 'var(--app-text-muted)' }}>
                       {uploadingPhoto ? 'Uploading…' : data.content.personalInfo.image ? 'Uploaded' : 'PNG/JPG up to 5MB'}
                     </span>
@@ -303,7 +441,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all ${uploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ background: 'var(--app-primary)', color: '#fff' }}>
+                  <label className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${uploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ background: 'var(--app-primary)', color: '#fff', boxShadow: '0 4px 12px var(--app-primary-light)' }}>
                     <UploadCloud className="w-3.5 h-3.5" />
                     {data.content.personalInfo.image ? 'Change' : 'Upload'}
                     <input type="file" accept="image/*" disabled={uploadingPhoto} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadProfilePhoto(f); e.currentTarget.value = ''; }} />
@@ -312,13 +450,52 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                     <button
                       type="button"
                       onClick={() => updateNested('content.personalInfo.image', '')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all"
-                      style={{ background: 'var(--app-bg-card)', border: '1px solid var(--app-border)', color: 'var(--app-text-secondary)' }}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-red-50 hover:text-red-500"
+                      style={{ background: 'var(--app-bg-gray)', border: '1px solid var(--app-border)', color: 'var(--app-text-secondary)' }}
                     >
-                      <X className="w-3.5 h-3.5" /> Remove
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* PDF Action Row - ENHANCED UI */}
+              <div 
+                className="flex items-center justify-between gap-3 rounded-xl p-4 mb-2"
+                style={{ 
+                  background: 'linear-gradient(135deg, rgba(65,1,125,0.08), rgba(238,20,255,0.08))', 
+                  border: '2px solid var(--app-primary-light)',
+                  boxShadow: 'var(--app-shadow-md)'
+                }}
+              >
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: '#fff', border: '1px solid var(--app-border)', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+                  >
+                    <div className="p-2 rounded-lg" style={{ background: 'var(--app-primary-light)' }}>
+                      <FileDown className="w-5 h-5" style={{ color: 'var(--app-primary)' }} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text)' }}>Resume PDF</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${isExporting ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
+                      <span className="text-[10px] font-bold" style={{ color: 'var(--app-text-muted)' }}>
+                        {isExporting ? 'Generating...' : 'Ready to export'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={onExport}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))', color: '#fff' }}
+                >
+                  {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                  Download PDF
+                </button>
               </div>
 
               {/* Fields grid */}
@@ -369,10 +546,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
           <Droppable droppableId="sections">
             {(provided) => (
               <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3 w-full">
-                {data.activeSections.filter(sid => sid !== 'summary').map((sectionId, index) => {
+                {getAllSectionsWithData().map((sectionId, index) => {
                   const sInfo = CONTENT_MODULES.find(s => s.id === sectionId);
                   const Icon = sInfo?.icon || FolderGit2;
                   const isExpanded = expandedSection === sectionId;
+                  const isVisible = isSectionVisible(sectionId);
 
                   return (
                     <Draggable key={sectionId} draggableId={sectionId} index={index}>
@@ -387,8 +565,9 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                             className="p-3 rounded-xl flex-1 flex flex-col gap-2 w-[calc(100%-1.5rem)] overflow-hidden"
                             style={{
                               background: 'var(--app-bg-card)',
-                              border: '1px solid var(--app-border)',
-                              boxShadow: 'var(--app-shadow)',
+                              border: isVisible ? '1px solid var(--app-border)' : '1px dashed var(--app-border)',
+                              boxShadow: isVisible ? 'var(--app-shadow)' : 'none',
+                              opacity: isVisible ? 1 : 0.6,
                             }}
                           >
                             {/* Section Header */}
@@ -400,9 +579,27 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                 >
                                   <Icon className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-bold capitalize tracking-tight" style={{ color: 'var(--app-text)' }}>{sInfo?.title || sectionId}</h3>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-sm font-bold capitalize tracking-tight" style={{ color: 'var(--app-text)' }}>{sInfo?.title || sectionId}</h3>
+                                  {!isVisible && (
+                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider" style={{ background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}>
+                                      Hidden
+                                    </span>
+                                  )}
+                                </div>
                               </button>
                               <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Eye Icon - Show/Hide in Resume */}
+                                <button
+                                  onClick={e => { e.stopPropagation(); toggleSectionVisibility(sectionId); }}
+                                  className="p-1.5 rounded-lg transition-all"
+                                  style={isSectionVisible(sectionId)
+                                    ? { background: 'var(--app-primary-light)', color: 'var(--app-primary)' }
+                                    : { background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}
+                                  title={isSectionVisible(sectionId) ? 'Hide from resume' : 'Show in resume'}
+                                >
+                                  {isSectionVisible(sectionId) ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                </button>
                                 <button
                                   onClick={e => {
                                     e.stopPropagation();
@@ -475,7 +672,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                     const config = sectionMap[sectionId];
                                     if (config) updateNested(config.path, [...config.items, createEmptyItem(sectionId)]);
                                   }}
-                                  className={`flex items-center gap-1 text-[11px] font-bold transition-colors self-start px-2.5 py-1.5 rounded-lg ${sectionId === 'declaration' ? 'hidden' : ''}`}
+                                  className={`flex items-center gap-1 text-[11px] font-bold transition-colors self-start px-2.5 py-1.5 rounded-lg ${['declaration', 'interests', 'skills'].includes(sectionId) ? 'hidden' : ''}`}
                                   style={{ color: 'var(--app-primary)', background: 'var(--app-primary-light)' }}
                                 >
                                   <Plus className="w-3 h-3" /> Add Item
@@ -483,20 +680,36 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
                                 {sectionId === 'experience' && (
                                   <div className="flex flex-col gap-2 w-full">
-                                    {data.content.experience?.map((exp, expIdx) => (
-                                      <div key={expIdx} className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" style={{ background: "var(--app-bg-gray)", border: "1px solid var(--app-border)" }}>
-                                        <ArrayItemControls array={data.content.experience || []} index={expIdx} path="content.experience" updateNested={updateNested} />
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full pt-4 pr-4">
-                                          <input type="text" placeholder="Company" value={exp.company} onChange={e => updateNested(`content.experience[${expIdx}].company`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
-                                          <input type="text" placeholder="Position" value={exp.position} onChange={e => updateNested(`content.experience[${expIdx}].position`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
-                                          <input type="month" placeholder="Start Date" value={exp.startDate} onChange={e => updateNested(`content.experience[${expIdx}].startDate`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold uppercase tracking-wider" />
-                                          <input type="text" placeholder="End Date (e.g. Present)" value={exp.endDate} onChange={e => updateNested(`content.experience[${expIdx}].endDate`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold uppercase tracking-wider" />
+                                    {data.content.experience?.map((exp, expIdx) => {
+                                      const isHidden = exp.hidden === true;
+                                      return (
+                                        <div 
+                                          key={expIdx} 
+                                          className="p-2 rounded-lg flex flex-col gap-2 relative group/item w-full" 
+                                          style={{ 
+                                            background: "var(--app-bg-gray)", 
+                                            border: isHidden ? "1px dashed var(--app-border)" : "1px solid var(--app-border)",
+                                            opacity: isHidden ? 0.5 : 1
+                                          }}
+                                        >
+                                          <ArrayItemControls array={data.content.experience || []} index={expIdx} path="content.experience" updateNested={updateNested} />
+                                          {isHidden && (
+                                            <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider z-10" style={{ background: 'var(--app-bg-card)', color: 'var(--app-text-muted)', border: '1px solid var(--app-border)' }}>
+                                              Hidden
+                                            </div>
+                                          )}
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full pt-4 pr-4">
+                                            <input type="text" placeholder="Company" value={exp.company} onChange={e => updateNested(`content.experience[${expIdx}].company`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
+                                            <input type="text" placeholder="Position" value={exp.position} onChange={e => updateNested(`content.experience[${expIdx}].position`, e.target.value)} className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }} />
+                                            <input type="month" placeholder="Start Date" value={exp.startDate} onChange={e => updateNested(`content.experience[${expIdx}].startDate`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold uppercase tracking-wider" />
+                                            <input type="text" placeholder="End Date (e.g. Present)" value={exp.endDate} onChange={e => updateNested(`content.experience[${expIdx}].endDate`, e.target.value)} className="w-full p-2 bg-white border border-gray-100 rounded-md focus:ring-1 focus:ring-[#ff4d7d] text-[11px] font-semibold uppercase tracking-wider" />
+                                          </div>
+                                          <div className="border border-gray-200 rounded-md overflow-hidden bg-white w-full text-[11px]">
+                                            <RichTextEditor value={exp.description} onChange={val => updateNested(`content.experience[${expIdx}].description`, val)} />
+                                          </div>
                                         </div>
-                                        <div className="border border-gray-200 rounded-md overflow-hidden bg-white w-full text-[11px]">
-                                          <RichTextEditor value={exp.description} onChange={val => updateNested(`content.experience[${expIdx}].description`, val)} />
-                                        </div>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 )}
 
@@ -517,20 +730,59 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                 )}
 
                                 {sectionId === 'skills' && (
-                                  <div className="flex flex-wrap gap-2 w-full">
-                                    {data.content.skills?.map((skill, skillIdx) => (
-                                      <div key={skill.id || skillIdx} className="relative group/skill flex-1 min-w-[100px]">
-                                        <input
-                                          value={skill.name || ''}
-                                          onChange={e => updateNested(`content.skills[${skillIdx}].name`, e.target.value)}
-                                          className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }}
-                                          placeholder="Skill"
-                                        />
-                                        <button onClick={() => updateNested('content.skills', data.content.skills?.filter((_, idx) => idx !== skillIdx))} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover/skill:opacity-100 bg-white shadow-sm p-0.5 rounded">
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ))}
+                                  <div className="flex flex-wrap gap-2.5 w-full">
+                                    {data.content.skills?.map((skill, skillIdx) => {
+                                      const isHidden = skill.hidden === true;
+                                      return (
+                                        <div 
+                                          key={skill.id || skillIdx} 
+                                          className={`relative group/skill flex-1 min-w-[160px] transition-all hover:scale-[1.01] ${isHidden ? 'opacity-60' : 'opacity-100'}`}
+                                        >
+                                          <div
+                                            className="flex items-center gap-1 p-1 rounded-xl transition-all"
+                                            style={{ 
+                                              background: "var(--app-bg-card)", 
+                                              border: isHidden ? "1px dashed var(--app-border)" : "1px solid var(--app-border)", 
+                                              boxShadow: isHidden ? 'none' : 'var(--app-shadow-sm)' 
+                                            }}
+                                          >
+                                            <button 
+                                              onClick={() => {
+                                                const updated = [...(data.content.skills || [])];
+                                                updated[skillIdx] = { ...updated[skillIdx], hidden: !isHidden };
+                                                updateNested('content.skills', updated);
+                                              }}
+                                              className="p-1.5 rounded-lg transition-all shrink-0 ml-1"
+                                              style={isHidden ? { color: 'var(--app-text-muted)' } : { color: 'var(--app-primary)', background: 'var(--app-primary-light)' }}
+                                              title={isHidden ? 'Show in resume' : 'Hide from resume'}
+                                            >
+                                              {isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                            </button>
+                                            <input
+                                              value={skill.name || ''}
+                                              onChange={e => updateNested(`content.skills[${skillIdx}].name`, e.target.value)}
+                                              className="flex-1 bg-transparent border-none focus:ring-0 text-[11px] font-bold py-1.5 px-1.5"
+                                              style={{ color: isHidden ? "var(--app-text-muted)" : "var(--app-text)" }}
+                                              placeholder="Skill"
+                                            />
+                                            <button 
+                                              onClick={() => updateNested('content.skills', data.content.skills?.filter((_, idx) => idx !== skillIdx))} 
+                                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50/50 transition-all shrink-0 mr-1"
+                                              title="Delete Skill"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    <button
+                                      onClick={() => updateNested('content.skills', [...(data.content.skills || []), { id: `skill_${Date.now()}`, name: '', hidden: false }])}
+                                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:opacity-80 group/add"
+                                      style={{ background: 'var(--app-bg-gray)', border: '1px dashed var(--app-border)', color: 'var(--app-text-muted)' }}
+                                    >
+                                      <Plus className="w-4 h-4 group-hover/add:rotate-90 transition-transform" /> Add Skill
+                                    </button>
                                   </div>
                                 )}
 
@@ -687,20 +939,59 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                 )}
 
                                 {sectionId === 'interests' && (
-                                  <div className="flex flex-wrap gap-2 w-full">
-                                    {data.content.interests?.map((interest, iIdx) => (
-                                      <div key={interest.id || iIdx} className="relative group/skill flex-1 min-w-[100px]">
-                                        <input
-                                          value={interest.name || ''}
-                                          onChange={e => updateNested(`content.interests[${iIdx}].name`, e.target.value)}
-                                          className="w-full p-2 rounded-md text-[11px] font-semibold focus:outline-none focus:ring-1 focus:ring-[#ff4d7d] transition-all" style={{ background: "var(--app-bg-card)", border: "1px solid var(--app-border)", color: "var(--app-text)" }}
-                                          placeholder="Interest (e.g. Hiking)"
-                                        />
-                                        <button onClick={() => updateNested('content.interests', data.content.interests?.filter((_, idx) => idx !== iIdx))} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover/skill:opacity-100 bg-white shadow-sm p-0.5 rounded">
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ))}
+                                  <div className="flex flex-wrap gap-2.5 w-full">
+                                    {data.content.interests?.map((interest, iIdx) => {
+                                      const isHidden = interest.hidden === true;
+                                      return (
+                                        <div 
+                                          key={interest.id || iIdx} 
+                                          className={`relative group/skill flex-1 min-w-[160px] transition-all hover:scale-[1.01] ${isHidden ? 'opacity-60' : 'opacity-100'}`}
+                                        >
+                                          <div
+                                            className="flex items-center gap-1 p-1 rounded-xl transition-all"
+                                            style={{ 
+                                              background: "var(--app-bg-card)", 
+                                              border: isHidden ? "1px dashed var(--app-border)" : "1px solid var(--app-border)", 
+                                              boxShadow: isHidden ? 'none' : 'var(--app-shadow-sm)' 
+                                            }}
+                                          >
+                                            <button 
+                                              onClick={() => {
+                                                const updated = [...(data.content.interests || [])];
+                                                updated[iIdx] = { ...updated[iIdx], hidden: !isHidden };
+                                                updateNested('content.interests', updated);
+                                              }}
+                                              className="p-1.5 rounded-lg transition-all shrink-0 ml-1"
+                                              style={isHidden ? { color: 'var(--app-text-muted)' } : { color: 'var(--app-primary)', background: 'var(--app-primary-light)' }}
+                                              title={isHidden ? 'Show in resume' : 'Hide from resume'}
+                                            >
+                                              {isHidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                            </button>
+                                            <input
+                                              value={interest.name || ''}
+                                              onChange={e => updateNested(`content.interests[${iIdx}].name`, e.target.value)}
+                                              className="flex-1 bg-transparent border-none focus:ring-0 text-[11px] font-bold py-1.5 px-1.5"
+                                              style={{ color: isHidden ? "var(--app-text-muted)" : "var(--app-text)" }}
+                                              placeholder="e.g. Hiking"
+                                            />
+                                            <button 
+                                              onClick={() => updateNested('content.interests', data.content.interests?.filter((_, idx) => idx !== iIdx))} 
+                                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50/50 transition-all shrink-0 mr-1"
+                                              title="Delete Interest"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    <button
+                                      onClick={() => updateNested('content.interests', [...(data.content.interests || []), { id: `interest_${Date.now()}`, name: '', hidden: false }])}
+                                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:opacity-80 group/add"
+                                      style={{ background: 'var(--app-bg-gray)', border: '1px dashed var(--app-border)', color: 'var(--app-text-muted)' }}
+                                    >
+                                      <Plus className="w-4 h-4 group-hover/add:rotate-90 transition-transform" /> Add Interest
+                                    </button>
                                   </div>
                                 )}
 

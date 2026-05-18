@@ -5,6 +5,8 @@ export async function POST(req: Request) {
   try {
     const { text, fieldType, context, instruction } = await req.json();
 
+    console.log('📝 Enhance request:', { text: text?.substring(0, 50), fieldType, hasInstruction: !!instruction });
+
     if (!text && !instruction) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
@@ -37,9 +39,14 @@ ${instruction ? `Instruction: ${instruction}` : ''}`,
       fallbackText: text,
     });
 
+    console.log('✅ Enhancement successful:', enhanced?.substring(0, 50));
+
     return NextResponse.json({ enhanced });
   } catch (error: any) {
-    console.error('Enhance field failed:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('❌ Enhance field failed:', error.message);
+    return NextResponse.json({ 
+      error: error.message,
+      enhanced: null // Return null so frontend can handle gracefully
+    }, { status: 500 });
   }
 }

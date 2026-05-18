@@ -139,118 +139,120 @@ export default function CoverLettersPage() {
   if (!session) return null;
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--app-bg-gray)' }}>
-      <AppSidebar />
+    <>
+      <div className="flex min-h-screen" style={{ background: 'var(--app-bg-gray)' }}>
+        <AppSidebar />
 
-      {/* Main Content */}
-      <main className="flex-1 ml-64 p-10">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-black mb-10" style={{ color: 'var(--app-text)' }}>My Cover Letters</h1>
+        {/* Main Content */}
+        <main className="flex-1 ml-64 p-10">
+          <div className="max-w-6xl mx-auto">
+            <h1 className="text-3xl font-black mb-10" style={{ color: 'var(--app-text)' }}>My Cover Letters</h1>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {/* New Letter Button */}
-            <button
-              onClick={createCoverLetter}
-              disabled={creating}
-              className="group aspect-[3/4.2] border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-4 hover:border-[#ff4d7d] hover:bg-white transition-all"
-            >
-              <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-[#fff0f3] transition-all">
-                {creating ? (
-                  <Loader2 className="h-6 w-6 text-[#ff4d7d] animate-spin" />
-                ) : (
-                  <Plus className="h-6 w-6 text-gray-400 group-hover:text-[#ff4d7d]" />
-                )}
-              </div>
-              <span className="text-sm font-semibold text-gray-500 group-hover:text-gray-900">New letter</span>
-            </button>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {/* New Letter Button */}
+              <button
+                onClick={createCoverLetter}
+                disabled={creating}
+                className="group aspect-[3/4.2] border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-4 hover:border-[#ff4d7d] hover:bg-white transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-[#fff0f3] transition-all">
+                  {creating ? (
+                    <Loader2 className="h-6 w-6 text-[#ff4d7d] animate-spin" />
+                  ) : (
+                    <Plus className="h-6 w-6 text-gray-400 group-hover:text-[#ff4d7d]" />
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-gray-500 group-hover:text-gray-900">New letter</span>
+              </button>
 
-            {coverLetters.map((letter) => (
-              <div key={letter._id} className="group flex flex-col">
-                <div className="relative aspect-[3/4.2] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1">
-                  {/* Preview Image */}
-                  {letter.previewImage ? (
-                     <div className="relative w-full h-full">
-                       <img 
-                         src={letter.previewImage} 
-                         alt={letter.title} 
-                         className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                         loading="lazy"
-                       />
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                     </div>
-                   ) : (
-                      /* Real Data Fallback Preview (No dummy text) */
-                      <div className="p-6 h-full flex flex-col gap-3 bg-white text-[8px] font-serif overflow-hidden select-none">
-                        <div className="text-right text-gray-400 mb-2">{letter.content?.date}</div>
-                        
-                        <div className="space-y-0.5">
-                          <div className="font-bold text-gray-900 text-[10px]">{letter.content?.personalInfo?.fullName}</div>
-                          <div className="text-gray-600">{letter.content?.personalInfo?.professionalTitle}</div>
-                          <div className="text-gray-400">
-                            {letter.content?.personalInfo?.email} {letter.content?.personalInfo?.phone && `| ${letter.content.personalInfo.phone}`}
+              {coverLetters.map((letter) => (
+                <div key={letter._id} className="group flex flex-col">
+                  <div className="relative aspect-[3/4.2] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1">
+                    {/* Preview Image */}
+                    {letter.previewImage ? (
+                       <div className="relative w-full h-full">
+                         <img 
+                           src={letter.previewImage} 
+                           alt={letter.title} 
+                           className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                           loading="lazy"
+                         />
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                       </div>
+                     ) : (
+                        /* Real Data Fallback Preview (No dummy text) */
+                        <div className="p-6 h-full flex flex-col gap-3 bg-white text-[8px] font-serif overflow-hidden select-none">
+                          <div className="text-right text-gray-400 mb-2">{letter.content?.date}</div>
+                          
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-gray-900 text-[10px]">{letter.content?.personalInfo?.fullName}</div>
+                            <div className="text-gray-600">{letter.content?.personalInfo?.professionalTitle}</div>
+                            <div className="text-gray-400">
+                              {letter.content?.personalInfo?.email} {letter.content?.personalInfo?.phone && `| ${letter.content.personalInfo.phone}`}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 space-y-0.5">
+                            <div className="font-bold text-gray-900">To:</div>
+                            <div className="text-gray-700">{letter.content?.recipient?.name}</div>
+                            <div className="text-gray-600">{letter.content?.recipient?.company}</div>
+                            <div className="text-gray-500">{letter.content?.recipient?.address}</div>
+                          </div>
+
+                          <div className="mt-4 flex-1 text-gray-700 leading-relaxed line-clamp-[12] whitespace-pre-wrap">
+                            {letter.content?.body}
+                          </div>
+
+                          <div className="mt-auto pt-4 border-t border-gray-50 flex flex-col gap-1">
+                            <div className="font-bold text-gray-900">{letter.content?.signature?.fullName}</div>
                           </div>
                         </div>
-
-                        <div className="mt-4 space-y-0.5">
-                          <div className="font-bold text-gray-900">To:</div>
-                          <div className="text-gray-700">{letter.content?.recipient?.name}</div>
-                          <div className="text-gray-600">{letter.content?.recipient?.company}</div>
-                          <div className="text-gray-500">{letter.content?.recipient?.address}</div>
-                        </div>
-
-                        <div className="mt-4 flex-1 text-gray-700 leading-relaxed line-clamp-[12] whitespace-pre-wrap">
-                          {letter.content?.body}
-                        </div>
-
-                        <div className="mt-auto pt-4 border-t border-gray-50 flex flex-col gap-1">
-                          <div className="font-bold text-gray-900">{letter.content?.signature?.fullName}</div>
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    
+                    {/* Hover Actions */}
+                    <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Link
+                        href={`/cover-letter/${letter._id}`}
+                        className="px-6 py-3 bg-white text-gray-900 rounded-xl font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform"
+                      >
+                        Edit letter
+                      </Link>
+                    </div>
+                  </div>
                   
-                  {/* Hover Actions */}
-                  <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Link
-                      href={`/cover-letter/${letter._id}`}
-                      className="px-6 py-3 bg-white text-gray-900 rounded-xl font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform"
+                  <div className="mt-4 flex items-center justify-between px-2">
+                    <div>
+                      <h3 className="font-bold text-gray-900 uppercase tracking-widest text-[10px] mb-1">{letter.title}</h3>
+                      <p className="text-[10px] text-gray-400 font-medium uppercase">
+                        edited {formatTimeAgo(letter.updatedAt)} • A4
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setMenuOpen(menuOpen === letter._id ? null : letter._id)}
+                      className="p-2 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 transition-all"
                     >
-                      Edit letter
-                    </Link>
-                  </div>
-                </div>
-                
-                <div className="mt-4 flex items-center justify-between px-2">
-                  <div>
-                    <h3 className="font-bold text-gray-900 uppercase tracking-widest text-[10px] mb-1">{letter.title}</h3>
-                    <p className="text-[10px] text-gray-400 font-medium uppercase">
-                      edited {formatTimeAgo(letter.updatedAt)} • A4
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => setMenuOpen(menuOpen === letter._id ? null : letter._id)}
-                    className="p-2 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-gray-100 transition-all"
-                  >
-                    <MoreVertical className="h-4 w-4 text-gray-400" />
-                  </button>
-                </div>
-
-                {menuOpen === letter._id && (
-                  <div className="mt-2 mx-2 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2 z-10">
-                    <button
-                      onClick={() => deleteCoverLetter(letter._id)}
-                      className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                      <MoreVertical className="h-4 w-4 text-gray-400" />
                     </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {menuOpen === letter._id && (
+                    <div className="mt-2 mx-2 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2 z-10">
+                      <button
+                        onClick={() => deleteCoverLetter(letter._id)}
+                        className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
-    {confirmModal}
+        </main>
+      </div>
+      {confirmModal}
+    </>
   );
 }

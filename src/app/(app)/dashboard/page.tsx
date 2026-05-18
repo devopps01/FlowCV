@@ -403,6 +403,7 @@ export default function DashboardPage() {
   const fetchResumes = async () => {
     try {
       const res = await fetch('/api/resumes');
+      if (!res.ok) throw new Error('Failed to load resumes');
       const data = await res.json();
       setResumes(data.resumes || []);
     } catch {
@@ -428,6 +429,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      if (!res.ok) throw new Error('Failed to create resume');
       const data = await res.json();
       const id = data.resume?._id || data.data?._id;
       if (id) {
@@ -450,7 +452,8 @@ export default function DashboardPage() {
     });
     if (!confirmed) return;
     try {
-      await fetch(`/api/resumes/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/resumes/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete resume');
       setResumes(prev => prev.filter(r => r._id !== id));
       setMenuOpen(null);
       toast.success('Deleted');
@@ -466,6 +469,7 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: `${resume.title} (Copy)`, template: resume.template }),
       });
+      if (!res.ok) throw new Error('Failed to duplicate resume');
       const data = await res.json();
       const id = data.resume?._id || data.data?._id;
       if (id) router.push(`/resume/${id}`);
@@ -690,28 +694,22 @@ export default function DashboardPage() {
                     >
                       <Link
                         href={`/resume/${resume._id}`}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold transition-colors"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/10 rounded-md"
                         style={{ color: 'var(--app-text)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                       >
                         <FileText className="h-3.5 w-3.5" /> Open
                       </Link>
                       <button
                         onClick={() => duplicateResume(resume)}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold transition-colors"
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/10 rounded-md"
                         style={{ color: 'var(--app-text)' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                       >
                         <Copy className="h-3.5 w-3.5" /> Duplicate
                       </button>
                       <div style={{ height: '1px', background: 'var(--app-border)', margin: '2px 0' }} />
                       <button
                         onClick={() => deleteResume(resume._id)}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-500 transition-colors"
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Delete
                       </button>

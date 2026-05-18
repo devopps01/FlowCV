@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, Mail, Phone, MapPin, Globe, Linkedin, Award, BookOpen, Briefcase, GraduationCap, Languages, BadgeCheck, Heart, FolderGit2, FileText, Check, Plus, Users, Building, PenTool, Layers, GripVertical } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { ResumeData } from './types';
@@ -9,13 +9,24 @@ import { HEADING_STYLES } from './design-options';
 interface ResumePreviewProps {
   data: ResumeData;
   numPages: number;
-  previewRef: React.RefObject<HTMLDivElement>;
+  previewRef?: React.RefObject<HTMLDivElement>;
   zoomLevel: number;
   onReorderSections?: (newOrder: string[]) => void;
   isThumbnail?: boolean;
   isExporting?: boolean;
   selectedSectionId?: string | null;
   onSelectSection?: (sid: string) => void;
+  onPageCountChange?: (count: number) => void;
+}
+
+interface PageBlock {
+  sid: string;
+  itemIndices?: number[];
+}
+
+interface PageData {
+  main: PageBlock[];
+  sidebar?: PageBlock[];
 }
 
 /* --- Dynamic Font Loader --- */
@@ -51,7 +62,7 @@ const getLevelPercentage = (proficiency: string): number => {
   return 50; // default
 };
 
-const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRef, zoomLevel, onReorderSections, isThumbnail = false, isExporting = false, selectedSectionId = null, onSelectSection }) => {
+const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRef, zoomLevel, onReorderSections, isThumbnail = false, isExporting = false, selectedSectionId = null, onSelectSection, onPageCountChange }) => {
   const A4_HEIGHT_PX = 1122;
 
   // Fallback design if missing
@@ -61,8 +72,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
     lineHeight: 1.45,
     marginLR: 20,
     marginTB: 20,
-    textColor: '#1f2937',
-    primaryColor: '#ff4d7d',
+    textColor: '#000000',
+    primaryColor: '#000000',
     backgroundColor: '#ffffff',
     layout: 'single',
     applyAccentTo: [],
@@ -210,122 +221,546 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
     }
   };
 
+  // State to hold page distributions calculated dynamically
+  const [pageDistributions, setPageDistributions] = useState<PageData[]>([
+    { main: (data.activeSections || []).map(sid => ({ sid })) }
+  ]);
+
+  // Pagination and Height Measurement Engine
+  const measureAndPaginate = () => {
+    const container = document.getElementById('resume-measuring-container');
+    if (!container) return;
+
+    const marginTB = design.marginTB ?? 20;
+    const marginTB_px = marginTB * 3.77952755906;
+
+    const A4_HEIGHT = 1122; // A4 height in pixels at 96 DPI
+    const maxContentHeight = A4_HEIGHT - (marginTB_px * 2);
+
+    // Measure the header height
+    const headerEl = container.querySelector('#measure-personal-header');
+    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+    
+    const sectionSpacing_mm = design.sectionSpacing ?? 10;
+    const sectionSpacing_px = sectionSpacing_mm * 3.77952755906;
+
+    const entrySpacing_mm = design.entrySpacing ?? 8;
+    const entrySpacing_px = entrySpacing_mm * 3.77952755906;
+
+    const pages: PageData[] = [];
+    const isSidebar = design.layout?.includes('sidebar');
+
+    if (isSidebar) {
+      const sidebarSections = (data.activeSections || []).filter(sid => ['skills', 'languages', 'interests', 'awards', 'certifications', 'socials'].includes(sid));
+      const mainSections = (data.activeSections || []).filter(sid => !['skills', 'languages', 'interests', 'awards', 'certifications', 'socials', 'personalInfo'].includes(sid));
+
+      // Main column pagination
+      const mainPages: PageBlock[][] = [];
+      let currentMainPage: PageBlock[] = [];
+      let currentMainHeight = 0;
+
+      for (const sid of mainSections) {
+        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
+        if (!sectionEl) continue;
+
+        const totalSectionHeight = sectionEl.getBoundingClientRect().height;
+        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
+
+        if (totalSectionHeight <= maxContentHeight - currentMainHeight) {
+          currentMainPage.push({ sid });
+          currentMainHeight += totalSectionHeight + sectionSpacing_px;
+        } else if (items.length > 1) {
+          const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
+          const headerH = headerEl ? headerEl.getBoundingClientRect().height : 30;
+
+          let tempItems: number[] = [];
+          let currentItemHeight = headerH;
+
+          for (let idx = 0; idx < items.length; idx++) {
+            const itemH = items[idx].getBoundingClientRect().height;
+            if (currentItemHeight + itemH <= maxContentHeight - currentMainHeight) {
+              tempItems.push(idx);
+              currentItemHeight += itemH + entrySpacing_px;
+            } else {
+              if (tempItems.length > 0) {
+                currentMainPage.push({ sid, itemIndices: tempItems });
+              }
+              mainPages.push(currentMainPage);
+
+              currentMainPage = [];
+              currentMainHeight = 0;
+              tempItems = [idx];
+              currentItemHeight = headerH + itemH + entrySpacing_px;
+            }
+          }
+          if (tempItems.length > 0) {
+            currentMainPage.push({ sid, itemIndices: tempItems });
+            currentMainHeight = currentItemHeight + sectionSpacing_px;
+          }
+        } else {
+          if (currentMainPage.length > 0) {
+            mainPages.push(currentMainPage);
+          }
+          currentMainPage = [{ sid }];
+          currentMainHeight = totalSectionHeight + sectionSpacing_px;
+        }
+      }
+      if (currentMainPage.length > 0) {
+        mainPages.push(currentMainPage);
+      }
+
+      // Sidebar column pagination
+      const sidebarPages: PageBlock[][] = [];
+      let currentSidebarPage: PageBlock[] = [];
+      let currentSidebarHeight = headerHeight; // Page 1 has personal details header in sidebar
+
+      for (const sid of sidebarSections) {
+        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
+        if (!sectionEl) continue;
+
+        const totalSectionHeight = sectionEl.getBoundingClientRect().height;
+        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
+
+        if (totalSectionHeight <= maxContentHeight - currentSidebarHeight) {
+          currentSidebarPage.push({ sid });
+          currentSidebarHeight += totalSectionHeight + sectionSpacing_px;
+        } else if (items.length > 1) {
+          const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
+          const headerH = headerEl ? headerEl.getBoundingClientRect().height : 25;
+
+          let tempItems: number[] = [];
+          let currentItemHeight = headerH;
+
+          for (let idx = 0; idx < items.length; idx++) {
+            const itemH = items[idx].getBoundingClientRect().height;
+            if (currentItemHeight + itemH <= maxContentHeight - currentSidebarHeight) {
+              tempItems.push(idx);
+              currentItemHeight += itemH + entrySpacing_px;
+            } else {
+              if (tempItems.length > 0) {
+                currentSidebarPage.push({ sid, itemIndices: tempItems });
+              }
+              sidebarPages.push(currentSidebarPage);
+
+              currentSidebarPage = [];
+              currentSidebarHeight = 0; // Page 2+ sidebar doesn't have details header
+              tempItems = [idx];
+              currentItemHeight = headerH + itemH + entrySpacing_px;
+            }
+          }
+          if (tempItems.length > 0) {
+            currentSidebarPage.push({ sid, itemIndices: tempItems });
+            currentSidebarHeight = currentItemHeight + sectionSpacing_px;
+          }
+        } else {
+          if (currentSidebarPage.length > 0) {
+            sidebarPages.push(currentSidebarPage);
+          }
+          currentSidebarPage = [{ sid }];
+          currentSidebarHeight = totalSectionHeight + sectionSpacing_px;
+        }
+      }
+      if (currentSidebarPage.length > 0) {
+        sidebarPages.push(currentSidebarPage);
+      }
+
+      const totalPageCount = Math.max(mainPages.length, sidebarPages.length, 1);
+      for (let i = 0; i < totalPageCount; i++) {
+        pages.push({
+          main: mainPages[i] || [],
+          sidebar: sidebarPages[i] || [],
+        });
+      }
+    } else {
+      // Single continuous vertical stream layout
+      let currentPage: PageBlock[] = [];
+      let currentHeight = headerHeight; // Page 1 starts with personal header
+
+      for (const sid of (data.activeSections || [])) {
+        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
+        if (!sectionEl) continue;
+
+        const totalSectionHeight = sectionEl.getBoundingClientRect().height;
+        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
+
+        if (totalSectionHeight <= maxContentHeight - currentHeight) {
+          currentPage.push({ sid });
+          currentHeight += totalSectionHeight + sectionSpacing_px;
+        } else if (items.length > 1) {
+          const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
+          const headerH = headerEl ? headerEl.getBoundingClientRect().height : 30;
+
+          let tempItems: number[] = [];
+          let currentItemHeight = headerH;
+
+          for (let idx = 0; idx < items.length; idx++) {
+            const itemH = items[idx].getBoundingClientRect().height;
+            if (currentItemHeight + itemH <= maxContentHeight - currentHeight) {
+              tempItems.push(idx);
+              currentItemHeight += itemH + entrySpacing_px;
+            } else {
+              if (tempItems.length > 0) {
+                currentPage.push({ sid, itemIndices: tempItems });
+              }
+              pages.push({ main: currentPage });
+
+              currentPage = [];
+              currentHeight = 0;
+              tempItems = [idx];
+              currentItemHeight = headerH + itemH + entrySpacing_px;
+            }
+          }
+          if (tempItems.length > 0) {
+            currentPage.push({ sid, itemIndices: tempItems });
+            currentHeight = currentItemHeight + sectionSpacing_px;
+          }
+        } else {
+          if (currentPage.length > 0) {
+            pages.push({ main: currentPage });
+          }
+          currentPage = [{ sid }];
+          currentHeight = totalSectionHeight + sectionSpacing_px;
+        }
+      }
+      if (currentPage.length > 0) {
+        pages.push({ main: currentPage });
+      }
+    }
+
+    if (pages.length > 0) {
+      setPageDistributions(pages);
+      onPageCountChange?.(pages.length);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      measureAndPaginate();
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [data, design]);
+
   const onDragEnd = (result: any) => {
     if (!result.destination || !onReorderSections) return;
-    const items = Array.from(data.activeSections || []);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    onReorderSections(items);
+    
+    const sourceDroppableId = result.source.droppableId;
+    const destDroppableId = result.destination.droppableId;
+    
+    const sourcePageMatch = sourceDroppableId.match(/page-main-(\d+)/) || sourceDroppableId.match(/page-sidebar-(\d+)/);
+    const destPageMatch = destDroppableId.match(/page-main-(\d+)/) || destDroppableId.match(/page-sidebar-(\d+)/);
+    
+    if (sourcePageMatch && destPageMatch) {
+      const sourcePageNum = parseInt(sourcePageMatch[1]);
+      const destPageNum = parseInt(destPageMatch[1]);
+      
+      const isSourceSidebar = sourceDroppableId.includes('sidebar');
+      const isDestSidebar = destDroppableId.includes('sidebar');
+
+      const sourceBlocks = isSourceSidebar 
+        ? (pageDistributions[sourcePageNum - 1]?.sidebar || [])
+        : (pageDistributions[sourcePageNum - 1]?.main || []);
+
+      const destBlocks = isDestSidebar 
+        ? (pageDistributions[destPageNum - 1]?.sidebar || [])
+        : (pageDistributions[destPageNum - 1]?.main || []);
+      
+      const draggedSid = sourceBlocks[result.source.index]?.sid;
+      if (!draggedSid) return;
+      
+      const items = Array.from(data.activeSections || []);
+      const sourceIdx = items.indexOf(draggedSid);
+      items.splice(sourceIdx, 1);
+      
+      const targetSid = destBlocks[result.destination.index]?.sid;
+      if (targetSid) {
+        const destIdx = items.indexOf(targetSid);
+        items.splice(destIdx, 0, draggedSid);
+      } else {
+        items.push(draggedSid);
+      }
+      
+      onReorderSections(items);
+    } else {
+      const items = Array.from(data.activeSections || []);
+      const [reorderedItem] = items.splice(result.source.index, 1);
+      items.splice(result.destination.index, 0, reorderedItem);
+      onReorderSections(items);
+    }
   };
 
   return (
     <div
-      className={`w-full flex items-start justify-center ${isThumbnail ? 'p-0 overflow-hidden bg-transparent' : 'pt-8 pb-16 px-6'}`}
+      className={`w-full flex flex-col items-center ${isThumbnail ? 'p-0 overflow-hidden bg-transparent' : 'pt-8 pb-16 px-6'}`}
       style={isThumbnail ? {} : { backgroundColor: 'var(--app-bg-medium)' }}
     >
       <GoogleFontsLoader fontFamily={design.fontFamily || 'Inter'} />
 
       {/* Zoom wrapper */}
       <div
-        className="relative"
+        className="relative flex flex-col items-center"
         style={{
           transform: `scale(${zoomLevel / 100})`,
           transformOrigin: 'top center',
-          // Compensate for scale so the scrollable area matches actual rendered size
-          // Only add compensation when zoomed out (negative scale factor)
-          marginBottom: isThumbnail ? '0' : zoomLevel < 100 ? `${(zoomLevel / 100 - 1) * (numPages * A4_HEIGHT_PX)}px` : '0',
+          marginBottom: isThumbnail ? '0' : zoomLevel < 100 ? `${(zoomLevel / 100 - 1) * (pageDistributions.length * A4_HEIGHT_PX)}px` : '0',
         }}
       >
-        {/* ── The single resume content container ── */}
-        {/* We render the full content once, then use page-sheet overlays to show A4 boundaries */}
-        <div
-          ref={previewRef}
-          id="resume-preview"
-          className={`resume-paper bg-white ${isExporting ? 'shadow-none' : ''}`}
-          style={{
-            fontFamily: design.fontFamily ?? 'Inter',
-            fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
-            lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
-            width: '210mm',
-            // Only enforce minHeight in preview mode — not during export/print (avoids blank pages)
-            minHeight: isExporting ? 'auto' : '297mm',
-            color: design.textColor ?? '#1f2937',
-            paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-            paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-            paddingTop: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-            paddingBottom: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-            backgroundColor: design.backgroundColor ?? '#ffffff',
-            overflow: 'visible',
-            colorScheme: 'light',
-            boxShadow: 'none',
-          }}
-        >
-          <div className={`flex flex-col ${isThumbnail ? 'min-h-0' : ''}`} style={{ breakInside: 'auto' }}>
-            <DragDropContext onDragEnd={onDragEnd}>
-              {design.layout?.includes('sidebar') ? (
-                 <SidebarLayout data={harmonizedData} getSectionStyle={getSectionStyle} isThumbnail={isThumbnail} isExporting={isExporting} selectedSectionId={selectedSectionId} onSelectSection={onSelectSection} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} />
-              ) : design.layout === 'modern-header' ? (
-                 <ModernHeaderLayout data={harmonizedData} getSectionStyle={getSectionStyle} isThumbnail={isThumbnail} isExporting={isExporting} selectedSectionId={selectedSectionId} onSelectSection={onSelectSection} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} />
-              ) : design.layout === 'double-header' ? (
-                 <DoubleHeaderLayout data={harmonizedData} getSectionStyle={getSectionStyle} isThumbnail={isThumbnail} isExporting={isExporting} selectedSectionId={selectedSectionId} onSelectSection={onSelectSection} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} />
-              ) : (
-                 <SingleColumnLayout data={harmonizedData} getSectionStyle={getSectionStyle} isThumbnail={isThumbnail} isExporting={isExporting} selectedSectionId={selectedSectionId} onSelectSection={onSelectSection} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} />
+        <DragDropContext onDragEnd={onDragEnd}>
+          {pageDistributions.map((pageBlocks, pageIdx) => {
+            const pageNum = pageIdx + 1;
+            
+            return (
+              <div
+                key={pageIdx}
+                ref={pageIdx === 0 ? previewRef : undefined}
+                id={pageIdx === 0 ? "resume-preview" : `resume-preview-page-${pageNum}`}
+                className={`resume-page resume-paper bg-white relative ${isExporting ? 'shadow-none' : 'shadow-2xl mb-8'}`}
+                style={{
+                  fontFamily: design.fontFamily ?? 'Inter',
+                  fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
+                  lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
+                  width: '210mm',
+                  height: '297mm',
+                  color: '#000000',
+                  paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
+                  paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
+                  paddingTop: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
+                  paddingBottom: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
+                  backgroundColor: '#ffffff',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  colorScheme: 'light',
+                  pageBreakAfter: 'always',
+                  breakAfter: 'always',
+                }}
+              >
+                {design.layout?.includes('sidebar') ? (
+                  <SidebarLayout
+                    data={harmonizedData}
+                    getSectionStyle={getSectionStyle}
+                    isThumbnail={isThumbnail}
+                    isExporting={isExporting}
+                    selectedSectionId={selectedSectionId}
+                    onSelectSection={onSelectSection}
+                    getAccentColor={getAccentColor}
+                    getHeadingMeta={getHeadingMeta}
+                    pageNum={pageNum}
+                    pageBlocks={pageBlocks}
+                  />
+                ) : design.layout === 'modern-header' ? (
+                  <ModernHeaderLayout
+                    data={harmonizedData}
+                    getSectionStyle={getSectionStyle}
+                    isThumbnail={isThumbnail}
+                    isExporting={isExporting}
+                    selectedSectionId={selectedSectionId}
+                    onSelectSection={onSelectSection}
+                    getAccentColor={getAccentColor}
+                    getHeadingMeta={getHeadingMeta}
+                    pageNum={pageNum}
+                    pageBlocks={pageBlocks}
+                  />
+                ) : design.layout === 'double-header' ? (
+                  <DoubleHeaderLayout
+                    data={harmonizedData}
+                    getSectionStyle={getSectionStyle}
+                    isThumbnail={isThumbnail}
+                    isExporting={isExporting}
+                    selectedSectionId={selectedSectionId}
+                    onSelectSection={onSelectSection}
+                    getAccentColor={getAccentColor}
+                    getHeadingMeta={getHeadingMeta}
+                    pageNum={pageNum}
+                    pageBlocks={pageBlocks}
+                  />
+                ) : (
+                  <SingleColumnLayout
+                    data={harmonizedData}
+                    getSectionStyle={getSectionStyle}
+                    isThumbnail={isThumbnail}
+                    isExporting={isExporting}
+                    selectedSectionId={selectedSectionId}
+                    onSelectSection={onSelectSection}
+                    getAccentColor={getAccentColor}
+                    getHeadingMeta={getHeadingMeta}
+                    pageNum={pageNum}
+                    pageBlocks={pageBlocks}
+                  />
+                )}
+
+                {/* Page number badge inside preview */}
+                {!isThumbnail && !isExporting && (
+                  <div
+                    className="absolute bottom-4 right-6 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest pointer-events-none select-none"
+                    style={{
+                      background: 'rgba(0,0,0,0.03)',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      color: 'var(--app-text-muted)',
+                    }}
+                  >
+                    Page {pageNum} of {pageDistributions.length}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </DragDropContext>
+      </div>
+
+      {/* Hidden measuring container for high-fidelity A4 page calculations */}
+      <div
+        id="resume-measuring-container"
+        style={{
+          position: 'absolute',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          top: '-9999px',
+          left: '-9999px',
+          width: '210mm',
+          fontFamily: design.fontFamily ?? 'Inter',
+          fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
+          lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
+          paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
+          paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
+          paddingTop: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
+          paddingBottom: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
+          boxSizing: 'border-box',
+          backgroundColor: '#ffffff',
+          color: '#000000',
+        }}
+      >
+        {/* Personal Details Header for height calculations */}
+        <div id="measure-personal-header">
+          {design.layout?.includes('sidebar') ? (
+            <div className="flex flex-col gap-4" style={{ width: '32%', padding: '24px', boxSizing: 'border-box' }}>
+              {design.photoShow && harmonizedData.content.personalInfo.image && (
+                <div className="w-28 h-28 bg-white border-2 overflow-hidden" style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}>
+                  <img src={harmonizedData.content.personalInfo.image} className="w-full h-full object-cover" />
+                </div>
               )}
-            </DragDropContext>
-          </div>
+              <div className="space-y-1">
+                <h1 style={{ fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : '18px', fontWeight: design.nameBold ? '900' : '500' }}>
+                  {harmonizedData.content.personalInfo.fullName}
+                </h1>
+                <p style={{ fontSize: '10px' }}>{harmonizedData.content.personalInfo.professionalTitle}</p>
+              </div>
+              <div className="space-y-2" style={{ fontSize: '10px' }}>
+                {harmonizedData.content.personalInfo.email && <div>{harmonizedData.content.personalInfo.email}</div>}
+                {harmonizedData.content.personalInfo.phone && <div>{harmonizedData.content.personalInfo.phone}</div>}
+                {harmonizedData.content.personalInfo.location && <div>{harmonizedData.content.personalInfo.location}</div>}
+              </div>
+            </div>
+          ) : design.layout === 'modern-header' ? (
+            <div className="flex flex-col py-10 px-8">
+              <h1>{harmonizedData.content.personalInfo.fullName}</h1>
+              <p>{harmonizedData.content.personalInfo.professionalTitle}</p>
+            </div>
+          ) : design.layout === 'double-header' ? (
+            <div className="h-32 flex items-center justify-between">
+              <h1>{harmonizedData.content.personalInfo.fullName}</h1>
+            </div>
+          ) : (
+            <div className="flex flex-col pb-6">
+              <h1>{harmonizedData.content.personalInfo.fullName}</h1>
+            </div>
+          )}
         </div>
 
-        {/* ── Page boundary overlays ── */}
-        {/* These sit on top of the content and visually separate pages */}
-        {!isThumbnail && !isExporting && numPages > 1 && Array.from({ length: numPages - 1 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute left-0 right-0 z-20 pointer-events-none flex flex-col items-center"
-            style={{ top: `${(i + 1) * A4_HEIGHT_PX}px` }}
-          >
-            {/* Gap strip — covers the seam between pages */}
-            <div
-              className="w-full"
-              style={{
-                height: '32px',
-                backgroundColor: 'var(--app-bg-medium)',
-                borderTop: '1px solid rgba(0,0,0,0.06)',
-                borderBottom: '1px solid rgba(0,0,0,0.06)',
-              }}
-            />
-            {/* Page label */}
-            <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest"
-              style={{
-                background: 'rgba(255,255,255,0.95)',
-                border: '1px solid rgba(0,0,0,0.08)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                color: '#64748b',
-                top: '4px',
-              }}
-            >
-              <span>Page {i + 1}</span>
-              <span style={{ color: '#cbd5e1' }}>·</span>
-              <span style={{ color: 'var(--app-primary)' }}>Page {i + 2}</span>
+        {/* Section List for continuous layout height calculations */}
+        {design.layout?.includes('sidebar') ? (
+          <div style={{ display: 'block', width: '100%' }}>
+            {/* Float left column for sidebar */}
+            <div style={{ float: 'left', width: '32%', padding: '24px', boxSizing: 'border-box' }}>
+              {(harmonizedData.activeSections || [])
+                .filter(sid => ['skills', 'languages', 'interests', 'awards', 'certifications', 'socials'].includes(sid))
+                .map(sid => (
+                  <div
+                    key={sid}
+                    className="measure-section"
+                    data-sid={sid}
+                    style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
+                  >
+                    <div className="measure-header" data-sid={sid}>
+                      <SectionHeader
+                        title={sid}
+                        style={getSectionStyle(true)}
+                        headingStyle={getHeadingMeta(true).headingStyleId}
+                      />
+                    </div>
+                    <DynamicSectionRenderer
+                      sid={sid}
+                      data={harmonizedData}
+                      layout="sidebar"
+                      getStyle={getSectionStyle}
+                      getAccentColor={getAccentColor}
+                      getHeadingMeta={getHeadingMeta}
+                      isExporting={true}
+                      isMeasuring={true}
+                    />
+                  </div>
+                ))}
             </div>
+            {/* Margin left column for main sections */}
+            <div style={{ marginLeft: '32%', padding: '24px', boxSizing: 'border-box' }}>
+              {(harmonizedData.activeSections || [])
+                .filter(sid => !['skills', 'languages', 'interests', 'awards', 'certifications', 'socials', 'personalInfo'].includes(sid))
+                .map(sid => (
+                  <div
+                    key={sid}
+                    className="measure-section"
+                    data-sid={sid}
+                    style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
+                  >
+                    <div className="measure-header" data-sid={sid}>
+                      <SectionHeader
+                        title={sid}
+                        style={getSectionStyle(false)}
+                        headingStyle={getHeadingMeta(false).headingStyleId}
+                      />
+                    </div>
+                    <DynamicSectionRenderer
+                      sid={sid}
+                      data={harmonizedData}
+                      layout="single"
+                      getStyle={getSectionStyle}
+                      getAccentColor={getAccentColor}
+                      getHeadingMeta={getHeadingMeta}
+                      isExporting={true}
+                      isMeasuring={true}
+                    />
+                  </div>
+                ))}
+            </div>
+            <div style={{ clear: 'both' }} />
           </div>
-        ))}
-
-        {/* ── Page shadow frames ── */}
-        {/* Each page gets its own shadow box so it looks like separate sheets */}
-        {!isThumbnail && !isExporting && Array.from({ length: numPages }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute left-0 right-0 pointer-events-none z-[-1]"
-            style={{
-              top: `${i * A4_HEIGHT_PX}px`,
-              height: `${A4_HEIGHT_PX}px`,
-              boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
-              borderRadius: '1px',
-              background: 'white',
-            }}
-          />
-        ))}
+        ) : (
+          /* Non-sidebar continuous layouts */
+          (harmonizedData.activeSections || []).map(sid => (
+            <div
+              key={sid}
+              className="measure-section"
+              data-sid={sid}
+              style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
+            >
+              <div className="measure-header" data-sid={sid}>
+                <SectionHeader
+                  title={sid}
+                  style={getSectionStyle(false)}
+                  headingStyle={getHeadingMeta(false).headingStyleId}
+                />
+              </div>
+              <DynamicSectionRenderer
+                sid={sid}
+                data={harmonizedData}
+                layout="single"
+                getStyle={getSectionStyle}
+                getAccentColor={getAccentColor}
+                getHeadingMeta={getHeadingMeta}
+                isExporting={true}
+                isMeasuring={true}
+              />
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -335,7 +770,6 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
 const RichContent = ({ html, className = '', style }: { html: string; className?: string; style?: React.CSSProperties }) => {
   if (!html || html === '<p></p>') return null;
-  // Strip any AI error messages that may have been saved as content
   const errorPatterns = [
     /error:\s*gemini[_\s]api[_\s]key[^.]*\./gi,
     /error:\s*GEMINI_API_KEY[^.]*\./gi,
@@ -352,19 +786,6 @@ const RichContent = ({ html, className = '', style }: { html: string; className?
   return <div className={`rich-content ${className}`} style={style} dangerouslySetInnerHTML={{ __html: cleaned }} />;
 };
 
-// Strip AI error messages from plain text
-const cleanText = (text: string): string => {
-  if (!text) return text;
-  return text
-    .replace(/error:\s*gemini[_\s]api[_\s]key[^.]*\./gi, '')
-    .replace(/error:\s*GEMINI_API_KEY[^.]*\./gi, '')
-    .replace(/add it to \.env\.local[^.]*\./gi, '')
-    .replace(/AI service temporarily unavailable[^.]*\./gi, '')
-    .replace(/Rate limit reached[^.]*\./gi, '')
-    .trim();
-};
-
-// Smart SectionHeader: handles complex styles that need wrapper elements
 const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineWidth }: { 
   title: string, 
   style: React.CSSProperties,
@@ -376,7 +797,6 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
   const lc = lineColor || '#1f2937';
   const lt = lineThick || '2px';
 
-  // Dot prefix style
   if ((headingStyle || '').startsWith('dot')) {
     const sizeMatch = ((headingStyle || '').match(/_s(\d+)/) || [])[1];
     const dotSize = sizeMatch ? `${Number(sizeMatch)}px` : '7px';
@@ -388,7 +808,6 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
     );
   }
 
-  // Center flanked by lines, e.g. "── EXPERIENCE ──"
   if ((headingStyle || '').startsWith('double-side')) {
     return (
       <div className="section-header-container mb-3 flex items-center gap-3">
@@ -399,7 +818,6 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
     );
   }
 
-  // Centered text through a horizontal rule (strikethrough effect)
   if ((headingStyle || '').startsWith('strikethrough')) {
     const tMatch = ((headingStyle || '').match(/_t(\d+)/) || [])[1];
     const strikeH = tMatch ? `${Number(tMatch)}px` : '1px';
@@ -411,7 +829,6 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
     );
   }
 
-  // Default: the style object handles everything
   return (
     <div className="section-header-container mb-3">
        <h2 style={style}>{title}</h2>
@@ -419,23 +836,22 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
   );
 };
 
-const SortableSection = ({ id, index, children, isSelected, onSelect }: { id: string, index: number, children: React.ReactNode, isSelected?: boolean, onSelect?: () => void }) => (
-  <Draggable draggableId={id} index={index}>
+const SortableSection = ({ id, pageNum, index, children, isSelected, onSelect }: { id: string, pageNum: number, index: number, children: React.ReactNode, isSelected?: boolean, onSelect?: () => void }) => (
+  <Draggable draggableId={`${id}-${pageNum}`} index={index}>
     {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`relative group/section ${snapshot.isDragging ? 'bg-blue-50/30 ring-2 ring-blue-200 ring-offset-4 rounded-xl scale-[1.01] z-50' : ''} ${isSelected ? 'ring-2 ring-[#ff4d7d] ring-offset-4 rounded-xl' : ''}`}
+          className={`relative group/section ${snapshot.isDragging ? 'bg-blue-50/30 ring-2 ring-blue-200 ring-offset-4 rounded-xl scale-[1.01] z-50' : ''} ${isSelected ? 'ring-2 ring-slate-900 ring-offset-4 rounded-xl' : ''}`}
           style={{
             ...provided.draggableProps.style,
-            // These must be on the element itself, not a child, for break-inside to work
             breakInside: 'avoid',
             pageBreakInside: 'avoid',
           }}
         >
         <div
           {...provided.dragHandleProps}
-          className="absolute -left-10 top-0 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab text-slate-300 hover:text-[#ff4d7d]"
+          className="absolute -left-10 top-0 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab text-slate-300 hover:text-slate-900"
           title="Drag to reorder section"
         >
           <GripVertical className="w-5 h-5" />
@@ -444,7 +860,7 @@ const SortableSection = ({ id, index, children, isSelected, onSelect }: { id: st
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect(); }}
-            className="absolute -left-10 top-10 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity text-slate-300 hover:text-[#ff4d7d]"
+            className="absolute -left-10 top-10 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity text-slate-300 hover:text-slate-900"
             title="Select section to edit"
           >
             <Check className="w-5 h-5" />
@@ -458,7 +874,7 @@ const SortableSection = ({ id, index, children, isSelected, onSelect }: { id: st
 
 /* --- Dynamic Global Section Renderer --- */
 
-const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, getHeadingMeta, isExporting }: { sid: string, data: ResumeData, layout: 'sidebar' | 'modern' | 'single' | 'double', getStyle: any, getAccentColor: any, getHeadingMeta: (isSidebar: boolean) => { headingStyleId: string; lineColor: string; lineThick: string; lineWidth: string }, isExporting?: boolean }) => {
+const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, getHeadingMeta, isExporting, itemIndices, isMeasuring }: { sid: string, data: ResumeData, layout: 'sidebar' | 'modern' | 'single' | 'double', getStyle: any, getAccentColor: any, getHeadingMeta: (isSidebar: boolean) => { headingStyleId: string; lineColor: string; lineThick: string; lineWidth: string }, isExporting?: boolean, itemIndices?: number[], isMeasuring?: boolean }) => {
    const design = data.design || {} as any;
    const content = data.content || {} as any;
    const personalInfo = content.personalInfo || {} as any;
@@ -527,10 +943,12 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
                ? (content.interests || [])
                : (content.socials || []);
 
-       // Ensure items is always an array — AI sometimes returns objects or null
        const safeItems = Array.isArray(items) ? items : [];
+       const filteredItems = itemIndices
+         ? safeItems.filter((_, idx) => itemIndices.includes(idx))
+         : safeItems;
 
-       if (!safeItems.length) return null;
+       if (!filteredItems.length) return null;
 
        const getLevel = (item: any) => {
          if (typeof item === 'string') return getLevelPercentage(item);
@@ -557,6 +975,10 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
           return prof ? `${name} — ${prof}` : name;
         };
 
+        const isFirstChunk = !itemIndices || itemIndices.includes(0);
+        const sectionTitle = isSkills ? 'Skills' : isInterests ? 'Interests' : isLanguages ? 'Languages' : isCertifications ? 'Certifications' : 'Socials';
+        const displayTitle = `${sectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
+
        return (
           <div style={{
             marginBottom: `${design.sectionSpacing ?? 8}mm`,
@@ -564,7 +986,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
             pageBreakInside: 'avoid',
           }}>
             <SectionHeader
-              title={isSkills ? 'Skills' : isInterests ? 'Interests' : isLanguages ? 'Languages' : isCertifications ? 'Certifications' : 'Socials'}
+              title={displayTitle}
               style={getStyle(layout === 'sidebar')}
               headingStyle={headingMeta.headingStyleId}
               lineColor={headingMeta.lineColor}
@@ -574,31 +996,40 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
             {styleType === 'compact' ? (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-80 font-medium" style={{ fontSize: '11px' }}>
-                {safeItems.map((item, i) => (
-                  <React.Fragment key={i}>
-                    <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                    {i < safeItems.length - 1 && <span className="opacity-30">•</span>}
-                  </React.Fragment>
-                ))}
+                {filteredItems.map((item, i) => {
+                  const originalIndex = itemIndices ? itemIndices[i] : i;
+                  return (
+                    <React.Fragment key={i}>
+                      <span className="measure-item animate-none" data-sid={sid} data-index={originalIndex}>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
+                      {i < filteredItems.length - 1 && <span className="opacity-30">•</span>}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             ) : styleType === 'bubble' ? (
               <div className="flex flex-wrap gap-1.5">
-                {safeItems.map((item, i) => (
-                  <span
-                    key={i}
-                    className="px-2.5 py-0.5 rounded-full font-semibold opacity-80"
-                    style={{ fontSize: '10px', color: getAccentColor('dots'), backgroundColor: `${design.primaryColor || '#ff4d7d'}12`, border: `1px solid ${design.primaryColor || '#ff4d7d'}25` }}
-                  >
-                    {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
-                  </span>
-                ))}
+                {filteredItems.map((item, i) => {
+                  const originalIndex = itemIndices ? itemIndices[i] : i;
+                  return (
+                    <span
+                      key={i}
+                      className="px-2.5 py-0.5 rounded-full font-semibold opacity-80 measure-item"
+                      data-sid={sid}
+                      data-index={originalIndex}
+                      style={{ fontSize: '10px', color: getAccentColor('dots'), backgroundColor: `${design.primaryColor || '#ff4d7d'}12`, border: `1px solid ${design.primaryColor || '#ff4d7d'}25` }}
+                    >
+                      {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
+                    </span>
+                  );
+                })}
               </div>
             ) : styleType === 'level' ? (
               <div className={`grid gap-x-4 gap-y-2`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {safeItems.map((item, i) => {
+                {filteredItems.map((item, i) => {
+                  const originalIndex = itemIndices ? itemIndices[i] : i;
                   const level = getLevel(item);
                   return (
-                    <div key={i} className="space-y-1">
+                    <div key={i} className="space-y-1 measure-item" data-sid={sid} data-index={originalIndex}>
                       <div className="flex justify-between items-center font-semibold opacity-80" style={{ fontSize: '11px' }}>
                         <span>{getItemLabel(item)}</span>
                         {isLanguages && typeof item === 'object' && item !== null && 'language' in item && 'proficiency' in item && <span className="opacity-40" style={{ fontSize: '10px' }}>{(item as any).proficiency}</span>}
@@ -613,12 +1044,15 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
             ) : (
               /* Default: GRID */
               <div className={`grid gap-x-3 gap-y-1`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {safeItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-1.5 font-medium opacity-80" style={{ fontSize: '11px' }}>
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                    <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                  </div>
-                ))}
+                {filteredItems.map((item, i) => {
+                  const originalIndex = itemIndices ? itemIndices[i] : i;
+                  return (
+                    <div key={i} className="flex items-center gap-1.5 font-medium opacity-80 measure-item" data-sid={sid} data-index={originalIndex} style={{ fontSize: '11px' }}>
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
+                      <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -639,9 +1073,18 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
    if (!listProps.items || listProps.items.length === 0) return null;
 
+   const filteredListItems = itemIndices
+     ? listProps.items.filter((_, idx) => itemIndices.includes(idx))
+     : listProps.items;
+
+   if (!filteredListItems.length) return null;
+
    const titleSize = design.entryTitleSize === 's' ? '11px' : design.entryTitleSize === 'm' ? '12px' : '13px';
    const subtitleStyle = design.entrySubtitleStyle || 'medium';
    const subtitlePlacement = design.entrySubtitlePlacement || 'next-line';
+
+   const isFirstChunk = !itemIndices || itemIndices.includes(0);
+   const displayTitle = `${listProps.title}${isFirstChunk ? '' : ' (Continued)'}`;
 
    return (
       <div style={{
@@ -650,7 +1093,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
         pageBreakInside: 'avoid',
       }}>
          <SectionHeader
-           title={listProps.title}
+           title={displayTitle}
            style={layout === 'single' ? { ...getStyle(false), textAlign: design.personalAlign ?? 'left', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
            headingStyle={headingMeta.headingStyleId}
            lineColor={headingMeta.lineColor}
@@ -658,11 +1101,15 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
            lineWidth={headingMeta.lineWidth}
          />
          <div style={{ display: 'block' }}>
-            {listProps.items.map((item, i) => {
+            {filteredListItems.map((item, i) => {
+              const originalIndex = itemIndices ? itemIndices[i] : i;
               const entryMargin = `${Math.min(8, Math.max(1, design.entrySpacing ?? 4))}mm`;
               const EntryContainer = ({ children }: { children: React.ReactNode }) => (
                 <div
-                  key={i}
+                  key={originalIndex}
+                  className="measure-item"
+                  data-sid={sid}
+                  data-index={originalIndex}
                   style={{
                     display: 'block',
                     breakInside: 'avoid',
@@ -676,7 +1123,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
               if (design.entryLayout === 'side-date') {
                 return (
-                  <EntryContainer key={i}>
+                  <EntryContainer key={originalIndex}>
                     <div className="grid grid-cols-12 gap-4">
                        <div className="col-span-3 text-right">
                           <span className="font-semibold opacity-40 uppercase tabular-nums" style={{ fontSize: '10px', color: getAccentColor('dates') }}>{item.d}</span>
@@ -697,7 +1144,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
               if (design.entryLayout === 'split') {
                  return (
-                  <EntryContainer key={i}>
+                  <EntryContainer key={originalIndex}>
                     <div className="flex justify-between gap-3">
                        <div className="flex-1">
                           <h3 style={{ fontSize: titleSize, color: getAccentColor('name'), fontWeight: '700' }}>{item.t}</h3>
@@ -717,7 +1164,7 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
               }
 
               return (
-                <EntryContainer key={i}>
+                <EntryContainer key={originalIndex}>
                    <div className={`flex ${subtitlePlacement === 'same-line' ? 'items-baseline gap-2' : 'flex-col'} justify-between`}>
                       <div className="flex justify-between items-baseline flex-1">
                         <h3
@@ -759,16 +1206,20 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
 
 /* --- Sub-layouts --- */
 
-const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any }) => {
+const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any, pageNum: number, pageBlocks: PageData }) => {
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
   const isRight = design.layout === 'sidebar-right';
+  const isFirstPage = pageNum === 1;
+
+  const sidebarBlocks = pageBlocks?.sidebar || [];
+  const mainBlocks = pageBlocks?.main || [];
   
   return (
     <div
       style={{
-        minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
+        height: '100%',
         display: 'block',
         position: 'relative',
       }}
@@ -778,7 +1229,7 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
         style={{
           float: isRight ? 'right' : 'left',
           width: '32%',
-          minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
+          height: '100%',
           backgroundColor: design.secondaryColor || '#f8fafc',
           borderRight: isRight ? 'none' : '1px solid rgba(0,0,0,0.05)',
           borderLeft: isRight ? '1px solid rgba(0,0,0,0.05)' : 'none',
@@ -786,62 +1237,65 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
           boxSizing: 'border-box',
         }}
       >
-        <div className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} ${isThumbnail ? 'gap-3' : 'gap-4'}`}>
-          {design.photoShow && personalInfo.image && (
-              <div 
-                className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all`} 
-                style={{ 
-                  borderColor: design.primaryColor || '#ff4d7d',
-                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : design.photoShape === 'hexagon' ? '8px' : '0'
-                }}
+        {isFirstPage && (
+          <div className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} ${isThumbnail ? 'gap-3' : 'gap-4'} mb-6`}>
+            {design.photoShow && personalInfo.image && (
+                <div 
+                  className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all`} 
+                  style={{ 
+                    borderColor: design.primaryColor || '#ff4d7d',
+                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : design.photoShape === 'hexagon' ? '8px' : '0'
+                  }}
+                >
+                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+              </div>
+            )}
+            <div className="space-y-1">
+              <h1
+                className={`${design.nameBold ? 'font-black' : 'font-medium'} leading-tight tracking-tight`}
+                style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : design.nameSize === 'xs' ? '13px' : '18px' }}
+                data-edit-path="content.personalInfo.fullName"
+                data-edit-label="Name"
+                data-edit-value={personalInfo.fullName || ''}
               >
-              <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+                {personalInfo.fullName || 'Name'}
+              </h1>
+              <p
+                className="font-bold opacity-60 uppercase tracking-[0.1em]"
+                style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}
+                data-edit-path="content.personalInfo.professionalTitle"
+                data-edit-label="Job Title"
+                data-edit-value={personalInfo.professionalTitle || ''}
+              >
+                {personalInfo.professionalTitle || ''}
+              </p>
             </div>
-          )}
-          <div className="space-y-1">
-            <h1
-              className={`${design.nameBold ? 'font-black' : 'font-medium'} leading-tight tracking-tight`}
-              style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : design.nameSize === 'xs' ? '13px' : '18px' }}
-              data-edit-path="content.personalInfo.fullName"
-              data-edit-label="Name"
-              data-edit-value={personalInfo.fullName || ''}
-            >
-              {personalInfo.fullName || 'Name'}
-            </h1>
-            <p
-              className="font-bold opacity-60 uppercase tracking-[0.1em]"
-              style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}
-              data-edit-path="content.personalInfo.professionalTitle"
-              data-edit-label="Job Title"
-              data-edit-value={personalInfo.professionalTitle || ''}
-            >
-              {personalInfo.professionalTitle || ''}
-            </p>
+            
+            <div className="space-y-3 w-full">
+              <h2 className="font-bold uppercase tracking-[0.15em] opacity-50 border-b pb-1 w-full" style={{ fontSize: '10px', borderColor: `${design.primaryColor || '#ff4d7d'}20`, color: getAccentColor('headings') }}>Contact</h2>
+              <div className="space-y-2 font-semibold opacity-80" style={{ fontSize: '10px' }}>
+                 {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email}>{personalInfo.email}</span></div>}
+                 {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone}>{personalInfo.phone}</span></div>}
+                 {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location}>{personalInfo.location}</span></div>}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-6">
-           <div className="space-y-3">
-             <h2 className="font-bold uppercase tracking-[0.15em] opacity-50 border-b pb-1" style={{ fontSize: '10px', borderColor: `${design.primaryColor || '#ff4d7d'}20`, color: getAccentColor('headings') }}>Contact</h2>
-             <div className="space-y-2 font-semibold opacity-80" style={{ fontSize: '10px' }}>
-                {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email}>{personalInfo.email}</span></div>}
-                {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone}>{personalInfo.phone}</span></div>}
-                {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location}>{personalInfo.location}</span></div>}
-             </div>
-           </div>
-
-           <Droppable droppableId="sidebar">
+           <Droppable droppableId={`page-sidebar-${pageNum}`}>
               {(provided) => (
-                <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block' }}>
-                  {data?.activeSections?.filter((sid: string) => ['skills', 'languages', 'interests', 'awards', 'certifications', 'socials'].includes(sid)).map((sid: string, idx: number) => (
+                <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
+                  {sidebarBlocks.map((block, idx) => (
                     <SortableSection
-                      key={sid}
-                      id={sid}
+                      key={`${block.sid}-${pageNum}-${idx}`}
+                      id={block.sid}
+                      pageNum={pageNum}
                       index={idx}
-                      isSelected={!isThumbnail && !isExporting && selectedSectionId === sid}
-                      onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(sid) : undefined}
+                      isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                      onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
                     >
-                       <DynamicSectionRenderer sid={sid} data={{ ...data, design, content }} layout="sidebar" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} />
+                       <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="sidebar" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} />
                     </SortableSection>
                   ))}
                   {provided.placeholder}
@@ -858,21 +1312,22 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
           marginRight: isRight ? '32%' : '0',
           padding: isThumbnail ? '16px' : '24px',
           boxSizing: 'border-box',
-          minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm',
+          height: '100%',
         }}
       >
-         <Droppable droppableId="main">
+         <Droppable droppableId={`page-main-${pageNum}`}>
             {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block' }}>
-                {data?.activeSections?.filter((sid: string) => !['skills', 'languages', 'interests', 'awards', 'certifications', 'socials', 'personalInfo'].includes(sid)).map((sid: string, idx: number) => (
+              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
+                {mainBlocks.map((block, idx) => (
                   <SortableSection
-                    key={sid}
-                    id={sid}
+                    key={`${block.sid}-${pageNum}-${idx}`}
+                    id={block.sid}
+                    pageNum={pageNum}
                     index={idx}
-                    isSelected={!isThumbnail && !isExporting && selectedSectionId === sid}
-                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(sid) : undefined}
+                    isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
                   >
-                     <DynamicSectionRenderer sid={sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} />
+                     <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} />
                   </SortableSection>
                 ))}
                 {provided.placeholder}
@@ -886,48 +1341,53 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
   );
 };
 
-const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any }) => {
+const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any, pageNum: number, pageBlocks: PageData }) => {
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const isFirstPage = pageNum === 1;
+  const blocks = pageBlocks?.main || [];
   
   return (
-    <div className="flex flex-col w-full" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
-      <div className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ backgroundColor: design.secondaryColor || '#f8fafc', marginBottom: `${design.sectionSpacing || 8}mm` }}>
-        {design.photoShow && personalInfo.image && (
-          <div 
-            className="w-24 h-24 overflow-hidden border-2 mb-4 shadow-lg" 
-            style={{ 
-              borderColor: design.primaryColor || '#ff4d7d',
-              borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-            }}
-          >
-            <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+    <div className="flex flex-col w-full h-full">
+      {isFirstPage && (
+        <div className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ backgroundColor: design.secondaryColor || '#f8fafc', marginBottom: `${design.sectionSpacing || 8}mm` }}>
+          {design.photoShow && personalInfo.image && (
+            <div 
+              className="w-24 h-24 overflow-hidden border-2 mb-4 shadow-lg" 
+              style={{ 
+                borderColor: design.primaryColor || '#ff4d7d',
+                borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
+              }}
+            >
+              <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+            </div>
+          )}
+          <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} mb-1 capitalize tracking-tight leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '28px' : design.nameSize === 'l' ? '24px' : design.nameSize === 's' ? '18px' : design.nameSize === 'xs' ? '15px' : '22px' }}>{personalInfo.fullName || 'Name'}</h1>
+          <p className="font-bold opacity-40 uppercase tracking-[0.15em] mb-3" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
+          
+          <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold opacity-70 ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
+            {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.email}</span></div>}
+            {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.phone}</span></div>}
+            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.location}</span></div>}
           </div>
-        )}
-        <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} mb-1 capitalize tracking-tight leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '28px' : design.nameSize === 'l' ? '24px' : design.nameSize === 's' ? '18px' : design.nameSize === 'xs' ? '15px' : '22px' }}>{personalInfo.fullName || 'Name'}</h1>
-        <p className="font-bold opacity-40 uppercase tracking-[0.15em] mb-3" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
-        
-        <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold opacity-70 ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
-          {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.email}</span></div>}
-          {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.phone}</span></div>}
-          {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-900">{personalInfo.location}</span></div>}
         </div>
-      </div>
+      )}
       
       <div className="flex-1 w-full pt-0">
-         <Droppable droppableId="modern-main">
+         <Droppable droppableId={`page-main-${pageNum}`}>
             {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block' }}>
-               {data?.activeSections?.map((sid, idx) => (
+              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }} className="flex-1">
+                 {blocks.map((block, idx) => (
                      <SortableSection
-                       key={sid}
-                       id={sid}
+                       key={`${block.sid}-${pageNum}-${idx}`}
+                       id={block.sid}
+                       pageNum={pageNum}
                        index={idx}
-                       isSelected={!isThumbnail && !isExporting && selectedSectionId === sid}
-                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(sid) : undefined}
+                       isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
                      >
-                        <DynamicSectionRenderer sid={sid} data={{ ...data, design, content }} layout="modern" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} />
+                        <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="modern" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} />
                      </SortableSection>
                  ))}
                  {provided.placeholder}
@@ -939,50 +1399,55 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   );
 };
 
-const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any }) => {
+const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any, pageNum: number, pageBlocks: PageData }) => {
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const isFirstPage = pageNum === 1;
+  const blocks = pageBlocks?.main || [];
 
   return (
-    <div className="flex flex-col w-full" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
-      <div className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ marginBottom: `${Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}>
-        <div className={`absolute bottom-0 w-32 h-1 ${design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-        
-        {design.photoShow && personalInfo.image && (
-            <div 
-              className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2`} 
-              style={{ 
-                borderColor: design.primaryColor || '#ff4d7d',
-                borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-              }}
-            >
-              <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-            </div>
-        )}
+    <div className="flex flex-col w-full h-full">
+      {isFirstPage && (
+        <div className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} style={{ marginBottom: `${Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}>
+          <div className={`absolute bottom-0 w-32 h-1 ${design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || 'black' }} />
+          
+          {design.photoShow && personalInfo.image && (
+              <div 
+                className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2`} 
+                style={{ 
+                  borderColor: design.primaryColor || 'black',
+                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
+                }}
+              >
+                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+              </div>
+          )}
 
-        <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{personalInfo.fullName || 'Name'}</h1>
-        <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
-        
-        <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
-           {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {personalInfo.email}</div>}
-           {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {personalInfo.phone}</div>}
-           {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {personalInfo.location}</div>}
+          <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{personalInfo.fullName || 'Name'}</h1>
+          <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
+          
+          <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
+             {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {personalInfo.email}</div>}
+             {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {personalInfo.phone}</div>}
+             {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {personalInfo.location}</div>}
+          </div>
         </div>
-      </div>
+      )}
 
-      <Droppable droppableId="single-main">
+      <Droppable droppableId={`page-main-${pageNum}`}>
          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block' }}>
-               {data?.activeSections?.map((sid, idx) => (
+            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }} className="flex-1">
+               {blocks.map((block, idx) => (
                   <SortableSection
-                    key={sid}
-                    id={sid}
+                    key={`${block.sid}-${pageNum}-${idx}`}
+                    id={block.sid}
+                    pageNum={pageNum}
                     index={idx}
-                    isSelected={!isThumbnail && !isExporting && selectedSectionId === sid}
-                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(sid) : undefined}
+                    isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
                   >
-                     <DynamicSectionRenderer sid={sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} />
+                     <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} />
                   </SortableSection>
                ))}
                {provided.placeholder}
@@ -993,52 +1458,59 @@ const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   );
 };
 
-const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any }) => {
+const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks }: { data: ResumeData, getSectionStyle: (s?: boolean) => React.CSSProperties, isThumbnail?: boolean, isExporting?: boolean, selectedSectionId?: string | null, onSelectSection?: (sid: string) => void, getAccentColor: any, getHeadingMeta: any, pageNum: number, pageBlocks: PageData }) => {
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const isFirstPage = pageNum === 1;
+  const blocks = pageBlocks?.main || [];
 
   return (
-    <div className="flex flex-col w-full bg-white" style={{ minHeight: (isThumbnail || isExporting) ? 'auto' : '297mm' }}>
-      <div className={`${isThumbnail ? 'h-24' : 'h-32'} flex items-center justify-between ${isThumbnail ? 'px-8' : 'px-12'} text-white overflow-hidden relative`} style={{ backgroundColor: design.primaryColor || '#ff4d7d' }}>
-         <div className="flex items-center gap-6 z-10">
-            {design.photoShow && personalInfo.image && (
-              <div 
-                className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
-                style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
-              >
-                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-              </div>
-            )}
-            <div>
-              <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{personalInfo.fullName || 'Name'}</h1>
-              <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{personalInfo.professionalTitle || ''}</p>
-            </div>
-         </div>
-         <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
-            <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
-               {personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {personalInfo.email}</div>}
-               {personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {personalInfo.phone}</div>}
-            </div>
-         </div>
-      </div>
-      <div className={`bg-slate-50 border-b border-slate-100 flex flex-wrap justify-center gap-6 items-center ${isThumbnail ? 'py-1.5' : 'py-3'} font-bold tracking-[0.15em] uppercase text-slate-400`} style={{ marginBottom: `${design.sectionSpacing || 8}mm`, fontSize: '10px' }}>
-         {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {personalInfo.location}</div>}
-         {(personalInfo as any).linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
-      </div>
+    <div className="flex flex-col w-full h-full bg-white">
+      {isFirstPage && (
+        <>
+          <div className={`${isThumbnail ? 'h-24' : 'h-32'} flex items-center justify-between ${isThumbnail ? 'px-8' : 'px-12'} text-white overflow-hidden relative`} style={{ backgroundColor: design.primaryColor || 'black' }}>
+             <div className="flex items-center gap-6 z-10">
+                {design.photoShow && personalInfo.image && (
+                  <div 
+                    className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
+                    style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
+                  >
+                    <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+                  </div>
+                )}
+                <div>
+                  <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{personalInfo.fullName || 'Name'}</h1>
+                  <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{personalInfo.professionalTitle || ''}</p>
+                </div>
+             </div>
+             <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
+                <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
+                   {personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {personalInfo.email}</div>}
+                   {personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {personalInfo.phone}</div>}
+                </div>
+             </div>
+          </div>
+          <div className={`bg-slate-50 border-b border-slate-100 flex flex-wrap justify-center gap-6 items-center ${isThumbnail ? 'py-1.5' : 'py-3'} font-bold tracking-[0.15em] uppercase text-slate-400`} style={{ marginBottom: `${design.sectionSpacing || 8}mm`, fontSize: '10px' }}>
+             {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {personalInfo.location}</div>}
+             {(personalInfo as any).linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
+          </div>
+        </>
+      )}
       <div className="flex-1 w-full pt-0">
-         <Droppable droppableId="double-main">
+         <Droppable droppableId={`page-main-${pageNum}`}>
             {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3">
-                 {data?.activeSections?.map((sid, idx) => (
+              <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3 flex-1" style={{ minHeight: '50px' }}>
+                 {blocks.map((block, idx) => (
                      <SortableSection
-                       key={sid}
-                       id={sid}
+                       key={`${block.sid}-${pageNum}-${idx}`}
+                       id={block.sid}
+                       pageNum={pageNum}
                        index={idx}
-                       isSelected={!isThumbnail && !isExporting && selectedSectionId === sid}
-                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(sid) : undefined}
+                       isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
                      >
-                        <DynamicSectionRenderer sid={sid} data={{ ...data, design, content }} layout="double" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} />
+                        <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="double" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} />
                      </SortableSection>
                    ))}
                    {provided.placeholder}

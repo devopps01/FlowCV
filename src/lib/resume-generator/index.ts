@@ -152,6 +152,7 @@ export class ResumeGenerator {
     const years = this.input.experienceYears || 1;
 
     return {
+      id: 'p1',
       firstName,
       lastName,
       email: this.input.email || '',
