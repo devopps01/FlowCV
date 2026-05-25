@@ -184,7 +184,7 @@ export interface ResumeData {
     // --- Font ---
     fontFamily: string;
     fontCategory: 'serif' | 'sans' | 'mono';
-    
+
     // --- Section Headings ---
     /**
      * Section heading style id.
@@ -264,6 +264,7 @@ export interface ResumeData {
     layout: 'single' | 'single-centered' | 'single-compact' | 'single-minimal' | 'two-column' | 'two-column-reverse' | 'sidebar-left' | 'sidebar-left-wide' | 'sidebar-left-narrow' | 'sidebar-right' | 'sidebar-right-wide' | 'sidebar-right-narrow' | 'modern-header' | 'modern-header-dark' | 'modern-header-split' | 'double-header' | 'double-header-bold' | 'timeline' | 'timeline-left' | 'card-header' | 'infographic';
     borderRadius?: 'none' | 'md' | 'lg' | 'xl';
     shadow?: 'none' | 'sm' | 'md' | 'lg';
+    sectionTitles?: Record<string, string>;
   };
   activeSections: string[];
   // Per-element style overrides: key = data-edit-path, value = CSS properties

@@ -10,32 +10,55 @@ function LoginForm() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === 'authenticated') router.replace('/dashboard');
-  }, [status, router]);
+    if (status === 'authenticated') router.replace(callbackUrl);
+  }, [status, router, callbackUrl]);
 
   useEffect(() => {
-    if (searchParams.get('error')) setError('Authentication failed. Please try again.');
+    const errorParam = searchParams.get('error');
+    const registered = searchParams.get('registered');
+
+    if (registered === 'true') {
+      setNotice('Account created successfully. Sign in to continue.');
+    } else {
+      setNotice('');
+    }
+
+    if (errorParam) {
+      setError(
+        errorParam === 'CredentialsSignin'
+          ? 'Invalid email or password'
+          : 'Authentication failed. Please try again.'
+      );
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     if (!email || !password) { setError('Please enter both email and password'); return; }
     setLoading(true);
     try {
-      const result = await signIn('credentials', { email: email.toLowerCase().trim(), password, redirect: false });
+      const result = await signIn('credentials', {
+        email: email.toLowerCase().trim(),
+        password,
+        redirect: false,
+        callbackUrl,
+      });
       if (result?.error) {
         setError(result.error === 'CredentialsSignin' ? 'Invalid email or password' : 'Login failed. Please try again.');
       } else if (result?.ok) {
-        router.push('/dashboard');
+        router.push(result.url || callbackUrl);
         router.refresh();
       }
     } catch {
@@ -57,6 +80,13 @@ function LoginForm() {
         <div className="flex items-center gap-3 rounded-2xl p-4 text-sm" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {notice && (
+        <div className="flex items-center gap-3 rounded-2xl p-4 text-sm" style={{ backgroundColor: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#059669' }}>
+          <Sparkles className="h-4 w-4 flex-shrink-0" />
+          <span>{notice}</span>
         </div>
       )}
 

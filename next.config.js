@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  distDir: '.next-local',
   images: {
     domains: ['images.unsplash.com', 'prod.flowcvassets.com', 'assets.flowcvassets.com'],
   },

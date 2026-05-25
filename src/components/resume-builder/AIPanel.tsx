@@ -16,6 +16,7 @@ import {
   Loader2, Check, X, Lightbulb, Zap, GitMerge, AlertTriangle,
 } from 'lucide-react';
 import { ResumeData } from './types';
+import { readApiResponse } from '@/lib/utils/api-client';
 
 interface AIPanelProps {
   data: ResumeData;
@@ -113,11 +114,13 @@ function SectionEnhancer({ label, fieldType, currentText, context, onApply }: Se
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: currentText, fieldType, context, instruction: customInstruction || instruction }),
       });
-      const d = await res.json();
-      if (d.enhanced && !d.error) {
-        setResult(d.enhanced);
+      const result = await readApiResponse<{ enhanced?: string; error?: string }>(res);
+      if (!result.ok) {
+        setResult(`âš ï¸ ${result.error}`);
+      } else if (result.data.enhanced && !result.data.error) {
+        setResult(result.data.enhanced);
       } else {
-        setResult(`⚠️ ${d.error?.includes('unavailable') || d.error?.includes('rate') ? 'AI is busy, please try again.' : (d.error || 'Enhancement failed.')}`);
+        setResult(`AI error: ${result.data.error?.includes('unavailable') || result.data.error?.includes('rate') ? 'AI is busy, please try again.' : (result.data.error || 'Enhancement failed.')}`);
       }
     } catch (e: any) {
       setResult(`⚠️ ${e.message || 'Network error'}`);
@@ -231,11 +234,11 @@ export function AIPanel({ data, onApply, updateNested }: AIPanelProps) {
         }),
       });
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Generation failed');
-      if (json.content) {
-        setGeneratedPreview(json.content);
-        if (json.warning) setError(json.warning);
+      const result = await readApiResponse<{ content?: any; warning?: string; error?: string }>(res);
+      if (!result.ok) throw new Error(result.error || 'Generation failed');
+      if (result.data.content) {
+        setGeneratedPreview(result.data.content);
+        if (result.data.warning) setError(result.data.warning);
       }
     } catch (e: any) {
       setError(e.message || 'Failed to generate resume');

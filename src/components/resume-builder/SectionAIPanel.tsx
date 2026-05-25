@@ -8,6 +8,7 @@
 
 import React, { useState } from 'react';
 import { Sparkles, Loader2, Check, X, RefreshCw, Wand2, ChevronDown, ChevronUp } from 'lucide-react';
+import { readApiResponse } from '@/lib/utils/api-client';
 
 interface SectionAIPanelProps {
   section: string;
@@ -212,9 +213,14 @@ export function SectionAIPanel({ section, sectionLabel, currentData, resumeConte
         }),
       });
 
-      const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || 'Generation failed');
-      setGenerated(json.data);
+      const result = await readApiResponse<{ data?: any; error?: string }>(res);
+      if (!result.ok) {
+        throw new Error(result.error || 'Generation failed');
+      }
+      if (result.data.error) {
+        throw new Error(result.data.error);
+      }
+      setGenerated(result.data.data);
     } catch (e: any) {
       setError(e.message || 'Failed to generate. Please try again.');
     } finally {

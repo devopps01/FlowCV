@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Wand2, Loader2, Check, X } from 'lucide-react';
+import { readApiResponse } from '@/lib/utils/api-client';
 
 interface RichTextEditorProps {
   value: string;
@@ -40,11 +41,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, placeh
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, fieldType, context, instruction }),
       });
-      const data = await res.json();
-      if (data.enhanced && !data.error) {
-        setAiResult(data.enhanced);
+      const result = await readApiResponse<{ enhanced?: string; error?: string }>(res);
+      if (!result.ok) {
+        setAiResult(`AI error: ${result.error}`);
+      } else if (result.data.enhanced && !result.data.error) {
+        setAiResult(result.data.enhanced);
       } else {
-        const msg = data.error || '';
+        const msg = result.data.error || '';
         setAiResult(`⚠️ ${msg.includes('unavailable') || msg.includes('rate') || msg.includes('quota') ? 'AI is busy, please try again.' : 'AI enhancement failed. Please try again.'}`);
       }
     } catch {

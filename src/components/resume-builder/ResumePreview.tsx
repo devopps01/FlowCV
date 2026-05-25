@@ -46,8 +46,8 @@ const GoogleFontsLoader = ({ fontFamily }: { fontFamily: string }) => {
     }
 
     // Force the browser to load the font into memory so it's ready for canvas
-    document.fonts.load(`700 12px '${fontFamily}'`).catch(() => {});
-    document.fonts.load(`400 12px '${fontFamily}'`).catch(() => {});
+    document.fonts.load(`700 12px '${fontFamily}'`).catch(() => { });
+    document.fonts.load(`400 12px '${fontFamily}'`).catch(() => { });
   }, [fontFamily]);
 
   return null;
@@ -126,7 +126,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
   };
 
   const getSectionStyle = (isSidebar = false): React.CSSProperties => {
-    const headingColor = isSidebar 
+    const headingColor = isSidebar
       ? (design.textColor || '#1f2937')
       : getAccentColor('headings', design.primaryColor || '#ff4d7d');
 
@@ -207,11 +207,11 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
   };
 
   // Harmonize data to handle schema variations
-  const harmonizedContent = (data.content || {}) as any;
+  const harmonizedContent: any = (data.content || {}) as any;
   const pInfo = (harmonizedContent.personalInfo || {}) as any;
   const fullName = pInfo.fullName || `${pInfo.firstName || ''} ${pInfo.lastName || ''}`.trim() || 'Name';
   const displayImage = pInfo.image || pInfo.photo || '';
-  
+
   const harmonizedData = {
     ...data,
     content: {
@@ -235,7 +235,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
   const onMoveItem = (sid: string, index: number, direction: 'up' | 'down') => {
     if (!updateNested) return;
-    const list = [...(data.content?.[sid] || [])];
+    const contentMap = data.content as Record<string, any>;
+    const list: any = [...(contentMap?.[sid] || [])];
     if (direction === 'up') {
       if (index === 0) return;
       const temp = list[index];
@@ -252,8 +253,9 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
   const onDeleteItem = (sid: string, index: number) => {
     if (!updateNested) return;
-    const list = data.content?.[sid] || [];
-    const updated = list.filter((_, idx) => idx !== index);
+    const contentMap = data.content as Record<string, any>;
+    const list: any = contentMap?.[sid] || [];
+    const updated = list.filter((_: any, idx: any) => idx !== index);
     updateNested(`content.${sid}`, updated);
   };
 
@@ -275,7 +277,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
     // Measure the header height
     const headerEl = container.querySelector('#measure-personal-header');
     const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
-    
+
     const sectionSpacing_mm = design.sectionSpacing ?? 10;
     const sectionSpacing_px = sectionSpacing_mm * 3.77952755906;
 
@@ -284,25 +286,25 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
     const getItemHeight = (el: Element) => {
       const actualHeight = el.getBoundingClientRect().height;
-      
+
       const text = el.textContent?.trim() || '';
       if (text.length === 0) return actualHeight > 0 ? actualHeight : 0;
-      
+
       const listItems = el.querySelectorAll('li').length;
       const paragraphs = el.querySelectorAll('p').length;
       const lineBreaks = (el.innerHTML.match(/<br\s*\/?>/gi) || []).length;
       const structuralLines = Math.max(1, listItems + paragraphs + lineBreaks);
-      
+
       const charLines = Math.ceil(text.length / 65);
       const estimatedLines = Math.max(structuralLines, charLines);
-      
-      const lineH = Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)) * (design.fontSize ?? 10.5) * 1.333; 
+
+      const lineH = Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)) * (design.fontSize ?? 10.5) * 1.333;
       const estimatedHeight = estimatedLines * lineH + 28; // 28px padding buffer
-      
+
       if (actualHeight > 0) {
         return actualHeight;
       }
-      
+
       return estimatedHeight;
     };
 
@@ -325,7 +327,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
         const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
         const headerH = headerEl ? headerEl.getBoundingClientRect().height : 30;
-        
+
         const isSkills = sid === 'skills';
         const isLanguages = sid === 'languages';
         const isInterests = sid === 'interests';
@@ -333,7 +335,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
         const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
         const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-        
+
         // Group items by rows to correctly paginate columns and grids side-by-side
         const cols = (isActualGrid && !isSidebar)
           ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
@@ -367,7 +369,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
           for (let r = 0; r < rows.length; r++) {
             const rowIndices = rows[r];
             const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-            
+
             if (currentItemHeight + rowHeight <= maxContentHeight - currentMainHeight) {
               tempItems.push(...rowIndices);
               currentItemHeight += rowHeight + entrySpacing_px;
@@ -421,7 +423,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
         const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
         const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-        
+
         // Group items by rows to correctly paginate columns and grids side-by-side (cols=1 in sidebar usually)
         const cols = (isActualGrid && false) // Sidebar layout sidebar is always 1 column
           ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
@@ -455,7 +457,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
           for (let r = 0; r < rows.length; r++) {
             const rowIndices = rows[r];
             const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-            
+
             if (currentItemHeight + rowHeight <= maxContentHeight - currentSidebarHeight) {
               tempItems.push(...rowIndices);
               currentItemHeight += rowHeight + entrySpacing_px;
@@ -516,7 +518,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
         const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
         const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-        
+
         // Group items by rows to correctly paginate columns and grids side-by-side
         const cols = (isActualGrid && !isSidebar)
           ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
@@ -550,7 +552,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
           for (let r = 0; r < rows.length; r++) {
             const rowIndices = rows[r];
             const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-            
+
             if (currentItemHeight + rowHeight <= maxContentHeight - currentHeight) {
               tempItems.push(...rowIndices);
               currentItemHeight += rowHeight + entrySpacing_px;
@@ -600,35 +602,35 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
   const onDragEnd = (result: any) => {
     if (!result.destination || !onReorderSections) return;
-    
+
     const sourceDroppableId = result.source.droppableId;
     const destDroppableId = result.destination.droppableId;
-    
+
     const sourcePageMatch = sourceDroppableId.match(/page-main-(\d+)/) || sourceDroppableId.match(/page-sidebar-(\d+)/);
     const destPageMatch = destDroppableId.match(/page-main-(\d+)/) || destDroppableId.match(/page-sidebar-(\d+)/);
-    
+
     if (sourcePageMatch && destPageMatch) {
       const sourcePageNum = parseInt(sourcePageMatch[1]);
       const destPageNum = parseInt(destPageMatch[1]);
-      
+
       const isSourceSidebar = sourceDroppableId.includes('sidebar');
       const isDestSidebar = destDroppableId.includes('sidebar');
 
-      const sourceBlocks = isSourceSidebar 
+      const sourceBlocks = isSourceSidebar
         ? (pageDistributions[sourcePageNum - 1]?.sidebar || [])
         : (pageDistributions[sourcePageNum - 1]?.main || []);
 
-      const destBlocks = isDestSidebar 
+      const destBlocks = isDestSidebar
         ? (pageDistributions[destPageNum - 1]?.sidebar || [])
         : (pageDistributions[destPageNum - 1]?.main || []);
-      
+
       const draggedSid = sourceBlocks[result.source.index]?.sid;
       if (!draggedSid) return;
-      
+
       const items = Array.from(data.activeSections || []);
       const sourceIdx = items.indexOf(draggedSid);
       items.splice(sourceIdx, 1);
-      
+
       const targetSid = destBlocks[result.destination.index]?.sid;
       if (targetSid) {
         const destIdx = items.indexOf(targetSid);
@@ -636,7 +638,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
       } else {
         items.push(draggedSid);
       }
-      
+
       onReorderSections(items);
     } else {
       const items = Array.from(data.activeSections || []);
@@ -648,7 +650,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
   return (
     <div
-      className={`w-full flex flex-col items-center ${isThumbnail ? 'p-0 overflow-hidden bg-transparent' : 'pt-8 pb-16 px-6'}`}
+      className={`w-full flex flex-col items-center ${isThumbnail ? 'p-0 overflow-hidden bg-transparent' : 'pt-0 pb-0 px-0'}`}
       style={isThumbnail ? {} : { backgroundColor: 'var(--app-bg-medium)' }}
     >
       <GoogleFontsLoader fontFamily={design.fontFamily || 'Inter'} />
@@ -665,7 +667,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         <DragDropContext onDragEnd={onDragEnd}>
           {pageDistributions.map((pageBlocks, pageIdx) => {
             const pageNum = pageIdx + 1;
-            
+
             return (
               <div
                 key={pageIdx}
@@ -760,7 +762,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                 {/* Page number badge inside preview */}
                 {!isThumbnail && !isExporting && (
                   <div
-                    className="absolute bottom-4 right-6 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest pointer-events-none select-none"
+                    className="absolute bottom-2 right-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest pointer-events-none select-none"
                     style={{
                       background: 'rgba(0,0,0,0.03)',
                       border: '1px solid rgba(0,0,0,0.05)',
@@ -801,18 +803,18 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
         {/* Personal Details Header for height calculations */}
         <div id="measure-personal-header" style={{ display: 'block', width: '100%' }}>
           {design.layout?.includes('sidebar') ? (
-            <div 
+            <div
               className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} gap-4 mb-6`}
               style={{ width: '32%', padding: '24px', boxSizing: 'border-box' }}
             >
               {design.photoShow && harmonizedData.content.personalInfo.image && (
-                  <div 
-                    className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all" 
-                    style={{ 
-                      borderColor: design.primaryColor || '#ff4d7d',
-                      borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                    }}
-                  >
+                <div
+                  className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all"
+                  style={{
+                    borderColor: design.primaryColor || '#ff4d7d',
+                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
+                  }}
+                >
                   <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
                 </div>
               )}
@@ -820,7 +822,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                 <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : '18px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
                 <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
               </div>
-              
+
               <div className="flex flex-col gap-2 font-bold uppercase tracking-wide text-slate-400" style={{ fontSize: '10px' }}>
                 {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.email}</div>}
                 {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.phone}</div>}
@@ -828,14 +830,14 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
               </div>
             </div>
           ) : design.layout === 'modern-header' ? (
-            <div 
-              className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} 
+            <div
+              className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
               style={{ backgroundColor: design.secondaryColor || '#f8fafc', marginBottom: `${design.sectionSpacing || 8}mm` }}
             >
               {design.photoShow && harmonizedData.content.personalInfo.image && (
-                <div 
-                  className="w-24 h-24 overflow-hidden border-2 mb-4 shadow-lg" 
-                  style={{ 
+                <div
+                  className="w-24 h-24 overflow-hidden border-2 mb-4 shadow-lg"
+                  style={{
                     borderColor: design.primaryColor || '#ff4d7d',
                     borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
                   }}
@@ -845,7 +847,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
               )}
               <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} mb-1 capitalize tracking-tight leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '28px' : design.nameSize === 'l' ? '24px' : design.nameSize === 's' ? '18px' : design.nameSize === 'xs' ? '15px' : '22px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
               <p className="font-bold opacity-40 uppercase tracking-[0.15em] mb-3" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-              
+
               <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold opacity-70 ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
                 {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-900">{harmonizedData.content.personalInfo.email}</span></div>}
                 {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-900">{harmonizedData.content.personalInfo.phone}</span></div>}
@@ -855,58 +857,58 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
           ) : design.layout === 'double-header' ? (
             <div style={{ marginBottom: `${design.sectionSpacing || 8}mm` }}>
               <div className="h-32 flex items-center justify-between px-12 text-white overflow-hidden relative" style={{ backgroundColor: design.primaryColor || 'black' }}>
-                 <div className="flex items-center gap-6 z-10">
-                    {design.photoShow && harmonizedData.content.personalInfo.image && (
-                      <div 
-                        className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
-                        style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
-                      >
-                        <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                      </div>
-                    )}
-                    <div>
-                      <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
-                      <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
+                <div className="flex items-center gap-6 z-10">
+                  {design.photoShow && harmonizedData.content.personalInfo.image && (
+                    <div
+                      className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
+                      style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
+                    >
+                      <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
                     </div>
-                 </div>
-                 <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
-                    <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
-                       {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.email}</div>}
-                       {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.phone}</div>}
-                    </div>
-                 </div>
+                  )}
+                  <div>
+                    <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
+                    <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
+                  </div>
+                </div>
+                <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
+                  <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
+                    {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.email}</div>}
+                    {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.phone}</div>}
+                  </div>
+                </div>
               </div>
               <div className="bg-slate-50 border-b border-slate-100 flex flex-wrap justify-center gap-6 items-center py-3 font-bold tracking-[0.15em] uppercase text-slate-400" style={{ fontSize: '10px' }}>
-                 {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.location}</div>}
-                 {harmonizedData.content.personalInfo.linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
+                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.location}</div>}
+                {harmonizedData.content.personalInfo.linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
               </div>
             </div>
           ) : (
-            <div 
-              className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} 
+            <div
+              className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
               style={{ marginBottom: `${Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}
             >
               <div className={`absolute bottom-0 w-32 h-1 ${design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || 'black' }} />
-              
+
               {design.photoShow && harmonizedData.content.personalInfo.image && (
-                  <div 
-                    className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2" 
-                    style={{ 
-                      borderColor: design.primaryColor || 'black',
-                      borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                    }}
-                  >
-                    <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                  </div>
+                <div
+                  className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2"
+                  style={{
+                    borderColor: design.primaryColor || 'black',
+                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
+                  }}
+                >
+                  <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+                </div>
               )}
 
               <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
               <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-              
+
               <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
-                 {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.email}</div>}
-                 {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.phone}</div>}
-                 {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.location}</div>}
+                {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.email}</div>}
+                {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.phone}</div>}
+                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.location}</div>}
               </div>
             </div>
           )}
@@ -1013,7 +1015,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
             {/* Controls Container */}
             <div className="flex flex-col gap-4 max-h-[350px] overflow-y-auto pr-1">
-              
+
               {/* Font Size */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
@@ -1299,7 +1301,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
 
 /* --- Shared Components --- */
 
-const RichContent = ({ html, className = '', style }: { html: string; className?: string; style?: React.CSSProperties }) => {
+const RichContent = ({ html, path, overrides, className = '', style }: { html: string; path?: string; overrides?: Record<string, React.CSSProperties>; className?: string; style?: React.CSSProperties }) => {
   if (!html || html === '<p></p>') return null;
   const errorPatterns = [
     /error:\s*gemini[_\s]api[_\s]key[^.]*\./gi,
@@ -1314,55 +1316,287 @@ const RichContent = ({ html, className = '', style }: { html: string; className?
   }
   cleaned = cleaned.trim();
   if (!cleaned || cleaned === '<p></p>' || cleaned === '<p> </p>') return null;
-  return <div className={`rich-content ${className}`} style={style} dangerouslySetInnerHTML={{ __html: cleaned }} />;
+
+  if (path) {
+    let pIndex = 0;
+    let liIndex = 0;
+    cleaned = cleaned.replace(/<(p|li)(>|\s[^>]*>)/gi, (match, rawTag, rest) => {
+      const tag = rawTag.toLowerCase();
+      const idx = tag === 'p' ? pIndex++ : liIndex++;
+      const stylePath = `${path}.${tag}[${idx}]`;
+      let inlineStyle = '';
+      if (overrides && overrides[stylePath]) {
+        const styleObj = overrides[stylePath];
+        const styleStr = Object.entries(styleObj).map(([k, v]) => {
+          const dashKey = k.replace(/([A-Z])/g, "-$1").toLowerCase();
+          const value = typeof v === 'number' && k !== 'fontWeight' ? `${v}px` : v;
+          return `${dashKey}:${value}`;
+        }).join(';');
+        if (styleStr) inlineStyle = ` style="${styleStr}"`;
+      }
+      return `<${rawTag} data-style-path="${stylePath}"${inlineStyle}${rest}`;
+    });
+  }
+
+  const wrapperStyle = path && overrides && overrides[path] ? { ...style, ...overrides[path] } : style;
+  return <div className={`rich-content ${className}`} style={wrapperStyle} dangerouslySetInnerHTML={{ __html: cleaned }} {...(path ? { 'data-edit-path': path, 'data-edit-type': 'richtext' } : {})} />;
 };
 
-const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineWidth }: { 
-  title: string, 
-  style: React.CSSProperties,
-  headingStyle?: string,
-  lineColor?: string,
-  lineThick?: string,
-  lineWidth?: string,
+const SectionHeader = ({
+  title,
+  style,
+  headingStyle,
+  lineColor,
+  lineThick,
+  lineWidth,
+  editPath,
+  editValue,
+  editLabel,
+  textStylePath,
+  wrapperStylePath,
+  overrides,
+}: {
+  title: string;
+  style: React.CSSProperties;
+  headingStyle?: string;
+  lineColor?: string;
+  lineThick?: string;
+  lineWidth?: string;
+  editPath?: string;
+  editValue?: string;
+  editLabel?: string;
+  textStylePath?: string;
+  wrapperStylePath?: string;
+  overrides?: Record<string, React.CSSProperties>;
 }) => {
   const lc = lineColor || '#1f2937';
   const lt = lineThick || '2px';
+  const titleStyle = textStylePath && overrides?.[textStylePath] ? { ...style, ...overrides[textStylePath] } : style;
+  const blockStyle = wrapperStylePath && overrides?.[wrapperStylePath] ? overrides[wrapperStylePath] : {};
+  const wrapperEditableProps = editPath ? {
+    'data-edit-path': editPath,
+    'data-edit-value': editValue || title,
+    'data-edit-label': editLabel || 'Section Heading',
+  } : {};
+  const wrapperStyleProps = wrapperStylePath ? { 'data-style-path': wrapperStylePath } : {};
+  const titleEditableProps = editPath ? {
+    'data-edit-path': editPath,
+    'data-edit-value': editValue || title,
+    'data-edit-label': editLabel || 'Section Heading',
+  } : {};
+  const titleStyleProps = textStylePath ? { 'data-style-path': textStylePath } : {};
 
+  // default line width
+  const lw = lineWidth || '100%';
+
+  // convert number to %
+  const parsedWidth = lw.includes('%') ? lw : `${lw}%`;
+
+  // =========================
+  // DOT STYLE
+  // =========================
   if ((headingStyle || '').startsWith('dot')) {
     const sizeMatch = ((headingStyle || '').match(/_s(\d+)/) || [])[1];
     const dotSize = sizeMatch ? `${Number(sizeMatch)}px` : '7px';
+
     return (
-      <div className="section-header-container mb-3 flex items-center gap-2">
-        <div style={{ width: dotSize, height: dotSize, borderRadius: '50%', backgroundColor: lc, flexShrink: 0 }} />
-        <h2 style={style}>{title}</h2>
+      <div
+        className="section-header-container mb-3 flex items-center gap-2"
+        style={{
+          width: parsedWidth,
+          ...blockStyle,
+        }}
+        {...wrapperEditableProps}
+        {...wrapperStyleProps}
+      >
+        <div
+          style={{
+            width: dotSize,
+            height: dotSize,
+            borderRadius: '50%',
+            backgroundColor: lc,
+            flexShrink: 0,
+          }}
+        />
+
+        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
+
+        {/* right line */}
+        <div
+          style={{
+            flex: 1,
+            height: lt,
+            backgroundColor: lc,
+            opacity: 0.3,
+          }}
+        />
       </div>
     );
   }
 
+  // =========================
+  // DOUBLE SIDE STYLE
+  // =========================
   if ((headingStyle || '').startsWith('double-side')) {
     return (
-      <div className="section-header-container mb-3 flex items-center gap-3">
-        <div style={{ flex: 1, height: lt, backgroundColor: lc, opacity: 0.4 }} />
-        <h2 style={{ ...style, display: 'inline-block', width: 'auto' }}>{title}</h2>
-        <div style={{ flex: 1, height: lt, backgroundColor: lc, opacity: 0.4 }} />
+      <div
+        className="section-header-container mb-3 flex items-center gap-3"
+        style={{
+          width: parsedWidth,
+          ...blockStyle,
+        }}
+        {...wrapperEditableProps}
+        {...wrapperStyleProps}
+      >
+        <div
+          style={{
+            flex: 1,
+            height: lt,
+            backgroundColor: lc,
+            opacity: 0.4,
+          }}
+        />
+
+        <h2
+          style={{
+            ...titleStyle,
+            display: 'inline-block',
+            whiteSpace: 'nowrap',
+          }}
+          {...titleEditableProps}
+          {...titleStyleProps}
+        >
+          {title}
+        </h2>
+
+        <div
+          style={{
+            flex: 1,
+            height: lt,
+            backgroundColor: lc,
+            opacity: 0.4,
+          }}
+        />
       </div>
     );
   }
 
+  // =========================
+  // STRIKETHROUGH STYLE
+  // =========================
   if ((headingStyle || '').startsWith('strikethrough')) {
     const tMatch = ((headingStyle || '').match(/_t(\d+)/) || [])[1];
-    const strikeH = tMatch ? `${Number(tMatch)}px` : '1px';
+
+    const strikeH = tMatch
+      ? `${Number(tMatch)}px`
+      : lt;
+
     return (
-      <div className="section-header-container mb-3 relative flex items-center">
-        <div style={{ position: 'absolute', left: 0, right: 0, height: strikeH, backgroundColor: lc, opacity: 0.25 }} />
-        <h2 style={{ ...style, display: 'inline-block', width: 'auto', backgroundColor: 'white', paddingLeft: '4px', paddingRight: '8px', position: 'relative' }}>{title}</h2>
+      <div
+        className="section-header-container mb-3 relative flex items-center"
+        style={{
+          width: parsedWidth,
+          ...blockStyle,
+        }}
+        {...wrapperEditableProps}
+        {...wrapperStyleProps}
+      >
+        {/* line */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: '100%',
+            height: strikeH,
+            backgroundColor: lc,
+            opacity: 0.25,
+          }}
+        />
+
+        {/* title */}
+        <h2
+          style={{
+            ...titleStyle,
+            display: 'inline-block',
+            backgroundColor: 'white',
+            paddingLeft: '6px',
+            paddingRight: '10px',
+            position: 'relative',
+            zIndex: 2,
+          }}
+          {...titleEditableProps}
+          {...titleStyleProps}
+        >
+          {title}
+        </h2>
       </div>
     );
   }
 
+  // =========================
+  // UNDERLINE STYLE
+  // =========================
+  if ((headingStyle || '').startsWith('underline')) {
+    return (
+      <div
+        className="section-header-container mb-3"
+        style={{
+          width: parsedWidth,
+          ...blockStyle,
+        }}
+        {...wrapperEditableProps}
+        {...wrapperStyleProps}
+      >
+        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
+
+        <div
+          style={{
+            marginTop: '6px',
+            width: '100%',
+            height: lt,
+            backgroundColor: lc,
+            borderRadius: '999px',
+          }}
+        />
+      </div>
+    );
+  }
+
+  // =========================
+  // LEFT BORDER STYLE
+  // =========================
+  if ((headingStyle || '').startsWith('left-border')) {
+    return (
+      <div
+        className="section-header-container mb-3 flex items-center"
+        style={{
+          width: parsedWidth,
+          borderLeft: `${lt} solid ${lc}`,
+          paddingLeft: '10px',
+          ...blockStyle,
+        }}
+        {...wrapperEditableProps}
+        {...wrapperStyleProps}
+      >
+        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
+      </div>
+    );
+  }
+
+  // =========================
+  // DEFAULT STYLE
+  // =========================
   return (
-    <div className="section-header-container mb-3">
-       <h2 style={style}>{title}</h2>
+    <div
+      className="section-header-container mb-3"
+      style={{
+        width: parsedWidth,
+        ...blockStyle,
+      }}
+      {...wrapperEditableProps}
+      {...wrapperStyleProps}
+    >
+      <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
     </div>
   );
 };
@@ -1370,16 +1604,16 @@ const SectionHeader = ({ title, style, headingStyle, lineColor, lineThick, lineW
 const SortableSection = ({ id, pageNum, index, children, isSelected, onSelect }: { id: string, pageNum: number, index: number, children: React.ReactNode, isSelected?: boolean, onSelect?: () => void }) => (
   <Draggable draggableId={`${id}-${pageNum}`} index={index}>
     {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          className={`relative group/section ${snapshot.isDragging ? 'bg-blue-50/30 ring-2 ring-blue-200 ring-offset-4 rounded-xl scale-[1.01] z-50' : ''} ${isSelected ? 'ring-2 ring-slate-900 ring-offset-4 rounded-xl' : ''}`}
-          style={{
-            ...provided.draggableProps.style,
-            breakInside: 'avoid',
-            pageBreakInside: 'avoid',
-          }}
-        >
+      <div
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+        className={`relative group/section ${snapshot.isDragging ? 'bg-blue-50/30 ring-2 ring-blue-200 ring-offset-4 rounded-xl scale-[1.01] z-50' : ''} ${isSelected ? 'ring-2 ring-slate-900 ring-offset-4 rounded-xl' : ''}`}
+        style={{
+          ...provided.draggableProps.style,
+          breakInside: 'avoid',
+          pageBreakInside: 'avoid',
+        }}
+      >
         <div
           {...provided.dragHandleProps}
           className="absolute -left-10 top-0 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab text-slate-300 hover:text-slate-900"
@@ -1406,501 +1640,938 @@ const SortableSection = ({ id, pageNum, index, children, isSelected, onSelect }:
 /* --- Dynamic Global Section Renderer --- */
 
 const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, getHeadingMeta, isExporting, itemIndices, isMeasuring, onMoveItem, onDeleteItem, onOpenStylePopup, isThumbnail }: { sid: string, data: ResumeData, layout: 'sidebar' | 'modern' | 'single' | 'double', getStyle: any, getAccentColor: any, getHeadingMeta: (isSidebar: boolean) => { headingStyleId: string; lineColor: string; lineThick: string; lineWidth: string }, isExporting?: boolean, itemIndices?: number[], isMeasuring?: boolean, onMoveItem?: (sid: string, index: number, direction: 'up' | 'down') => void, onDeleteItem?: (sid: string, index: number) => void, onOpenStylePopup?: (sid: string, index: number) => void, isThumbnail?: boolean }) => {
-   const design = data.design || {} as any;
-   const content = data.content || {} as any;
-   const personalInfo = content.personalInfo || {} as any;
-   const headingMeta = getHeadingMeta(layout === 'sidebar');
+  const design = data.design || {} as any;
+  const content = data.content || {} as any;
+  const personalInfo = content.personalInfo || {} as any;
+  const headingMeta = getHeadingMeta(layout === 'sidebar');
 
-   const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
-     const overrides = data.styleOverrides?.[path];
-     if (!overrides) return baseStyle;
-     return { ...baseStyle, ...overrides };
-   };
-   
-   if (sid === 'summary' && personalInfo.summary) {
-       return (
-          <div style={{
-            marginBottom: `${design.sectionSpacing ?? 8}mm`,
-            breakInside: 'avoid',
-            pageBreakInside: 'avoid',
-          }}>
-             {design.showSummaryHeading && (
-               <div className="measure-header" data-sid={sid}>
-                 <SectionHeader
-                   title={layout === 'single' ? 'Professional Profile' : 'Profile'}
-                   style={layout === 'single' ? { ...getStyle(false), textAlign: 'center', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
-                   headingStyle={headingMeta.headingStyleId}
-                   lineColor={headingMeta.lineColor}
-                   lineThick={headingMeta.lineThick}
-                   lineWidth={headingMeta.lineWidth}
-                 />
-               </div>
-             )}
-             <RichContent html={personalInfo.summary} className={`leading-relaxed opacity-80 ${layout === 'single' ? 'font-medium italic text-slate-600' : ''}`} style={{ fontSize: '11px' } as any} />
-          </div>
-       );
-   }
+  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const overrides = data.styleOverrides?.[path];
+    if (!overrides) return baseStyle;
+    return { ...baseStyle, ...overrides };
+  };
+  const getSectionTitle = (sectionId: string, fallback: string) => {
+    return design.sectionTitles?.[sectionId] || fallback;
+  };
 
-   if (sid === 'declaration' && content.declaration?.text) {
-       return (
-          <div style={{ marginBottom: `${design.sectionSpacing ?? 8}mm`, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-            <div className="measure-header" data-sid={sid}>
-              <SectionHeader
-                title="Declaration"
-                style={getStyle(layout === 'sidebar')}
-                headingStyle={headingMeta.headingStyleId}
-                lineColor={headingMeta.lineColor}
-                lineThick={headingMeta.lineThick}
-                lineWidth={headingMeta.lineWidth}
-              />
-            </div>
-            <div className="space-y-3 opacity-80 text-[1em]">
-               <p>{content.declaration.text}</p>
-               <div className="flex gap-10 font-semibold opacity-60 text-[0.85em]">
-                 {content.declaration.date && <span>Date: {content.declaration.date}</span>}
-                 {content.declaration.place && <span>Place: {content.declaration.place}</span>}
-               </div>
-            </div>
-          </div>
-       );
-   }
-
-   if (['skills', 'interests', 'languages', 'certifications', 'socials'].includes(sid)) {
-       const isLanguages = sid === 'languages';
-       const isSkills = sid === 'skills';
-       const isInterests = sid === 'interests';
-       const isCertifications = sid === 'certifications';
-
-       const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
-       const columns = (isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2;
-
-       const items = isLanguages 
-         ? (content.languages || [])
-         : isCertifications
-           ? (content.certifications || [])
-           : isSkills
-             ? (content.skills || [])
-             : isInterests
-               ? (content.interests || [])
-               : (content.socials || []);
-
-       const safeItems = Array.isArray(items) ? items : [];
-       const filteredItems = itemIndices
-         ? safeItems.filter((_, idx) => itemIndices.includes(idx))
-         : safeItems;
-
-       if (!filteredItems.length) return null;
-
-       const getLevel = (item: any) => {
-         if (typeof item === 'string') return getLevelPercentage(item);
-         if (isLanguages) return getLevelPercentage(item.proficiency || '');
-         return 50;
-       };
-
-        const getItemLabel = (item: any) => {
-          if (typeof item === 'string') return item;
-          if (isLanguages) {
-            const langName = item.language || '';
-            return langName;
-          }
-          if (isCertifications) return `${item.name || ''}${item.issuer ? ` (${item.issuer})` : ''}`;
-          if (sid === 'socials') return item.platform || item.label || item.url || '';
-          if (isSkills || isInterests) return item.name || item.label || String(item);
-          return item.label || item.name || String(item);
-        };
-
-        const getLanguageLabel = (item: any) => {
-          if (typeof item === 'string') return item;
-          const name = item.language || '';
-          const prof = item.proficiency || '';
-          return prof ? `${name} — ${prof}` : name;
-        };
-
-        const isFirstChunk = !itemIndices || itemIndices.includes(0);
-        const sectionTitle = isSkills ? 'Skills' : isInterests ? 'Interests' : isLanguages ? 'Languages' : isCertifications ? 'Certifications' : 'Socials';
-        const displayTitle = `${sectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
-
-        const GridEntryContainer = ({ originalIndex, children, className = "" }: { originalIndex: number, children: React.ReactNode, className?: string }) => {
-          const overrides = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
-          return (
-            <div
-              className={`group/item relative transition-all duration-200 ${className}`}
-              style={{
-                display: 'inline-block',
-                verticalAlign: 'middle',
-                breakInside: 'avoid',
-                pageBreakInside: 'avoid',
-                marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : '4px',
-                borderStyle: overrides.borderStyle || 'none',
-                borderColor: overrides.borderColor || 'transparent',
-                borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
-                padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
-                backgroundColor: overrides.backgroundColor || 'transparent',
-                borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
-                boxShadow: overrides.boxShadow || 'none',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {/* Hover controls overlay */}
-              {!isExporting && !isThumbnail && !isMeasuring && (
-                <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none scale-75 origin-top-right">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onMoveItem?.(sid, originalIndex, 'up');
-                    }}
-                    disabled={originalIndex === 0}
-                    className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    title="Move Up"
-                  >
-                    <ChevronUp size={11} strokeWidth={2.5} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onMoveItem?.(sid, originalIndex, 'down');
-                    }}
-                    disabled={originalIndex === safeItems.length - 1}
-                    className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                    title="Move Down"
-                  >
-                    <ChevronDown size={11} strokeWidth={2.5} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onOpenStylePopup?.(sid, originalIndex);
-                    }}
-                    className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
-                    title="Customize Style"
-                  >
-                    <PenTool size={11} strokeWidth={2.5} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onDeleteItem?.(sid, originalIndex);
-                    }}
-                    className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
-                    title="Delete Item"
-                  >
-                    <Trash size={11} strokeWidth={2.5} />
-                  </button>
-                </div>
-              )}
-              {/* Content scaled styles wrapper */}
-              <div style={{ fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit' }}>
-                {children}
-              </div>
-            </div>
-          );
-        };
-
-       return (
-          <div style={{
-            marginBottom: `${design.sectionSpacing ?? 8}mm`,
-            breakInside: 'avoid',
-            pageBreakInside: 'avoid',
-          }}>
-             <div className="measure-header" data-sid={sid}>
-               <SectionHeader
-                 title={displayTitle}
-                 style={getStyle(layout === 'sidebar')}
-                 headingStyle={headingMeta.headingStyleId}
-                 lineColor={headingMeta.lineColor}
-                 lineThick={headingMeta.lineThick}
-                 lineWidth={headingMeta.lineWidth}
-               />
-             </div>
-
-            {styleType === 'compact' ? (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-80 font-medium" style={{ fontSize: '11px' }}>
-                {filteredItems.map((item, i) => {
-                  const originalIndex = itemIndices ? itemIndices[i] : i;
-                  return (
-                    <React.Fragment key={i}>
-                      <GridEntryContainer originalIndex={originalIndex} className="w-auto">
-                        <span className="measure-item animate-none" data-sid={sid} data-index={originalIndex}>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                      </GridEntryContainer>
-                      {i < filteredItems.length - 1 && <span className="opacity-30 mx-1">•</span>}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            ) : styleType === 'bubble' ? (
-              <div className="flex flex-wrap gap-1.5">
-                {filteredItems.map((item, i) => {
-                  const originalIndex = itemIndices ? itemIndices[i] : i;
-                  return (
-                    <GridEntryContainer key={i} originalIndex={originalIndex} className="w-auto">
-                      <span
-                        className="px-2.5 py-0.5 rounded-full font-semibold opacity-80 measure-item block text-center"
-                        data-sid={sid}
-                        data-index={originalIndex}
-                        style={{ fontSize: '10px', color: getAccentColor('dots'), backgroundColor: `${design.primaryColor || '#ff4d7d'}12`, border: `1px solid ${design.primaryColor || '#ff4d7d'}25` }}
-                      >
-                        {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
-                      </span>
-                    </GridEntryContainer>
-                  );
-                })}
-              </div>
-            ) : styleType === 'level' ? (
-              <div className={`grid gap-x-4 gap-y-2`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {filteredItems.map((item, i) => {
-                  const originalIndex = itemIndices ? itemIndices[i] : i;
-                  const level = getLevel(item);
-                  return (
-                    <GridEntryContainer key={i} originalIndex={originalIndex}>
-                      <div className="space-y-1 measure-item" data-sid={sid} data-index={originalIndex}>
-                        <div className="flex justify-between items-center font-semibold opacity-80" style={{ fontSize: '11px' }}>
-                          <span>{getItemLabel(item)}</span>
-                          {isLanguages && typeof item === 'object' && item !== null && 'language' in item && 'proficiency' in item && <span className="opacity-40" style={{ fontSize: '10px' }}>{(item as any).proficiency}</span>}
-                        </div>
-                        <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${isExporting ? '' : 'transition-all'}`} style={{ width: `${level}%`, backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                        </div>
-                      </div>
-                    </GridEntryContainer>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Default: GRID */
-              <div className={`grid gap-x-3 gap-y-1`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-                {filteredItems.map((item, i) => {
-                  const originalIndex = itemIndices ? itemIndices[i] : i;
-                  return (
-                    <GridEntryContainer key={i} originalIndex={originalIndex}>
-                      <div className="flex items-center gap-1.5 font-medium opacity-80 measure-item" data-sid={sid} data-index={originalIndex} style={{ fontSize: '11px' }}>
-                        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                        <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                      </div>
-                    </GridEntryContainer>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-       );
-   }
-
-   let listProps = { title: '', items: [] as any[] };
-   const safeArr = (v: any) => Array.isArray(v) ? v : [];
-   if (sid === 'experience') listProps = { title: 'Experience', items: safeArr(content.experience).map((x: any, i: number) => ({ t: x.position, s: x.company, d: `${x.startDate || ''} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.experience[${i}].position`, sPath: `content.experience[${i}].company`, descPath: `content.experience[${i}].description` })) };
-   else if (sid === 'education') listProps = { title: 'Education', items: safeArr(content.education).map((x: any, i: number) => ({ t: design.educationOrder === 'school-degree' ? x.school : x.degree, s: design.educationOrder === 'school-degree' ? `${x.degree} in ${x.field}` : x.school, d: x.graduationYear, desc: '', tPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'school' : 'degree'}`, sPath: `content.education[${i}].${design.educationOrder === 'school-degree' ? 'degree' : 'school'}`, descPath: '' })) };
-   else if (sid === 'projects') listProps = { title: 'Projects', items: safeArr(content.projects).map((x: any, i: number) => ({ t: x.name, s: Array.isArray(x.technologies) ? x.technologies.join(', ') : (x.technologies || ''), d: '', desc: x.description, tPath: `content.projects[${i}].name`, sPath: '', descPath: `content.projects[${i}].description` })) };
-   else if (sid === 'awards') listProps = { title: 'Awards', items: safeArr(content.awards).map((x: any, i: number) => ({ t: x.title, s: x.issuer, d: x.date, desc: x.description, tPath: `content.awards[${i}].title`, sPath: `content.awards[${i}].issuer`, descPath: `content.awards[${i}].description` })) };
-   else if (sid === 'courses') listProps = { title: 'Courses', items: safeArr(content.courses).map((x: any, i: number) => ({ t: x.title, s: x.provider, d: x.date, desc: x.description, tPath: `content.courses[${i}].title`, sPath: `content.courses[${i}].provider`, descPath: `content.courses[${i}].description` })) };
-   else if (sid === 'organisations') listProps = { title: 'Organisations', items: safeArr(content.organisations).map((x: any, i: number) => ({ t: x.name, s: x.role, d: `${x.startDate || ''} ${x.endDate ? '— '+x.endDate : ''}`, desc: x.description, tPath: `content.organisations[${i}].name`, sPath: `content.organisations[${i}].role`, descPath: `content.organisations[${i}].description` })) };
-   else if (sid === 'publications') listProps = { title: 'Publications', items: safeArr(content.publications).map((x: any, i: number) => ({ t: x.title, s: x.publisher, d: x.date, desc: x.description, tPath: `content.publications[${i}].title`, sPath: `content.publications[${i}].publisher`, descPath: `content.publications[${i}].description` })) };
-   else if (sid === 'references') listProps = { title: 'References', items: safeArr(content.references).map((x: any, i: number) => ({ t: x.name, s: `${x.position || ''} at ${x.company || ''}`, d: '', desc: `${x.email || ''} ${x.phone || ''}`, tPath: `content.references[${i}].name`, sPath: '', descPath: '' })) };
-   else if (sid === 'custom') listProps = { title: 'Custom Section', items: safeArr(content.custom).map((x: any, i: number) => ({ t: x.title, s: '', d: '', desc: x.content, tPath: `content.custom[${i}].title`, sPath: '', descPath: `content.custom[${i}].content` })) };
-
-   if (!listProps.items || listProps.items.length === 0) return null;
-
-   const filteredListItems = itemIndices
-     ? listProps.items.filter((_, idx) => itemIndices.includes(idx))
-     : listProps.items;
-
-   if (!filteredListItems.length) return null;
-
-   const titleSize = design.entryTitleSize === 's' ? '11px' : design.entryTitleSize === 'm' ? '12px' : '13px';
-   const subtitleStyle = design.entrySubtitleStyle || 'medium';
-   const subtitlePlacement = design.entrySubtitlePlacement || 'next-line';
-
-   const isFirstChunk = !itemIndices || itemIndices.includes(0);
-   const displayTitle = `${listProps.title}${isFirstChunk ? '' : ' (Continued)'}`;
-
-   return (
+  if (sid === 'summary' && personalInfo.summary) {
+    return (
       <div style={{
         marginBottom: `${design.sectionSpacing ?? 8}mm`,
         breakInside: 'avoid',
         pageBreakInside: 'avoid',
       }}>
-         <div className="measure-header" data-sid={sid}>
-           <SectionHeader
-             title={displayTitle}
-             style={layout === 'single' ? { ...getStyle(false), textAlign: design.personalAlign ?? 'left', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
-             headingStyle={headingMeta.headingStyleId}
-             lineColor={headingMeta.lineColor}
-             lineThick={headingMeta.lineThick}
-             lineWidth={headingMeta.lineWidth}
-           />
-         </div>
-         <div style={{ display: 'block' }}>
-            {filteredListItems.map((item, i) => {
-              const originalIndex = itemIndices ? itemIndices[i] : i;
-              const entryMargin = `${Math.min(8, Math.max(1, design.entrySpacing ?? 4))}mm`;
-              const overrides = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
-              const EntryContainer = ({ children }: { children: React.ReactNode }) => {
+        {design.showSummaryHeading && (
+          <div className="measure-header" data-sid={sid}>
+            <SectionHeader
+              title={getSectionTitle(sid, layout === 'single' ? 'Professional Profile' : 'Profile')}
+              style={layout === 'single' ? { ...getStyle(false), textAlign: 'center', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
+              headingStyle={headingMeta.headingStyleId}
+              lineColor={headingMeta.lineColor}
+              lineThick={headingMeta.lineThick}
+              lineWidth={headingMeta.lineWidth}
+              editPath={`design.sectionTitles.${sid}`}
+              editValue={getSectionTitle(sid, layout === 'single' ? 'Professional Profile' : 'Profile')}
+              editLabel="Section Heading"
+              textStylePath={`sectionTitle.${sid}.text`}
+              wrapperStylePath={`sectionTitle.${sid}.block`}
+              overrides={data.styleOverrides}
+            />
+          </div>
+        )}
+        <RichContent html={personalInfo.summary} className={`leading-relaxed opacity-80 ${layout === 'single' ? 'font-medium italic text-slate-600' : ''}`} style={{ fontSize: '11px' } as any} path="content.personalInfo.summary" overrides={data.styleOverrides} />
+      </div>
+    );
+  }
 
-                return (
-                  <div
-                    key={originalIndex}
-                    className="measure-item group/item relative transition-all duration-200"
-                    data-sid={sid}
-                    data-index={originalIndex}
-                    style={{
-                      display: 'block',
-                      breakInside: 'avoid',
-                      pageBreakInside: 'avoid',
-                      marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : entryMargin,
-                      borderStyle: overrides.borderStyle || 'none',
-                      borderColor: overrides.borderColor || 'transparent',
-                      borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
-                      padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
-                      backgroundColor: overrides.backgroundColor || 'transparent',
-                      borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
-                      boxShadow: overrides.boxShadow || 'none',
-                      color: overrides.textColor || 'inherit',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    {/* Hover controls overlay */}
-                    {!isExporting && !isThumbnail && !isMeasuring && (
-                      <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none">
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onMoveItem?.(sid, originalIndex, 'up');
-                          }}
-                          disabled={originalIndex === 0}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                          title="Move Up"
-                        >
-                          <ChevronUp size={11} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onMoveItem?.(sid, originalIndex, 'down');
-                          }}
-                          disabled={originalIndex === listProps.items.length - 1}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                          title="Move Down"
-                        >
-                          <ChevronDown size={11} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenStylePopup?.(sid, originalIndex);
-                          }}
-                          className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
-                          title="Customize Style"
-                        >
-                          <PenTool size={11} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onDeleteItem?.(sid, originalIndex);
-                          }}
-                          className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
-                          title="Delete Item"
-                        >
-                          <Trash size={11} strokeWidth={2.5} />
-                        </button>
-                      </div>
-                    )}
-                    {/* Content scaled styles wrapper */}
-                    <div style={{ fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit' }}>
-                      {children}
-                    </div>
-                  </div>
-                );
-              };
+  if (sid === 'declaration' && content.declaration?.text) {
+    return (
+      <div style={{ marginBottom: `${design.sectionSpacing ?? 8}mm`, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+        <div className="measure-header" data-sid={sid}>
+          <SectionHeader
+            title={getSectionTitle(sid, 'Declaration')}
+            style={getStyle(layout === 'sidebar')}
+            headingStyle={headingMeta.headingStyleId}
+            lineColor={headingMeta.lineColor}
+            lineThick={headingMeta.lineThick}
+            lineWidth={headingMeta.lineWidth}
+            editPath={`design.sectionTitles.${sid}`}
+            editValue={getSectionTitle(sid, 'Declaration')}
+            editLabel="Section Heading"
+            textStylePath={`sectionTitle.${sid}.text`}
+            wrapperStylePath={`sectionTitle.${sid}.block`}
+            overrides={data.styleOverrides}
+          />
+        </div>
+        <div className="space-y-3 opacity-80 text-[1em]">
+          <p>{content.declaration.text}</p>
+          <div className="flex gap-10 font-semibold opacity-60 text-[0.85em]">
+            {content.declaration.date && <span>Date: {content.declaration.date}</span>}
+            {content.declaration.place && <span>Place: {content.declaration.place}</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-              if (design.entryLayout === 'side-date') {
-                return (
-                  <EntryContainer key={originalIndex}>
-                    <div className="grid grid-cols-12 gap-4">
-                       <div className="col-span-3 text-right">
-                          <span className="font-semibold opacity-40 uppercase tabular-nums" style={{ fontSize: '10px', color: getAccentColor('dates') }}>{item.d}</span>
-                       </div>
-                       <div className="col-span-9">
-                          <h3 style={{ fontSize: titleSize, color: overrides.textColor || getAccentColor('name'), fontWeight: overrides.titleWeight || '700' }}>{item.t}</h3>
-                          {item.s && (
-                            <p className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80`} style={{ fontSize: '11px', color: getAccentColor('entrySubtitle') }}>
-                              {item.s}
-                            </p>
-                          )}
-                          <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} />
-                       </div>
-                    </div>
-                  </EntryContainer>
-                );
-              }
+  if (['skills', 'interests', 'languages', 'certifications', 'socials'].includes(sid)) {
+    const isLanguages = sid === 'languages';
+    const isSkills = sid === 'skills';
+    const isInterests = sid === 'interests';
+    const isCertifications = sid === 'certifications';
 
-              if (design.entryLayout === 'split') {
-                 return (
-                  <EntryContainer key={originalIndex}>
-                    <div className="flex justify-between gap-3">
-                       <div className="flex-1">
-                          <h3 style={{ fontSize: titleSize, color: overrides.textColor || getAccentColor('name'), fontWeight: overrides.titleWeight || '700' }}>{item.t}</h3>
-                          {item.s && (
-                            <p className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80`} style={{ fontSize: '11px', color: getAccentColor('entrySubtitle') }}>
-                              {item.s}
-                            </p>
-                          )}
-                       </div>
-                       <div className="text-right shrink-0">
-                          <span className="font-semibold opacity-40 uppercase tabular-nums" style={{ fontSize: '10px', color: getAccentColor('dates') }}>{item.d}</span>
-                       </div>
-                    </div>
-                    <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} />
-                  </EntryContainer>
-                 );
-              }
+    const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
+    const columns = (isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2;
 
+    const items = isLanguages
+      ? (content.languages || [])
+      : isCertifications
+        ? (content.certifications || [])
+        : isSkills
+          ? (content.skills || [])
+          : isInterests
+            ? (content.interests || [])
+            : (content.socials || []);
+
+    const safeItems = Array.isArray(items) ? items : [];
+    const hasText = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+    const normalizedItems = safeItems
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => {
+        const record = item as any;
+        if (!item) return false;
+        if (typeof item === 'object' && record.hidden === true) return false;
+        if (typeof item === 'string') return hasText(item);
+        if (isLanguages) return hasText(record.language);
+        if (isCertifications) return hasText(record.name);
+        if (sid === 'socials') return Boolean(record.platform || record.label || record.url);
+        if (isSkills || isInterests) return hasText(record.name) || hasText(record.label);
+        return true;
+      });
+
+    const filteredItems = itemIndices
+      ? normalizedItems.filter(({ index }) => itemIndices.includes(index))
+      : normalizedItems;
+
+    if (!filteredItems.length) return null;
+
+    const getLevel = (item: any) => {
+      if (typeof item === 'string') return getLevelPercentage(item);
+      if (isLanguages) return getLevelPercentage(item.proficiency || '');
+      return 50;
+    };
+
+    const getItemLabel = (item: any) => {
+      if (typeof item === 'string') return item;
+      if (isLanguages) {
+        const langName = item.language || '';
+        return langName;
+      }
+      if (isCertifications) return `${item.name || ''}${item.issuer ? ` (${item.issuer})` : ''}`;
+      if (sid === 'socials') return item.platform || item.label || item.url || '';
+      if (isSkills || isInterests) return item.name || item.label || '';
+      return item.label || item.name || '';
+    };
+
+    const getLanguageLabel = (item: any) => {
+      if (typeof item === 'string') return item;
+      const name = item.language || '';
+      const prof = item.proficiency || '';
+      return prof ? `${name} — ${prof}` : name;
+    };
+
+    const getItemEditMeta = (item: any, originalIndex: number) => {
+      if (isLanguages) {
+        return {
+          path: `content.languages[${originalIndex}].__composite`,
+          label: 'Language',
+          value: getLanguageLabel(item),
+          composite: 'language-line',
+        };
+      }
+      if (isSkills) {
+        return {
+          path: `content.skills[${originalIndex}].name`,
+          label: 'Skill',
+          value: getItemLabel(item),
+        };
+      }
+      if (isInterests) {
+        return {
+          path: `content.interests[${originalIndex}].name`,
+          label: 'Interest',
+          value: getItemLabel(item),
+        };
+      }
+      if (isCertifications) {
+        return {
+          path: `content.certifications[${originalIndex}].name`,
+          label: 'Certification',
+          value: typeof item === 'object' ? item.name || '' : String(item || ''),
+        };
+      }
+      if (sid === 'socials') {
+        return {
+          path: `content.socials[${originalIndex}].label`,
+          label: 'Social Link',
+          value: typeof item === 'object' ? (item.label || item.platform || item.url || '') : String(item || ''),
+        };
+      }
+      return {
+        path: `content.${sid}[${originalIndex}].name`,
+        label: 'Text',
+        value: getItemLabel(item),
+      };
+    };
+
+    const isFirstChunk = !itemIndices || itemIndices.includes(0);
+    const defaultSectionTitle = isSkills ? 'Skills' : isInterests ? 'Interests' : isLanguages ? 'Languages' : isCertifications ? 'Certifications' : 'Socials';
+    const baseSectionTitle = getSectionTitle(sid, defaultSectionTitle);
+    const displayTitle = `${baseSectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
+
+    const GridEntryContainer = ({ originalIndex, children, className = "" }: { originalIndex: number, children: React.ReactNode, className?: string }) => {
+      const overrides = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
+      return (
+        <div
+          className={`group/item relative transition-all duration-200 ${className}`}
+          style={{
+            display: 'inline-block',
+            verticalAlign: 'middle',
+            breakInside: 'avoid',
+            pageBreakInside: 'avoid',
+            marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : '4px',
+            borderStyle: overrides.borderStyle || 'none',
+            borderColor: overrides.borderColor || 'transparent',
+            borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
+            padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
+            backgroundColor: overrides.backgroundColor || 'transparent',
+            borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
+            boxShadow: overrides.boxShadow || 'none',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {/* Hover controls overlay */}
+          {/* {!isExporting && !isThumbnail && !isMeasuring && (
+            <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none scale-75 origin-top-right">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onMoveItem?.(sid, originalIndex, 'up');
+                }}
+                disabled={originalIndex === 0}
+                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                title="Move Up"
+              >
+                <ChevronUp size={11} strokeWidth={2.5} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onMoveItem?.(sid, originalIndex, 'down');
+                }}
+                disabled={originalIndex === safeItems.length - 1}
+                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                title="Move Down"
+              >
+                <ChevronDown size={11} strokeWidth={2.5} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onOpenStylePopup?.(sid, originalIndex);
+                }}
+                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
+                title="Customize Style"
+              >
+                <PenTool size={11} strokeWidth={2.5} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onDeleteItem?.(sid, originalIndex);
+                }}
+                className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
+                title="Delete Item"
+              >
+                <Trash size={11} strokeWidth={2.5} />
+              </button>
+            </div>
+          )} */}
+          {/* Content scaled styles wrapper */}
+          <div style={{
+            fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit',
+            fontWeight: overrides.fontWeight || 'inherit',
+            fontStyle: overrides.fontStyle || 'inherit',
+            textDecoration: overrides.textDecoration || 'inherit',
+            color: overrides.color || 'inherit',
+            fontFamily: overrides.fontFamily || 'inherit',
+            textAlign: (overrides.textAlign as any) || 'inherit',
+          }}>
+            {children}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{
+        marginBottom: `${design.sectionSpacing ?? 8}mm`,
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
+      }}>
+        <div className="measure-header" data-sid={sid}>
+          <SectionHeader
+            title={displayTitle}
+            style={getStyle(layout === 'sidebar')}
+            headingStyle={headingMeta.headingStyleId}
+            lineColor={headingMeta.lineColor}
+            lineThick={headingMeta.lineThick}
+            lineWidth={headingMeta.lineWidth}
+            editPath={isFirstChunk ? `design.sectionTitles.${sid}` : undefined}
+            editValue={baseSectionTitle}
+            editLabel="Section Heading"
+            textStylePath={`sectionTitle.${sid}.text`}
+            wrapperStylePath={`sectionTitle.${sid}.block`}
+            overrides={data.styleOverrides}
+          />
+        </div>
+
+        {styleType === 'compact' ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-80 font-medium" style={{ fontSize: '11px' }}>
+            {filteredItems.map(({ item, index: originalIndex }, i) => {
+              const editMeta = getItemEditMeta(item, originalIndex);
               return (
-                <EntryContainer key={originalIndex}>
-                   <div className={`flex ${subtitlePlacement === 'same-line' ? 'items-baseline gap-2' : 'flex-col'} justify-between`}>
-                      <div className="flex justify-between items-baseline flex-1">
-                        <h3
-                          style={{ fontSize: titleSize, color: overrides.textColor || getAccentColor('name'), fontWeight: overrides.titleWeight || '700' }}
-                          data-edit-path={item.tPath || ''}
-                          data-edit-label="Title"
-                          data-edit-value={item.t || ''}
-                        >{item.t}</h3>
-                        {subtitlePlacement === 'same-line' && item.s && <span className="mx-1.5 opacity-20 text-slate-300">•</span>}
-                        {subtitlePlacement === 'same-line' && item.s && (
-                          <span
-                            className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 flex-1`}
-                            style={{ fontSize: '11px', color: getAccentColor('entrySubtitle') }}
-                            data-edit-path={item.sPath || ''}
-                            data-edit-label="Subtitle"
-                            data-edit-value={item.s || ''}
-                          >{item.s}</span>
-                        )}
-                        <span className="font-semibold opacity-40 uppercase tabular-nums shrink-0" style={{ fontSize: '10px', color: getAccentColor('dates') }}>{item.d}</span>
-                      </div>
-                      {subtitlePlacement === 'next-line' && item.s && (
-                         <p
-                           className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 mt-0.5`}
-                           style={{ fontSize: '11px', color: getAccentColor('entrySubtitle') }}
-                           data-edit-path={item.sPath || ''}
-                           data-edit-label="Subtitle"
-                           data-edit-value={item.s || ''}
-                         >{item.s}</p>
-                      )}
-                   </div>
-                   <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} />
-                </EntryContainer>
+                <React.Fragment key={i}>
+                  <GridEntryContainer originalIndex={originalIndex} className="w-auto">
+                    <span
+                      className="measure-item animate-none"
+                      data-sid={sid}
+                      data-index={originalIndex}
+                      data-edit-path={editMeta.path}
+                      data-edit-label={editMeta.label}
+                      data-edit-value={editMeta.value}
+                      data-edit-composite={editMeta.composite || ''}
+                      data-style-path={`content.${sid}[${originalIndex}]`}
+                    >
+                      {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
+                    </span>
+                  </GridEntryContainer>
+                  {i < filteredItems.length - 1 && <span className="opacity-30 mx-1">•</span>}
+                </React.Fragment>
               );
             })}
-         </div>
+          </div>
+        ) : styleType === 'bubble' ? (
+          <div className="flex flex-wrap gap-1.5">
+            {filteredItems.map(({ item, index: originalIndex }, i) => {
+              const editMeta = getItemEditMeta(item, originalIndex);
+              return (
+                <GridEntryContainer key={i} originalIndex={originalIndex} className="w-auto">
+                  <span
+                    className="px-2.5 py-0.5 rounded-full font-semibold opacity-80 measure-item block text-center"
+                    data-sid={sid}
+                    data-index={originalIndex}
+                    data-edit-path={editMeta.path}
+                    data-edit-label={editMeta.label}
+                    data-edit-value={editMeta.value}
+                    data-edit-composite={editMeta.composite || ''}
+                    data-style-path={`content.${sid}[${originalIndex}]`}
+                    style={{ fontSize: '10px', color: getAccentColor('dots'), backgroundColor: `${design.primaryColor || '#ff4d7d'}12`, border: `1px solid ${design.primaryColor || '#ff4d7d'}25` }}
+                  >
+                    {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
+                  </span>
+                </GridEntryContainer>
+              );
+            })}
+          </div>
+        ) : styleType === 'level' ? (
+          <div className={`grid gap-x-4 gap-y-2`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
+            {filteredItems.map(({ item, index: originalIndex }, i) => {
+              const level = getLevel(item);
+              const editMeta = getItemEditMeta(item, originalIndex);
+              return (
+                <GridEntryContainer key={i} originalIndex={originalIndex}>
+                  <div
+                    className="space-y-1 measure-item"
+                    data-sid={sid}
+                    data-index={originalIndex}
+                    data-edit-path={editMeta.path}
+                    data-edit-label={editMeta.label}
+                    data-edit-value={editMeta.value}
+                    data-edit-composite={editMeta.composite || ''}
+                    data-style-path={`content.${sid}[${originalIndex}]`}
+                  >
+                    <div className="flex justify-between items-center font-semibold opacity-80" style={{ fontSize: '11px' }}>
+                      <span>{getItemLabel(item)}</span>
+                      {isLanguages && typeof item === 'object' && item !== null && 'language' in item && 'proficiency' in item && <span className="opacity-40" style={{ fontSize: '10px' }}>{(item as any).proficiency}</span>}
+                    </div>
+                    <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${isExporting ? '' : 'transition-all'}`} style={{ width: `${level}%`, backgroundColor: design.primaryColor || '#ff4d7d' }} />
+                    </div>
+                  </div>
+                </GridEntryContainer>
+              );
+            })}
+          </div>
+        ) : (
+          /* Default: GRID */
+          <div className={`grid gap-x-3 gap-y-1`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
+            {filteredItems.map(({ item, index: originalIndex }, i) => {
+              const editMeta = getItemEditMeta(item, originalIndex);
+              return (
+                <GridEntryContainer key={i} originalIndex={originalIndex}>
+                  <div
+                    className="flex items-center gap-1.5 font-medium opacity-80 measure-item"
+                    data-sid={sid}
+                    data-index={originalIndex}
+                    data-edit-path={editMeta.path}
+                    data-edit-label={editMeta.label}
+                    data-edit-value={editMeta.value}
+                    data-edit-composite={editMeta.composite || ''}
+                    data-style-path={`content.${sid}[${originalIndex}]`}
+                    style={{ fontSize: '11px' }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
+                    <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
+                  </div>
+                </GridEntryContainer>
+              );
+            })}
+          </div>
+        )}
       </div>
-   );
+    );
+  }
+
+  type ResumeItem = {
+    t: string;
+    s?: string;
+    d?: string;
+    desc?: string;
+
+    tPath?: string;
+    sPath?: string;
+    dPath?: string;
+    descPath?: string;
+  };
+
+  type ListProps = {
+    title: string;
+    section: string;
+    items: ResumeItem[];
+  };
+
+  const safeArr = (v: any): any[] =>
+    Array.isArray(v) ? v : [];
+
+  /* ======================================================
+     ALL SECTION CONFIG
+  ====================================================== */
+
+  const SECTION_CONFIG: Record<string, any> = {
+    experience: {
+      title: 'Experience',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.position || '',
+        s: x.company || '',
+        d: `${x.startDate || ''}${x.endDate ? ` — ${x.endDate}` : ''}`,
+        desc: x.description || '',
+
+        tPath: `content.experience[${i}].position`,
+        sPath: `content.experience[${i}].company`,
+        dPath: `content.experience[${i}].startDate`,
+        descPath: `content.experience[${i}].description`,
+      }),
+    },
+
+    education: {
+      title: 'Education',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t:
+          design.educationOrder === 'school-degree'
+            ? x.school
+            : x.degree,
+
+        s:
+          design.educationOrder === 'school-degree'
+            ? `${x.degree || ''} ${x.field ? `in ${x.field}` : ''}`
+            : x.school,
+
+        d: x.graduationYear || '',
+        desc: x.description || '',
+
+        tPath: `content.education[${i}].${design.educationOrder === 'school-degree'
+          ? 'school'
+          : 'degree'
+          }`,
+
+        sPath: `content.education[${i}].${design.educationOrder === 'school-degree'
+          ? 'degree'
+          : 'school'
+          }`,
+
+        dPath: `content.education[${i}].graduationYear`,
+        descPath: `content.education[${i}].description`,
+      }),
+    },
+
+    projects: {
+      title: 'Projects',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.name || '',
+
+        s: Array.isArray(x.technologies)
+          ? x.technologies.join(', ')
+          : x.technologies || '',
+
+        d: '',
+        desc: x.description || '',
+
+        tPath: `content.projects[${i}].name`,
+        sPath: `content.projects[${i}].technologies`,
+        descPath: `content.projects[${i}].description`,
+      }),
+    },
+
+    awards: {
+      title: 'Awards',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.title || '',
+        s: x.issuer || '',
+        d: x.date || '',
+        desc: x.description || '',
+
+        tPath: `content.awards[${i}].title`,
+        sPath: `content.awards[${i}].issuer`,
+        dPath: `content.awards[${i}].date`,
+        descPath: `content.awards[${i}].description`,
+      }),
+    },
+
+    courses: {
+      title: 'Courses',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.title || '',
+        s: x.provider || '',
+        d: x.date || '',
+        desc: x.description || '',
+
+        tPath: `content.courses[${i}].title`,
+        sPath: `content.courses[${i}].provider`,
+        dPath: `content.courses[${i}].date`,
+        descPath: `content.courses[${i}].description`,
+      }),
+    },
+
+    organisations: {
+      title: 'Organisations',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.name || '',
+        s: x.role || '',
+        d: `${x.startDate || ''}${x.endDate ? ` — ${x.endDate}` : ''}`,
+        desc: x.description || '',
+
+        tPath: `content.organisations[${i}].name`,
+        sPath: `content.organisations[${i}].role`,
+        dPath: `content.organisations[${i}].startDate`,
+        descPath: `content.organisations[${i}].description`,
+      }),
+    },
+
+    publications: {
+      title: 'Publications',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.title || '',
+        s: x.publisher || '',
+        d: x.date || '',
+        desc: x.description || '',
+
+        tPath: `content.publications[${i}].title`,
+        sPath: `content.publications[${i}].publisher`,
+        dPath: `content.publications[${i}].date`,
+        descPath: `content.publications[${i}].description`,
+      }),
+    },
+
+    references: {
+      title: 'References',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.name || '',
+
+        s: `${x.position || ''} ${x.company ? `at ${x.company}` : ''
+          }`,
+
+        d: '',
+
+        desc: `${x.email || ''} ${x.phone || ''}`,
+
+        tPath: `content.references[${i}].name`,
+        sPath: `content.references[${i}].position`,
+        descPath: `content.references[${i}].email`,
+      }),
+    },
+
+    custom: {
+      title: 'Custom Section',
+
+      map: (x: any, i: number): ResumeItem => ({
+        t: x.title || '',
+        s: '',
+        d: '',
+        desc: x.content || '',
+
+        tPath: `content.custom[${i}].title`,
+        descPath: `content.custom[${i}].content`,
+      }),
+    },
+  };
+
+  /* ======================================================
+     MAIN FUNCTION
+  ====================================================== */
+
+  const getSectionListProps = (
+    sid: string,
+    content: any
+  ): ListProps => {
+    const config = SECTION_CONFIG[sid];
+
+    if (!config) {
+      return {
+        title: '',
+        section: sid,
+        items: [],
+      };
+    }
+
+    return {
+      title: config.title,
+      section: sid,
+      items: safeArr(content?.[sid]).map(config.map),
+    };
+  };
+
+  /* ======================================================
+     FINAL USE
+  ====================================================== */
+
+  const listProps = getSectionListProps(
+    sid,
+    content
+  );
+  if (!listProps.items || listProps.items.length === 0) return null;
+
+  const filteredListItems = itemIndices
+    ? listProps.items.filter((_, idx) => itemIndices.includes(idx))
+    : listProps.items;
+
+  if (!filteredListItems.length) return null;
+
+  const titleSize = design.entryTitleSize === 's' ? '11px' : design.entryTitleSize === 'm' ? '12px' : '13px';
+  const subtitleStyle = design.entrySubtitleStyle || 'medium';
+  const subtitlePlacement = design.entrySubtitlePlacement || 'next-line';
+
+  const isFirstChunk = !itemIndices || itemIndices.includes(0);
+  const baseSectionTitle = getSectionTitle(sid, listProps.title);
+  const displayTitle = `${baseSectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
+
+  return (
+    <div style={{
+      marginBottom: `${design.sectionSpacing ?? 8}mm`,
+      breakInside: 'avoid',
+      pageBreakInside: 'avoid',
+    }}>
+      <div className="measure-header" data-sid={sid}>
+        <SectionHeader
+          title={displayTitle}
+          style={layout === 'single' ? { ...getStyle(false), textAlign: design.personalAlign ?? 'left', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
+          headingStyle={headingMeta.headingStyleId}
+          lineColor={headingMeta.lineColor}
+          lineThick={headingMeta.lineThick}
+          lineWidth={headingMeta.lineWidth}
+          editPath={isFirstChunk ? `design.sectionTitles.${sid}` : undefined}
+          editValue={baseSectionTitle}
+          editLabel="Section Heading"
+          textStylePath={`sectionTitle.${sid}.text`}
+          wrapperStylePath={`sectionTitle.${sid}.block`}
+          overrides={data.styleOverrides}
+        />
+      </div>
+      <div style={{ display: 'block' }}>
+        {filteredListItems.map((item: any, i: number) => {
+          const originalIndex = itemIndices ? itemIndices[i] : i;
+          const entryMargin = `${Math.min(8, Math.max(1, design.entrySpacing ?? 4))}mm`;
+          const overrides: any = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
+          const EntryContainer = ({ children }: { children: React.ReactNode }) => {
+
+            return (
+              <div
+                key={originalIndex}
+                className="measure-item group/item relative transition-all duration-200"
+                data-sid={sid}
+                data-index={originalIndex}
+                style={{
+                  display: 'block',
+                  breakInside: 'avoid',
+                  pageBreakInside: 'avoid',
+                  marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : entryMargin,
+                  borderStyle: overrides.borderStyle || 'none',
+                  borderColor: overrides.borderColor || 'transparent',
+                  borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
+                  padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
+                  backgroundColor: overrides.backgroundColor || 'transparent',
+                  borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
+                  boxShadow: overrides.boxShadow || 'none',
+                  color: overrides.textColor || 'inherit',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {/* Hover controls overlay */}
+                {/* {!isExporting && !isThumbnail && !isMeasuring && (
+                  <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onMoveItem?.(sid, originalIndex, 'up');
+                      }}
+                      disabled={originalIndex === 0}
+                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                      title="Move Up"
+                    >
+                      <ChevronUp size={11} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onMoveItem?.(sid, originalIndex, 'down');
+                      }}
+                      disabled={originalIndex === listProps.items.length - 1}
+                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                      title="Move Down"
+                    >
+                      <ChevronDown size={11} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onOpenStylePopup?.(sid, originalIndex);
+                      }}
+                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
+                      title="Customize Style"
+                    >
+                      <PenTool size={11} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDeleteItem?.(sid, originalIndex);
+                      }}
+                      className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
+                      title="Delete Item"
+                    >
+                      <Trash size={11} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                )} */}
+                {/* Content scaled styles wrapper */}
+                <div style={{ fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit' }}>
+                  {children}
+                </div>
+              </div>
+            );
+          };
+
+          if (design.entryLayout === 'side-date') {
+            return (
+              <EntryContainer key={originalIndex}>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-3 text-right">
+                    <span
+                      className="font-semibold opacity-40 uppercase tabular-nums"
+                      style={{
+                        fontSize: '10px',
+                        color: getAccentColor('dates')
+                      }}
+                      data-edit-path={item.dPath || ''}
+                      data-style-path={`content.${sid}[${originalIndex}]`}
+                      data-edit-label="Date"
+                      data-edit-value={item.d || ''}
+                    >
+                      {item.d}
+                    </span>                  </div>
+                  <div className="col-span-9">
+                    <h3
+                      style={getElementStyle(item.tPath || '', {
+                        fontSize: titleSize,
+                        color: overrides.textColor || getAccentColor('name'),
+                        fontWeight: overrides.titleWeight || '700'
+                      })}
+                      data-edit-path={item.tPath || ''}
+                      data-style-path={`content.${sid}[${originalIndex}]`}
+                      data-edit-label="Title"
+                      data-edit-value={item.t || ''}
+                    >
+                      {item.t}
+                    </h3>
+                    {item.s && (
+                      <p
+                        className={`${subtitleStyle === 'bold'
+                          ? 'font-bold text-slate-800'
+                          : subtitleStyle === 'italic'
+                            ? 'italic'
+                            : 'font-medium text-slate-600'
+                          } opacity-80`}
+                        style={getElementStyle(item.sPath || '', {
+                          fontSize: '11px',
+                          color: getAccentColor('entrySubtitle')
+                        })}
+                        data-edit-path={item.sPath || ''}
+                        data-style-path={`content.${sid}[${originalIndex}]`}
+                        data-edit-label="Subtitle"
+                        data-edit-value={item.s || ''}
+                      >
+                        {item.s}
+                      </p>
+                    )}
+                    <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
+                  </div>
+                </div>
+              </EntryContainer>
+            );
+          }
+
+          if (design.entryLayout === 'split') {
+            return (
+              <EntryContainer key={originalIndex}>
+                <div className="flex justify-between gap-3">
+                  <div className="flex-1">
+                    <h3
+                      style={getElementStyle(item.tPath || '', {
+                        fontSize: titleSize,
+                        color: overrides.textColor || getAccentColor('name'),
+                        fontWeight: overrides.titleWeight || '700'
+                      })}
+                      data-edit-path={item.tPath || ''}
+                      data-style-path={`content.${sid}[${originalIndex}]`}
+                      data-edit-label="Title"
+                      data-edit-value={item.t || ''}
+                    >
+                      {item.t}
+                    </h3>
+                    {item.s && (
+                      <p
+                        className={`${subtitleStyle === 'bold'
+                          ? 'font-bold text-slate-800'
+                          : subtitleStyle === 'italic'
+                            ? 'italic'
+                            : 'font-medium text-slate-600'
+                          } opacity-80`}
+                        style={getElementStyle(item.sPath || '', {
+                          fontSize: '11px',
+                          color: getAccentColor('entrySubtitle')
+                        })}
+                        data-edit-path={item.sPath || ''}
+                        data-style-path={`content.${sid}[${originalIndex}]`}
+                        data-edit-label="Subtitle"
+                        data-edit-value={item.s || ''}
+                      >
+                        {item.s}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span
+                      className="font-semibold opacity-40 uppercase tabular-nums"
+                      style={{
+                        fontSize: '10px',
+                        color: getAccentColor('dates')
+                      }}
+                      data-edit-path={item.dPath || ''}
+                      data-style-path={`content.${sid}[${originalIndex}]`}
+                      data-edit-label="Date"
+                      data-edit-value={item.d || ''}
+                    >
+                      {item.d}
+                    </span>                  </div>
+                </div>
+                <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
+              </EntryContainer>
+            );
+          }
+
+          return (
+            <EntryContainer key={originalIndex}>
+              <div className={`flex ${subtitlePlacement === 'same-line' ? 'items-baseline gap-2' : 'flex-col'} justify-between`}>
+                <div className="flex justify-between items-baseline flex-1">
+                  <h3
+                    style={getElementStyle(item.tPath || '', {
+                      fontSize: titleSize,
+                      color: overrides.textColor || getAccentColor('name'),
+                      fontWeight: overrides.titleWeight || '700'
+                    })}
+                    data-edit-path={item.tPath || ''}
+                    data-style-path={`content.${sid}[${originalIndex}]`}
+                    data-edit-label="Title"
+                    data-edit-value={item.t || ''}
+                  >
+                    {item.t}
+                  </h3>
+                  {subtitlePlacement === 'same-line' && item.s && <span className="mx-1.5 opacity-20 text-slate-300">•</span>}
+                  {subtitlePlacement === 'same-line' && item.s && (
+                    <span
+                      className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 flex-1`}
+                      style={getElementStyle(item.sPath || '', { fontSize: '11px', color: getAccentColor('entrySubtitle') })}
+                      data-edit-path={item.sPath || ''}
+                      data-edit-label="Subtitle"
+                      data-edit-value={item.s || ''}
+                    >{item.s}</span>
+                  )}
+                  <span
+                    className="font-semibold opacity-40 uppercase tabular-nums"
+                    style={{
+                      fontSize: '10px',
+                      color: getAccentColor('dates')
+                    }}
+                    data-edit-path={item.dPath || ''}
+                    data-style-path={`content.${sid}[${originalIndex}]`}
+                    data-edit-label="Date"
+                    data-edit-value={item.d || ''}
+                  >
+                    {item.d}
+                  </span>                </div>
+                {subtitlePlacement === 'next-line' && item.s && (
+                  <p
+                    className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 mt-0.5`}
+                    style={getElementStyle(item.sPath || '', { fontSize: '11px', color: getAccentColor('entrySubtitle') })}
+                    data-edit-path={item.sPath || ''}
+                    data-edit-label="Subtitle"
+                    data-edit-value={item.s || ''}
+                  >{item.s}</p>
+                )}
+              </div>
+              <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
+            </EntryContainer>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 /* --- Sub-layouts --- */
@@ -1932,7 +2603,7 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
 
   const sidebarBlocks = pageBlocks?.sidebar || [];
   const mainBlocks = pageBlocks?.main || [];
-  
+
   return (
     <div
       style={{
@@ -1957,13 +2628,13 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
         {isFirstPage && (
           <div className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} ${isThumbnail ? 'gap-3' : 'gap-4'} mb-6`}>
             {design.photoShow && personalInfo.image && (
-                <div 
-                  className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all`} 
-                  style={{ 
-                    borderColor: design.primaryColor || '#ff4d7d',
-                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : design.photoShape === 'hexagon' ? '8px' : '0'
-                  }}
-                >
+              <div
+                className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all`}
+                style={{
+                  borderColor: design.primaryColor || '#ff4d7d',
+                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : design.photoShape === 'hexagon' ? '8px' : '0'
+                }}
+              >
                 <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
               </div>
             )}
@@ -1987,38 +2658,38 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
                 {personalInfo.professionalTitle || ''}
               </p>
             </div>
-            
+
             <div className="space-y-3 w-full">
               <h2 className="font-bold uppercase tracking-[0.15em] opacity-50 border-b pb-1 w-full" style={{ fontSize: '10px', borderColor: `${design.primaryColor || '#ff4d7d'}20`, color: getAccentColor('headings') }}>Contact</h2>
               <div className="space-y-2 font-semibold opacity-80" style={{ fontSize: '10px' }}>
-                 {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email}>{personalInfo.email}</span></div>}
-                 {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone}>{personalInfo.phone}</span></div>}
-                 {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location}>{personalInfo.location}</span></div>}
+                {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email}>{personalInfo.email}</span></div>}
+                {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone}>{personalInfo.phone}</span></div>}
+                {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location}>{personalInfo.location}</span></div>}
               </div>
             </div>
           </div>
         )}
 
         <div className="space-y-6">
-           <Droppable droppableId={`page-sidebar-${pageNum}`}>
-              {(provided) => (
-                <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
-                  {sidebarBlocks.map((block, idx) => (
-                    <SortableSection
-                      key={`${block.sid}-${pageNum}-${idx}`}
-                      id={block.sid}
-                      pageNum={pageNum}
-                      index={idx}
-                      isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                      onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                    >
-                       <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="sidebar" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                    </SortableSection>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-           </Droppable>
+          <Droppable droppableId={`page-sidebar-${pageNum}`}>
+            {(provided) => (
+              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
+                {sidebarBlocks.map((block, idx) => (
+                  <SortableSection
+                    key={`${block.sid}-${pageNum}-${idx}`}
+                    id={block.sid}
+                    pageNum={pageNum}
+                    index={idx}
+                    isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
+                  >
+                    <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="sidebar" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
+                  </SortableSection>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
         </div>
       </div>
 
@@ -2032,25 +2703,25 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
           height: '100%',
         }}
       >
-         <Droppable droppableId={`page-main-${pageNum}`}>
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
-                {mainBlocks.map((block, idx) => (
-                  <SortableSection
-                    key={`${block.sid}-${pageNum}-${idx}`}
-                    id={block.sid}
-                    pageNum={pageNum}
-                    index={idx}
-                    isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                  >
-                     <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                  </SortableSection>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-         </Droppable>
+        <Droppable droppableId={`page-main-${pageNum}`}>
+          {(provided) => (
+            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
+              {mainBlocks.map((block, idx) => (
+                <SortableSection
+                  key={`${block.sid}-${pageNum}-${idx}`}
+                  id={block.sid}
+                  pageNum={pageNum}
+                  index={idx}
+                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
+                >
+                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
+                </SortableSection>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
       </div>
       {/* Clearfix for float layout */}
       <div style={{ clear: 'both' }} />
@@ -2067,23 +2738,23 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
 
   const isDarkHeader = design.layout === 'modern-header-dark';
   const isSplitHeader = design.layout === 'modern-header-split';
-  
+
   return (
     <div className="flex flex-col w-full h-full">
       {isFirstPage && (
-        <div 
-          className={`flex ${isSplitHeader ? 'flex-row justify-between items-center' : 'flex-col'} py-10 px-8 border-b border-slate-100/50 ${!isSplitHeader && design.personalAlign === 'center' ? 'items-center text-center' : !isSplitHeader && design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`} 
-          style={{ 
-            backgroundColor: isDarkHeader ? (design.primaryColor || '#ff4d7d') : (design.secondaryColor || '#f8fafc'), 
+        <div
+          className={`flex ${isSplitHeader ? 'flex-row justify-between items-center' : 'flex-col'} py-10 px-8 border-b border-slate-100/50 ${!isSplitHeader && design.personalAlign === 'center' ? 'items-center text-center' : !isSplitHeader && design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
+          style={{
+            backgroundColor: isDarkHeader ? (design.primaryColor || '#ff4d7d') : (design.secondaryColor || '#f8fafc'),
             color: isDarkHeader ? '#ffffff' : 'inherit',
-            marginBottom: `${design.sectionSpacing || 8}mm` 
+            marginBottom: `${design.sectionSpacing || 8}mm`
           }}
         >
           <div className={`flex ${isSplitHeader ? 'flex-row items-center gap-6' : 'flex-col items-inherit'}`}>
             {design.photoShow && personalInfo.image && (
-              <div 
-                className="w-24 h-24 overflow-hidden border-2 shadow-lg shrink-0" 
-                style={{ 
+              <div
+                className="w-24 h-24 overflow-hidden border-2 shadow-lg shrink-0"
+                style={{
                   borderColor: isDarkHeader ? '#ffffff' : (design.primaryColor || '#ff4d7d'),
                   borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0',
                   marginBottom: isSplitHeader ? '0' : '16px'
@@ -2097,7 +2768,7 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
               <p className="font-bold opacity-75 uppercase tracking-[0.15em]" style={{ fontSize: '10px', color: isDarkHeader ? '#e2e8f0' : getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
             </div>
           </div>
-          
+
           <div className={`flex ${isSplitHeader ? 'flex-col items-end gap-1.5' : 'flex-wrap gap-x-6 gap-y-1.5 mt-4'} font-semibold opacity-85`} style={{ fontSize: '10px' }}>
             {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className={isDarkHeader ? 'text-white' : 'text-slate-900'}>{personalInfo.email}</span></div>}
             {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className={isDarkHeader ? 'text-white' : 'text-slate-900'}>{personalInfo.phone}</span></div>}
@@ -2105,29 +2776,29 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
           </div>
         </div>
       )}
-      
+
       <div className="flex-1 w-full pt-0">
-         <Droppable droppableId={`page-main-${pageNum}`}>
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }} className="flex-1">
-                 {blocks.map((block, idx) => (
-                     <SortableSection
-                       key={`${block.sid}-${pageNum}-${idx}`}
-                       id={block.sid}
-                       pageNum={pageNum}
-                       index={idx}
-                       isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                     >
-                        <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="modern" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                     </SortableSection>
-                 ))}
-                 {provided.placeholder}
-              </div>
-            )}
-         </Droppable>
+        <Droppable droppableId={`page-main-${pageNum}`}>
+          {(provided) => (
+            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }} className="flex-1">
+              {blocks.map((block, idx) => (
+                <SortableSection
+                  key={`${block.sid}-${pageNum}-${idx}`}
+                  id={block.sid}
+                  pageNum={pageNum}
+                  index={idx}
+                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
+                >
+                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="modern" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
+                </SortableSection>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
       </div>
-   </div>
+    </div>
   );
 };
 
@@ -2145,7 +2816,7 @@ const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const isTwoColumn = layout === 'two-column' || layout === 'two-column-reverse';
   const isTimeline = layout === 'timeline' || layout === 'timeline-left';
   const isCard = layout === 'card-header';
-  
+
   const alignClass = isCentered ? 'items-center text-center' : design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
   const justifyClass = isCentered ? 'justify-center' : design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start';
 
@@ -2161,64 +2832,64 @@ const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
           {isMinimal && (
             <div className="absolute bottom-0 w-full h-[1px] bg-slate-100/60" />
           )}
-          
+
           {design.photoShow && personalInfo.image && (
-              <div 
-                className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2`} 
-                style={{ 
-                  borderColor: design.primaryColor || 'black',
-                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                }}
-              >
-                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-              </div>
+            <div
+              className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2`}
+              style={{
+                borderColor: design.primaryColor || 'black',
+                borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
+              }}
+            >
+              <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
+            </div>
           )}
 
           <h1 className={`${isMinimal ? 'font-light' : design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{personalInfo.fullName || 'Name'}</h1>
           <p className="font-bold opacity-45 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
-          
+
           <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${justifyClass}`} style={{ fontSize: '10px' }}>
-             {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {personalInfo.email}</div>}
-             {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {personalInfo.phone}</div>}
-             {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {personalInfo.location}</div>}
+            {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {personalInfo.email}</div>}
+            {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {personalInfo.phone}</div>}
+            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {personalInfo.location}</div>}
           </div>
         </div>
       )}
 
       <Droppable droppableId={`page-main-${pageNum}`}>
-         {(provided) => (
-            <div 
-              {...provided.droppableProps} 
-              ref={provided.innerRef} 
-              style={{ display: 'block', minHeight: '50px' }} 
-              className={`flex-1 relative ${isTimeline ? 'pl-8 border-l-2 border-slate-100 ml-4 py-2' : isTwoColumn ? 'grid grid-cols-2 gap-6 items-start' : 'space-y-4'}`}
-            >
-               {renderedBlocks.map((block, idx) => (
-                  <div key={`${block.sid}-${pageNum}-${idx}`} className="relative">
-                    {isTimeline && (
-                      <div 
-                        className="absolute -left-[41px] top-1.5 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center shadow-sm z-10 transition-all hover:scale-110"
-                        style={{ borderColor: design.primaryColor || '#ff4d7d' }}
-                      >
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                      </div>
-                    )}
-                    <SortableSection
-                      id={block.sid}
-                      pageNum={pageNum}
-                      index={idx}
-                      isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                      onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                    >
-                      <div className={isCard ? 'p-5 rounded-xl border border-slate-100/80 bg-slate-50/20 shadow-sm mb-4' : ''}>
-                        <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                      </div>
-                    </SortableSection>
+        {(provided) => (
+          <div
+            {...provided.droppableProps}
+            ref={provided.innerRef}
+            style={{ display: 'block', minHeight: '50px' }}
+            className={`flex-1 relative ${isTimeline ? 'pl-8 border-l-2 border-slate-100 ml-4 py-2' : isTwoColumn ? 'grid grid-cols-2 gap-6 items-start' : 'space-y-4'}`}
+          >
+            {renderedBlocks.map((block, idx) => (
+              <div key={`${block.sid}-${pageNum}-${idx}`} className="relative">
+                {isTimeline && (
+                  <div
+                    className="absolute -left-[41px] top-1.5 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center shadow-sm z-10 transition-all hover:scale-110"
+                    style={{ borderColor: design.primaryColor || '#ff4d7d' }}
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
                   </div>
-               ))}
-               {provided.placeholder}
-            </div>
-         )}
+                )}
+                <SortableSection
+                  id={block.sid}
+                  pageNum={pageNum}
+                  index={idx}
+                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
+                >
+                  <div className={isCard ? 'p-5 rounded-xl border border-slate-100/80 bg-slate-50/20 shadow-sm mb-4' : ''}>
+                    <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
+                  </div>
+                </SortableSection>
+              </div>
+            ))}
+            {provided.placeholder}
+          </div>
+        )}
       </Droppable>
     </div>
   );
@@ -2238,60 +2909,60 @@ const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
       {isFirstPage && (
         <>
           <div className={`${isThumbnail ? 'h-24' : 'h-32'} flex items-center justify-between ${isThumbnail ? 'px-8' : 'px-12'} text-white overflow-hidden relative`} style={{ backgroundColor: design.primaryColor || 'black' }}>
-             <div className="flex items-center gap-6 z-10">
-                {design.photoShow && personalInfo.image && (
-                  <div 
-                    className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
-                    style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
-                  >
-                    <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                  </div>
-                )}
-                <div>
-                  <h1 className={`${design.nameBold || isBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{personalInfo.fullName || 'Name'}</h1>
-                  <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{personalInfo.professionalTitle || ''}</p>
+            <div className="flex items-center gap-6 z-10">
+              {design.photoShow && personalInfo.image && (
+                <div
+                  className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
+                  style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
+                >
+                  <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
                 </div>
-             </div>
-             <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
-                <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
-                   {personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {personalInfo.email}</div>}
-                   {personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {personalInfo.phone}</div>}
-                </div>
-             </div>
+              )}
+              <div>
+                <h1 className={`${design.nameBold || isBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{personalInfo.fullName || 'Name'}</h1>
+                <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{personalInfo.professionalTitle || ''}</p>
+              </div>
+            </div>
+            <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
+              <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
+                {personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {personalInfo.email}</div>}
+                {personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {personalInfo.phone}</div>}
+              </div>
+            </div>
           </div>
-          <div 
-            className={`bg-slate-50 flex flex-wrap justify-center gap-6 items-center ${isThumbnail ? 'py-1.5' : 'py-3'} font-bold tracking-[0.15em] uppercase text-slate-400`} 
-            style={{ 
-              marginBottom: `${design.sectionSpacing || 8}mm`, 
+          <div
+            className={`bg-slate-50 flex flex-wrap justify-center gap-6 items-center ${isThumbnail ? 'py-1.5' : 'py-3'} font-bold tracking-[0.15em] uppercase text-slate-400`}
+            style={{
+              marginBottom: `${design.sectionSpacing || 8}mm`,
               fontSize: '10px',
               borderBottom: isBold ? `3px solid ${design.primaryColor || '#ff4d7d'}` : '1px solid #e2e8f0'
             }}
           >
-             {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {personalInfo.location}</div>}
-             {(personalInfo as any).linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
+            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {personalInfo.location}</div>}
+            {(personalInfo as any).linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
           </div>
         </>
       )}
       <div className="flex-1 w-full pt-0">
-         <Droppable droppableId={`page-main-${pageNum}`}>
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3 flex-1" style={{ minHeight: '50px' }}>
-                 {blocks.map((block, idx) => (
-                     <SortableSection
-                       key={`${block.sid}-${pageNum}-${idx}`}
-                       id={block.sid}
-                       pageNum={pageNum}
-                       index={idx}
-                       isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                       onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                     >
-                        <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="double" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                     </SortableSection>
-                   ))}
-                   {provided.placeholder}
-              </div>
-            )}
-         </Droppable>
+        <Droppable droppableId={`page-main-${pageNum}`}>
+          {(provided) => (
+            <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3 flex-1" style={{ minHeight: '50px' }}>
+              {blocks.map((block, idx) => (
+                <SortableSection
+                  key={`${block.sid}-${pageNum}-${idx}`}
+                  id={block.sid}
+                  pageNum={pageNum}
+                  index={idx}
+                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
+                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
+                >
+                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="double" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
+                </SortableSection>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
       </div>
     </div>
   );

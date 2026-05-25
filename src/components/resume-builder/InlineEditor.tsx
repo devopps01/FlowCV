@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, {
   useState, useRef, useEffect, useCallback, useLayoutEffect,
@@ -9,14 +9,16 @@ import {
   Minus, Plus, ChevronDown,
 } from 'lucide-react';
 import { ResumeData } from './types';
+import { readApiResponse } from '@/lib/utils/api-client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface EditTarget {
+export interface EditTarget {
   path: string;
+  stylePath: string;
   value: string;
   rect: DOMRect;
-  fieldType: 'text' | 'date' | 'textarea' | 'email' | 'tel' | 'url';
+  fieldType: 'text' | 'date' | 'textarea' | 'email' | 'tel' | 'url' | 'number';
   label: string;
   element?: HTMLElement;
 }
@@ -29,6 +31,7 @@ interface StyleOverride {
   textAlign?: string;
   fontFamily?: string;
   color?: string;
+  backgroundColor?: string;
 }
 
 interface InlineEditorProps {
@@ -42,8 +45,8 @@ interface InlineEditorProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const EDITABLE_TAGS = new Set([
-  'H1','H2','H3','H4','H5','H6','P','A','SPAN','LI','TD','TH',
-  'STRONG','EM','B','I','LABEL','DIV',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'A', 'SPAN', 'LI', 'TD', 'TH',
+  'STRONG', 'EM', 'B', 'I', 'LABEL', 'DIV',
 ]);
 
 const TAG_LABELS: Record<string, string> = {
@@ -312,6 +315,9 @@ interface FloatingPanelProps {
 }
 
 function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoom }: FloatingPanelProps) {
+
+  console.log(target);
+
   const [value, setValue] = useState(target.value);
   const [showStyle, setShowStyle] = useState(false);
   const [showAI, setShowAI] = useState(false);
@@ -321,7 +327,7 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const existingStyle: StyleOverride = (data.styleOverrides?.[target.path] || {}) as StyleOverride;
+  const existingStyle: StyleOverride = (data.styleOverrides?.[target.stylePath] || {}) as StyleOverride;
   const [fontSize, setFontSize] = useState<number>(existingStyle.fontSize || 0);
   const [fontWeight, setFontWeight] = useState(existingStyle.fontWeight || '');
   const [fontStyle, setFontStyle] = useState(existingStyle.fontStyle || '');
@@ -358,21 +364,32 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
 
   const saveStyleOverride = useCallback((overrides: StyleOverride) => {
     const current = data.styleOverrides || {};
-    const merged: any = { ...current[target.path], ...overrides };
+    const merged: any = { ...current[target.stylePath], ...overrides };
     Object.keys(merged).forEach(k => { if (!merged[k]) delete merged[k]; });
-    updateNested('styleOverrides', { ...current, [target.path]: merged });
-  }, [data.styleOverrides, target.path, updateNested]);
+    updateNested('styleOverrides', { ...current, [target.stylePath]: merged });
+  }, [data.styleOverrides, target.stylePath, updateNested]);
 
   const resetStyle = useCallback(() => {
     const current = { ...(data.styleOverrides || {}) };
-    delete current[target.path];
+    delete current[target.stylePath];
     updateNested('styleOverrides', current);
     setFontSize(0); setFontWeight(''); setFontStyle('');
     setTextDecoration(''); setTextAlign(''); setFontFamily(''); setColor('');
-  }, [data.styleOverrides, target.path, updateNested]);
+  }, [data.styleOverrides, target.stylePath, updateNested]);
 
   const handleChange = useCallback((newVal: string) => {
     setValue(newVal);
+    const compositeType = target.element?.dataset.editComposite;
+    if (compositeType === 'language-line') {
+      const normalized = newVal.trim();
+      const parts = normalized.split(/\s+[—-]\s+|—|-/).map(part => part.trim()).filter(Boolean);
+      const language = parts[0] || '';
+      const proficiency = parts.slice(1).join(' - ');
+      const basePath = target.path.replace(/\.__composite$/, '');
+      updateNested(`${basePath}.language`, language);
+      updateNested(`${basePath}.proficiency`, proficiency);
+      return;
+    }
     if (target.element?.dataset.editType === 'richtext') {
       updateNested(target.path, plainTextToHtml(newVal));
     } else {
@@ -409,8 +426,12 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
           instruction,
         }),
       });
-      const json = await res.json();
-      if (json.enhanced) setAiSuggestion(json.enhanced);
+      const result = await readApiResponse<{ enhanced?: string; error?: string }>(res);
+      if (result.ok && result.data.enhanced) {
+        setAiSuggestion(result.data.enhanced);
+      } else {
+        setAiSuggestion('');
+      }
     } catch {
       setAiSuggestion('');
     } finally {
@@ -619,6 +640,55 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
             </div>
           </div>
 
+          {/* Background */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 11, color: '#94a3b8', width: 70, paddingTop: 4 }}>Background</span>
+            <div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => { setColor(color); saveStyleOverride({ backgroundColor: 'transparent' }); }}
+                  title="Transparent"
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 4,
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.14))',
+                    border: existingStyle.backgroundColor === 'transparent' || !existingStyle.backgroundColor ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.2)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    boxSizing: 'border-box',
+                    color: '#cbd5e1',
+                    fontSize: 10
+                  }}
+                >
+                  ×
+                </button>
+                {COLOR_SWATCHES.map(bg => (
+                  <button
+                    key={`bg-${bg}`}
+                    type="button"
+                    onClick={() => saveStyleOverride({ backgroundColor: bg })}
+                    title={bg}
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 4,
+                      background: bg,
+                      border: existingStyle.backgroundColor === bg ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.2)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                ))}
+              </div>
+              {existingStyle.backgroundColor && existingStyle.backgroundColor !== 'transparent' && (
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>{existingStyle.backgroundColor}</div>
+              )}
+            </div>
+          </div>
+
           {/* Reset */}
           <button onClick={resetStyle} style={{ width: '100%', padding: '7px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#94a3b8', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
             <RefreshCw size={11} /> Reset to default
@@ -747,12 +817,16 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
     // Don't intercept drag handles or section controls
     if (clickedEl.closest('[data-drag-handle]') || clickedEl.closest('.group\\/section > button')) return;
 
-    // Walk up from clicked element to find data-edit-path
+    // Walk up from clicked element to find data-edit-path and data-style-path
     let el: HTMLElement | null = clickedEl;
     let editableEl: HTMLElement | null = null;
+    let stylePath = '';
     let depth = 0;
 
     while (el && depth < 12) {
+      if (!stylePath && el.dataset.stylePath) {
+        stylePath = el.dataset.stylePath;
+      }
       // Found explicit edit path — use it
       if (el.dataset.editPath && el.dataset.editPath.trim()) {
         editableEl = el;
@@ -770,6 +844,9 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
       el = clickedEl;
       depth = 0;
       while (el && depth < 8) {
+        if (!stylePath && el.dataset.stylePath) {
+          stylePath = el.dataset.stylePath;
+        }
         if (EDITABLE_TAGS.has(el.tagName) && el.textContent?.trim()) {
           const directText = Array.from(el.childNodes)
             .filter(n => n.nodeType === Node.TEXT_NODE)
@@ -809,6 +886,7 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
 
     setEditTarget({
       path,
+      stylePath: stylePath || path,
       value,
       rect,
       fieldType,

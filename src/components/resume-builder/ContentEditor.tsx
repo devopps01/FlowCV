@@ -972,7 +972,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                           className={`relative group/skill flex-1 min-w-[160px] transition-all hover:scale-[1.01] ${isHidden ? 'opacity-60' : 'opacity-100'}`}
                                         >
                                           <div
-                                            className="flex items-center gap-1 p-1 rounded-xl transition-all"
+                                            className="flex items-center gap-1 p-1 pr-10 rounded-xl transition-all"
                                             style={{ 
                                               background: "var(--app-bg-card)", 
                                               border: isHidden ? "1px dashed var(--app-border)" : "1px solid var(--app-border)", 
@@ -998,14 +998,25 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                               style={{ color: isHidden ? "var(--app-text-muted)" : "var(--app-text)" }}
                                               placeholder="e.g. Hiking"
                                             />
-                                            <button 
-                                              onClick={() => updateNested('content.interests', data.content.interests?.filter((_, idx) => idx !== iIdx))} 
-                                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50/50 transition-all shrink-0 mr-1"
-                                              title="Delete Interest"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
                                           </div>
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              const confirmed = await askConfirm({
+                                                title: 'Delete Interest',
+                                                message: 'Are you sure you want to delete this interest?',
+                                                confirmLabel: 'Delete',
+                                                variant: 'danger'
+                                              });
+                                              if (confirmed) {
+                                                updateNested('content.interests', data.content.interests?.filter((_, idx) => idx !== iIdx));
+                                              }
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg opacity-0 group-hover/skill:opacity-100 text-gray-400 hover:text-red-500 hover:bg-red-50/70 transition-all"
+                                            title="Delete Interest"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
                                         </div>
                                       );
                                     })}
