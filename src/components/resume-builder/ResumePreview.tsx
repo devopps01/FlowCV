@@ -183,7 +183,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
       case 'background':
         return {
           ...base,
-          backgroundColor: `${lineColor}${Math.max(8, Math.min(40, (opacityStep ?? 2) * 8)).toString(16).padStart(2, '0')}`,
+          backgroundColor: `${lineColor}${Math.max(8, Math.min(40, (opacityStep ?? 2) * 8)).toString(12).padStart(2, '0')}`,
           padding: `${3 + (padStep ?? 1)}px ${8 + (padStep ?? 1) * 2}px`,
           borderRadius: radiusPx != null ? `${radiusPx}px` : '6px',
           width: '100%',
@@ -2596,6 +2596,11 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const overrides = data.styleOverrides?.[path];
+    if (!overrides) return baseStyle;
+    return { ...baseStyle, ...overrides };
+  };
   const isRight = design.layout?.includes('sidebar-right');
   const isFirstPage = pageNum === 1;
 
@@ -2641,8 +2646,9 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
             <div className="space-y-1">
               <h1
                 className={`${design.nameBold ? 'font-black' : 'font-medium'} leading-tight tracking-tight`}
-                style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : design.nameSize === 'xs' ? '13px' : '18px' }}
+                style={getElementStyle('content.personalInfo.fullName', { color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : design.nameSize === 'xs' ? '13px' : '18px' })}
                 data-edit-path="content.personalInfo.fullName"
+                data-style-path="content.personalInfo.fullName"
                 data-edit-label="Name"
                 data-edit-value={personalInfo.fullName || ''}
               >
@@ -2650,8 +2656,9 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
               </h1>
               <p
                 className="font-bold opacity-60 uppercase tracking-[0.1em]"
-                style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}
+                style={getElementStyle('content.personalInfo.professionalTitle', { fontSize: '10px', color: getAccentColor('jobTitle') })}
                 data-edit-path="content.personalInfo.professionalTitle"
+                data-style-path="content.personalInfo.professionalTitle"
                 data-edit-label="Job Title"
                 data-edit-value={personalInfo.professionalTitle || ''}
               >
@@ -2662,9 +2669,9 @@ const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, select
             <div className="space-y-3 w-full">
               <h2 className="font-bold uppercase tracking-[0.15em] opacity-50 border-b pb-1 w-full" style={{ fontSize: '10px', borderColor: `${design.primaryColor || '#ff4d7d'}20`, color: getAccentColor('headings') }}>Contact</h2>
               <div className="space-y-2 font-semibold opacity-80" style={{ fontSize: '10px' }}>
-                {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email}>{personalInfo.email}</span></div>}
-                {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone}>{personalInfo.phone}</span></div>}
-                {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location}>{personalInfo.location}</span></div>}
+                {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-style-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email} style={getElementStyle('content.personalInfo.email')}>{personalInfo.email}</span></div>}
+                {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-style-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone} style={getElementStyle('content.personalInfo.phone')}>{personalInfo.phone}</span></div>}
+                {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-style-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location} style={getElementStyle('content.personalInfo.location')}>{personalInfo.location}</span></div>}
               </div>
             </div>
           </div>
@@ -2733,6 +2740,11 @@ const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const overrides = data.styleOverrides?.[path];
+    if (!overrides) return baseStyle;
+    return { ...baseStyle, ...overrides };
+  };
   const isFirstPage = pageNum === 1;
   const blocks = pageBlocks?.main || [];
 
@@ -2899,6 +2911,11 @@ const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, s
   const design = data.design || {} as any;
   const content = data.content || {} as any;
   const personalInfo = content.personalInfo || {} as any;
+  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const overrides = data.styleOverrides?.[path];
+    if (!overrides) return baseStyle;
+    return { ...baseStyle, ...overrides };
+  };
   const isFirstPage = pageNum === 1;
   const blocks = pageBlocks?.main || [];
 

@@ -9,7 +9,7 @@ import { processContentWithIds, getDefaultResumeContent } from '@/lib/utils/resu
 import { useRef } from 'react';
 
 const defaultDesign = {
-  fontSize: 10.5, lineHeight: 1.45, marginLR: 12, marginTB: 14,
+  fontSize: 9, lineHeight: 1.45, marginLR: 12, marginTB: 14,
   entrySpacing: 4, sectionSpacing: 8,
   primaryColor: '#ff4d7d', secondaryColor: '#c026d3', accentColor: '#c026d3',
   textColor: '#1f2937', backgroundColor: '#ffffff',

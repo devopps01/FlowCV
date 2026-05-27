@@ -310,11 +310,10 @@ interface FloatingPanelProps {
   data: ResumeData;
   updateNested: (path: string, value: any) => void;
   onClose: () => void;
-  containerRect: DOMRect | null;
   zoom: number;
 }
 
-function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoom }: FloatingPanelProps) {
+function FloatingPanel({ target, data, updateNested, onClose, zoom }: FloatingPanelProps) {
 
   console.log(target);
 
@@ -339,26 +338,21 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
   const panelWidth = target.fieldType === 'textarea' || target.fieldType === 'date' ? 380 : 320;
 
   const getPosition = useCallback(() => {
-    if (!containerRect) return { top: 100, left: 100 };
-    const scaledRect = {
-      top: target.rect.top - containerRect.top,
-      left: target.rect.left - containerRect.left,
-      bottom: target.rect.bottom - containerRect.top,
-    };
-    let top = scaledRect.bottom + 8;
-    let left = scaledRect.left;
-    const containerWidth = containerRect.width;
-    if (left + panelWidth > containerWidth - 8) {
-      left = Math.max(8, containerWidth - panelWidth - 8);
+    // Use viewport coordinates directly from target.rect (getBoundingClientRect)
+    let top = target.rect.bottom + 8;
+    let left = target.rect.left;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    if (left + panelWidth > viewportWidth - 8) {
+      left = Math.max(8, viewportWidth - panelWidth - 8);
     }
     if (left < 8) left = 8;
     const estimatedPanelHeight = 300;
-    const containerHeight = containerRect.height;
-    if (top + estimatedPanelHeight > containerHeight - 8) {
-      top = Math.max(8, scaledRect.top - estimatedPanelHeight - 8);
+    if (top + estimatedPanelHeight > viewportHeight - 8) {
+      top = Math.max(8, target.rect.top - estimatedPanelHeight - 8);
     }
     return { top, left };
-  }, [target.rect, containerRect, panelWidth]);
+  }, [target.rect, panelWidth]);
 
   const pos = getPosition();
 
@@ -758,26 +752,11 @@ function FloatingPanel({ target, data, updateNested, onClose, containerRect, zoo
   );
 }
 
-// ─── InlineEditor (main component) ───────────────────────────────────────────
+  // ─── InlineEditor (main component) ───────────────────────────────────────────
 
 export function InlineEditor({ data, updateNested, children, containerRef, zoom }: InlineEditorProps) {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  // Update container rect on resize
-  useEffect(() => {
-    const updateRect = () => {
-      if (containerRef.current) {
-        setContainerRect(containerRef.current.getBoundingClientRect());
-      }
-    };
-    updateRect();
-    const ro = new ResizeObserver(updateRect);
-    if (containerRef.current) ro.observe(containerRef.current);
-    window.addEventListener('resize', updateRect);
-    return () => { ro.disconnect(); window.removeEventListener('resize', updateRect); };
-  }, [containerRef]);
 
   // Find the nearest editable ancestor
   const findEditableElement = useCallback((target: HTMLElement): HTMLElement | null => {
@@ -823,16 +802,20 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
     let stylePath = '';
     let depth = 0;
 
+    // Use BOTH the closest data-edit-path AND data-style-path from the same element if possible
+    let editElement: HTMLElement | null = null;
+    let styleElement: HTMLElement | null = null;
+
+    el = clickedEl;
+    depth = 0;
     while (el && depth < 12) {
-      if (!stylePath && el.dataset.stylePath) {
-        stylePath = el.dataset.stylePath;
+      if (!editElement && el.dataset.editPath && el.dataset.editPath.trim()) {
+        editElement = el;
       }
-      // Found explicit edit path — use it
-      if (el.dataset.editPath && el.dataset.editPath.trim()) {
-        editableEl = el;
-        break;
+      if (!styleElement && el.dataset.stylePath) {
+        styleElement = el;
       }
-      // Skip UI chrome
+      if (editElement) break;
       if (el.dataset.dragHandle) break;
       if (el.id === 'resume-preview') break;
       el = el.parentElement;
@@ -840,21 +823,21 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
     }
 
     // If no data-edit-path found, try to find any text element with content
-    if (!editableEl) {
+    if (!editElement) {
       el = clickedEl;
       depth = 0;
       while (el && depth < 8) {
-        if (!stylePath && el.dataset.stylePath) {
-          stylePath = el.dataset.stylePath;
-        }
-        if (EDITABLE_TAGS.has(el.tagName) && el.textContent?.trim()) {
+        if (!editElement && EDITABLE_TAGS.has(el.tagName) && el.textContent?.trim()) {
           const directText = Array.from(el.childNodes)
             .filter(n => n.nodeType === Node.TEXT_NODE)
             .reduce((acc, n) => acc + (n.textContent?.length || 0), 0);
           if (directText > 0 || el.tagName.match(/^H[1-6]$/)) {
-            editableEl = el;
+            editElement = el;
             break;
           }
+        }
+        if (!styleElement && el.dataset.stylePath) {
+          styleElement = el;
         }
         if (el.id === 'resume-preview') break;
         el = el.parentElement;
@@ -862,14 +845,18 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
       }
     }
 
-    if (!editableEl) {
+    if (!editElement) {
       setEditTarget(null);
       return;
     }
 
-    const path = editableEl.dataset.editPath || '';
-    const isRichtext = editableEl.dataset.editType === 'richtext';
-    const rawValue = editableEl.dataset.editValue || editableEl.textContent || '';
+    const path = editElement.dataset.editPath || '';
+    // CRITICAL FIX: Use the element's OWN editPath as the stylePath
+    // This ensures saveStyleOverride saves to styleOverrides["content.personalInfo.fullName"]
+    // which matches what the preview reads with getElementStyle('content.personalInfo.fullName', {...})
+    const ownStylePath = editElement.dataset.stylePath || path;
+    const isRichtext = editElement.dataset.editType === 'richtext';
+    const rawValue = editElement.dataset.editValue || editElement.textContent || '';
     const value = isRichtext ? htmlToPlainText(rawValue) : rawValue;
 
     if (!value.trim() && !path) {
@@ -877,21 +864,21 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
       return;
     }
 
-    const label = editableEl.dataset.editLabel || getFieldLabel(path, editableEl.tagName);
-    const fieldType = detectFieldType(path, label, editableEl.tagName, value);
-    const rect = editableEl.getBoundingClientRect();
+    const label = editElement.dataset.editLabel || getFieldLabel(path, editElement.tagName);
+    const fieldType = detectFieldType(path, label, editElement.tagName, value);
+    const rect = editElement.getBoundingClientRect();
 
     e.preventDefault();
     e.stopPropagation();
 
     setEditTarget({
       path,
-      stylePath: stylePath || path,
+      stylePath: ownStylePath,
       value,
       rect,
       fieldType,
       label: label.toUpperCase(),
-      element: editableEl,
+      element: editElement,
     });
   }, [findEditableElement]);
 
@@ -909,28 +896,38 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
   }, [editTarget]);
 
   return (
-    <div
-      ref={wrapperRef}
-      style={{ position: 'relative', width: '100%', height: '100%', overflow: 'auto' }}
-      onClick={handleClick}
-    >
-      {children}
+    <>
+      {/* Fixed overlay for the floating panel - ensures no scrolling when panel opens */}
+      <div
+        ref={wrapperRef}
+        style={{ position: 'relative', width: '100%', height: '100%' }}
+        onClick={handleClick}
+      >
+        {children}
+      </div>
 
-      {editTarget && containerRect && (
-        <div data-inline-panel="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 9998 }}>
+      {editTarget && (
+        <div
+          data-inline-panel="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 9998,
+          }}
+        >
           <div style={{ pointerEvents: 'auto' }}>
             <FloatingPanel
               target={editTarget}
               data={data}
               updateNested={updateNested}
               onClose={() => setEditTarget(null)}
-              containerRect={containerRect}
               zoom={zoom}
             />
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

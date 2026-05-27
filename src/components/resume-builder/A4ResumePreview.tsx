@@ -37,7 +37,7 @@ const A4ResumePreview: React.FC<A4ResumePreviewProps> = ({
   const backgroundColor = design.backgroundColor || '#ffffff';
   const marginLR = design.marginLR || 12;
   const marginTB = design.marginTB || 16;
-  const fontSize = design.fontSize || 10.5;
+  const fontSize = design.fontSize || 9;
   const lineHeight = design.lineHeight || 1.45;
   
   const isSidebar = design.layout?.includes('sidebar');

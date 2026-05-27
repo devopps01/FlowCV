@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Loader2, FileDown, ZoomIn, ZoomOut, RotateCcw,
   Save, Share2, Printer, Undo2, Redo2, Copy,
-  Clipboard, FileText, Palette, ArrowLeft,
+  Clipboard, FileText, Palette, ArrowLeft, Settings2,
+  Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -13,6 +14,7 @@ import { ResumeData } from './types';
 import ResumePreview from './ResumePreview';
 import ContentEditor from './ContentEditor';
 import DesignEditor from './DesignEditor';
+import AdvancedStylePanel from './AdvancedStylePanel';
 import TemplateModal from './TemplateModal';
 import { DESIGN_PRESETS } from './design-presets';
 import { EditorTopBar } from './EditorTopBar';
@@ -34,6 +36,7 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
   const [saving, setSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [showAdvancedStyle, setShowAdvancedStyle] = useState(false);
   const [history, setHistory] = useState<ResumeData[]>([initialData]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [clipboard, setClipboard] = useState<any>(null);

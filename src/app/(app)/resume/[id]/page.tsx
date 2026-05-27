@@ -11,7 +11,7 @@ import { ResumeData } from '@/components/resume-builder/types';
 import { processContentWithIds, getDefaultResumeContent } from '@/lib/utils/resume-ids';
 
 const defaultDesign = {
-  fontSize: 10.5,
+  fontSize: 9,
   lineHeight: 1.45,
   marginLR: 12,
   marginTB: 14,

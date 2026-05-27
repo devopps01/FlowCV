@@ -75,7 +75,7 @@ function buildDesign(t: TemplateData): ResumeData['design'] {
     backgroundColor: s.backgroundColor || '#ffffff',
     fontFamily: s.fontFamily || 'Inter',
     fontCategory: 'sans' as const,
-    fontSize: s.fontSize || 10.5,
+    fontSize: s.fontSize || 9,
     lineHeight: 1.45,
     marginLR: 12, marginTB: 16,
     entrySpacing: 8, sectionSpacing: 16,
