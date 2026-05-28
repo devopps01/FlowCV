@@ -37,6 +37,7 @@ export async function POST(
     }
     if (body.design !== undefined) updateData.design = body.design;
     if (body.activeSections !== undefined) updateData.activeSections = body.activeSections;
+    if (body.styleOverrides !== undefined) updateData.styleOverrides = body.styleOverrides;
 
     const updatedResume = await Resume.findOneAndUpdate(
       { _id: params.id, userId: session.user.id },

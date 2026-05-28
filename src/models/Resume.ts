@@ -198,6 +198,7 @@ export interface IResume extends Document {
   };
   design: Record<string, any>;
   activeSections: string[];
+  styleOverrides?: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -71,6 +71,7 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
           content: data.content,
           design: data.design,
           activeSections: data.activeSections,
+          styleOverrides: data.styleOverrides,
         }),
       });
 
@@ -617,6 +618,7 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
               zoomLevel={zoomLevel}
               isExporting={isExporting}
               selectedSectionId={selectedSectionId}
+              updateNested={updateNested}
               onSelectSection={(sid) => {
                 setSelectedSectionId(sid);
                 setActiveTab('design');

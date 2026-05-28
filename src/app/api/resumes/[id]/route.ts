@@ -38,6 +38,7 @@ export async function GET(
         elements: resume.elements,
         content: resume.content,
         canvasData: resume.canvasData,
+        styleOverrides: resume.styleOverrides,
         createdAt: resume.createdAt,
         updatedAt: resume.updatedAt
       }
@@ -63,7 +64,7 @@ export async function PUT(
 
     await connectDB();
 
-    const { title, template, content, design, activeSections, elements, canvasData, previewImage } = body;
+    const { title, template, content, design, activeSections, elements, canvasData, previewImage, styleOverrides } = body;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -77,6 +78,7 @@ export async function PUT(
     if (elements !== undefined) updateData.elements = elements;
     if (canvasData !== undefined) updateData.canvasData = canvasData;
     if (previewImage !== undefined) updateData.previewImage = previewImage;
+    if (styleOverrides !== undefined) updateData.styleOverrides = styleOverrides;
 
     const resume = await Resume.findOneAndUpdate(
       { _id: params.id, userId: session.user.id },
@@ -99,6 +101,7 @@ export async function PUT(
         elements: resume.elements,
         content: resume.content,
         canvasData: resume.canvasData,
+        styleOverrides: resume.styleOverrides,
         createdAt: resume.createdAt,
         updatedAt: resume.updatedAt
       }
@@ -151,6 +154,7 @@ export async function PATCH(
         elements: resume.elements,
         content: resume.content,
         canvasData: resume.canvasData,
+        styleOverrides: resume.styleOverrides,
         createdAt: resume.createdAt,
         updatedAt: resume.updatedAt
       }

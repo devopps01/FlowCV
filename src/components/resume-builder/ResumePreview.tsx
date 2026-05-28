@@ -992,7 +992,11 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
       </div>
 
       {stylePopup && (() => {
-        const currentOverrides = data.styleOverrides?.[`content.${stylePopup.sid}[${stylePopup.index}]`] || {};
+        // Non-array sections (declaration) use the sid directly, without [index]
+        const overrideKey = stylePopup.index === -1
+          ? `content.${stylePopup.sid}`
+          : `content.${stylePopup.sid}[${stylePopup.index}]`;
+        const currentOverrides = data.styleOverrides?.[overrideKey] || {};
         return (
           <div
             className="fixed bottom-8 right-8 w-80 bg-slate-900 border border-slate-700/60 text-white rounded-2xl shadow-2xl p-5 z-[99999] backdrop-blur-md transition-all duration-300 flex flex-col gap-4 font-sans pointer-events-auto select-none"
@@ -1033,13 +1037,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', {
-                        ...current,
-                        [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                          ...currentOverrides,
-                          fontSize: val
-                        }
-                      });
+                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, fontSize: val } });
                     }}
                     className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
                   />
@@ -1049,7 +1047,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                         const current = { ...(data.styleOverrides || {}) };
                         const nextOverrides = { ...currentOverrides };
                         delete nextOverrides.fontSize;
-                        current[`content.${stylePopup.sid}[${stylePopup.index}]`] = nextOverrides;
+                        current[overrideKey] = nextOverrides;
                         updateNested?.('styleOverrides', current);
                       }}
                       className="text-[9px] font-bold text-red-400 hover:underline shrink-0"
@@ -1077,13 +1075,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', {
-                        ...current,
-                        [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                          ...currentOverrides,
-                          marginBottom: val
-                        }
-                      });
+                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, marginBottom: val } });
                     }}
                     className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
                   />
@@ -1093,7 +1085,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                         const current = { ...(data.styleOverrides || {}) };
                         const nextOverrides = { ...currentOverrides };
                         delete nextOverrides.marginBottom;
-                        current[`content.${stylePopup.sid}[${stylePopup.index}]`] = nextOverrides;
+                        current[overrideKey] = nextOverrides;
                         updateNested?.('styleOverrides', current);
                       }}
                       className="text-[9px] font-bold text-red-400 hover:underline shrink-0"
@@ -1121,13 +1113,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', {
-                        ...current,
-                        [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                          ...currentOverrides,
-                          padding: val
-                        }
-                      });
+                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, padding: val } });
                     }}
                     className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
                   />
@@ -1143,13 +1129,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                       key={st}
                       onClick={() => {
                         const current = data.styleOverrides || {};
-                        updateNested?.('styleOverrides', {
-                          ...current,
-                          [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                            ...currentOverrides,
-                            borderStyle: st
-                          }
-                        });
+                        updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderStyle: st } });
                       }}
                       className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase transition-all duration-150 ${currentOverrides.borderStyle === st ? 'bg-indigo-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/15'}`}
                     >
@@ -1176,13 +1156,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', {
-                        ...current,
-                        [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                          ...currentOverrides,
-                          borderWidth: val
-                        }
-                      });
+                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderWidth: val } });
                     }}
                     className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
                   />
@@ -1199,13 +1173,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                         key={col}
                         onClick={() => {
                           const current = data.styleOverrides || {};
-                          updateNested?.('styleOverrides', {
-                            ...current,
-                            [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                              ...currentOverrides,
-                              borderColor: col
-                            }
-                          });
+                          updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderColor: col } });
                         }}
                         className={`w-6 h-6 rounded-md cursor-pointer transition-all duration-150 ${currentOverrides.borderColor === col ? 'scale-110 ring-2 ring-indigo-400' : 'opacity-85 hover:opacity-100'}`}
                         style={{ backgroundColor: col }}
@@ -1224,13 +1192,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                       key={bg}
                       onClick={() => {
                         const current = data.styleOverrides || {};
-                        updateNested?.('styleOverrides', {
-                          ...current,
-                          [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                            ...currentOverrides,
-                            backgroundColor: bg
-                          }
-                        });
+                        updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, backgroundColor: bg } });
                       }}
                       className={`w-6 h-6 rounded-md cursor-pointer transition-all duration-150 border border-white/20 flex items-center justify-center ${currentOverrides.backgroundColor === bg ? 'scale-110 ring-2 ring-indigo-400' : 'opacity-85 hover:opacity-100'}`}
                       style={{ backgroundColor: bg === 'transparent' ? 'rgba(255,255,255,0.05)' : bg }}
@@ -1258,13 +1220,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', {
-                        ...current,
-                        [`content.${stylePopup.sid}[${stylePopup.index}]`]: {
-                          ...currentOverrides,
-                          borderRadius: val
-                        }
-                      });
+                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderRadius: val } });
                     }}
                     className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
                   />
@@ -1278,7 +1234,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRe
               <button
                 onClick={() => {
                   const current = { ...(data.styleOverrides || {}) };
-                  delete current[`content.${stylePopup.sid}[${stylePopup.index}]`];
+                  delete current[overrideKey];
                   updateNested?.('styleOverrides', current);
                 }}
                 className="flex-1 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-bold text-red-400 transition-colors"
@@ -1684,9 +1640,24 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
     );
   }
 
-  if (sid === 'declaration' && content.declaration?.text) {
+  if (sid === 'declaration' && content.declaration) {
+    const declaration = content.declaration;
+    // declaration is a plain object, NOT an array. Use sid as override key directly (no [0] index).
+    const overridesKey = `content.${sid}`;
+    const styleOverrides = data.styleOverrides?.[overridesKey] || {};
     return (
-      <div style={{ marginBottom: `${design.sectionSpacing ?? 8}mm`, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+      <div className="group/item" style={{
+        position: 'relative',
+        marginBottom: `${design.sectionSpacing ?? 8}mm`,
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
+        borderStyle: styleOverrides.borderStyle || 'none',
+        borderColor: styleOverrides.borderColor || 'transparent',
+        borderWidth: styleOverrides.borderWidth !== undefined ? `${styleOverrides.borderWidth}px` : '0px',
+        padding: styleOverrides.padding !== undefined ? `${styleOverrides.padding}px` : '0px',
+        backgroundColor: styleOverrides.backgroundColor || 'transparent',
+        borderRadius: styleOverrides.borderRadius !== undefined ? `${styleOverrides.borderRadius}px` : '0px',
+      }}>
         <div className="measure-header" data-sid={sid}>
           <SectionHeader
             title={getSectionTitle(sid, 'Declaration')}
@@ -1703,11 +1674,60 @@ const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, g
             overrides={data.styleOverrides}
           />
         </div>
-        <div className="space-y-3 opacity-80 text-[1em]">
-          <p>{content.declaration.text}</p>
+        {!isExporting && !isThumbnail && !isMeasuring && (
+          <div className="absolute -top-3 -right-1 hidden group-hover/item:flex items-center gap-1 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Use a special sentinel index (-1) to signal non-array section
+                onOpenStylePopup?.(sid, -1);
+              }}
+              className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
+              title="Customize Style"
+            >
+              <PenTool size={11} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+        <div className="space-y-3 opacity-80 text-[1em] measure-item"
+          data-sid={sid}
+          data-index={-1}
+        >
+          <p data-edit-path="content.declaration.text" data-edit-label="Declaration Text" data-edit-value={declaration.text || ''} data-style-path={`content.${sid}`}
+            style={{
+              fontSize: (data.styleOverrides?.[`content.${sid}`]?.fontSize !== undefined ? `${data.styleOverrides?.[`content.${sid}`]?.fontSize}px` : 'inherit'),
+              fontWeight: data.styleOverrides?.[`content.${sid}`]?.fontWeight || 'inherit',
+              fontStyle: data.styleOverrides?.[`content.${sid}`]?.fontStyle || 'inherit',
+              textDecoration: data.styleOverrides?.[`content.${sid}`]?.textDecoration || 'inherit',
+              color: data.styleOverrides?.[`content.${sid}`]?.color || 'inherit',
+              fontFamily: data.styleOverrides?.[`content.${sid}`]?.fontFamily || 'inherit',
+              textAlign: (data.styleOverrides?.[`content.${sid}`]?.textAlign as any) || 'inherit',
+            }}
+          >{declaration.text || 'Your declaration text...'}</p>
           <div className="flex gap-10 font-semibold opacity-60 text-[0.85em]">
-            {content.declaration.date && <span>Date: {content.declaration.date}</span>}
-            {content.declaration.place && <span>Place: {content.declaration.place}</span>}
+            {declaration.date && <span data-edit-path="content.declaration.date" data-edit-label="Date" data-style-path="content.declaration.date"
+              style={{
+                fontSize: (data.styleOverrides?.['content.declaration.date']?.fontSize !== undefined ? `${data.styleOverrides?.['content.declaration.date']?.fontSize}px` : 'inherit'),
+                fontWeight: data.styleOverrides?.['content.declaration.date']?.fontWeight || 'inherit',
+                fontStyle: data.styleOverrides?.['content.declaration.date']?.fontStyle || 'inherit',
+                textDecoration: data.styleOverrides?.['content.declaration.date']?.textDecoration || 'inherit',
+                color: data.styleOverrides?.['content.declaration.date']?.color || 'inherit',
+                fontFamily: data.styleOverrides?.['content.declaration.date']?.fontFamily || 'inherit',
+                textAlign: (data.styleOverrides?.['content.declaration.date']?.textAlign as any) || 'inherit',
+              }}
+            >{declaration.date}</span>}
+            {declaration.place && <span data-edit-path="content.declaration.place" data-edit-label="Place" data-style-path="content.declaration.place"
+              style={{
+                fontSize: (data.styleOverrides?.['content.declaration.place']?.fontSize !== undefined ? `${data.styleOverrides?.['content.declaration.place']?.fontSize}px` : 'inherit'),
+                fontWeight: data.styleOverrides?.['content.declaration.place']?.fontWeight || 'inherit',
+                fontStyle: data.styleOverrides?.['content.declaration.place']?.fontStyle || 'inherit',
+                textDecoration: data.styleOverrides?.['content.declaration.place']?.textDecoration || 'inherit',
+                color: data.styleOverrides?.['content.declaration.place']?.color || 'inherit',
+                fontFamily: data.styleOverrides?.['content.declaration.place']?.fontFamily || 'inherit',
+                textAlign: (data.styleOverrides?.['content.declaration.place']?.textAlign as any) || 'inherit',
+              }}
+            >{declaration.place}</span>}
           </div>
         </div>
       </div>
