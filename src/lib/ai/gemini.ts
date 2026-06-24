@@ -77,7 +77,7 @@ const GROQ_MODELS = [
   'gemma2-9b-it',
 ];
 
-async function tryGroq(prompt: string): Promise<string | null> {
+async function tryGroq(prompt: string, temperature = 0.8): Promise<string | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey.startsWith('your_')) return null;
 
@@ -93,7 +93,7 @@ async function tryGroq(prompt: string): Promise<string | null> {
           model,
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 2048,
-          temperature: 0.7,
+          temperature,
         }),
         signal: AbortSignal.timeout(15000),
       });
@@ -120,7 +120,7 @@ const GEMINI_MODELS = [
   'gemini-1.5-flash-8b',
 ];
 
-async function tryGemini(prompt: string): Promise<string | null> {
+async function tryGemini(prompt: string, temperature = 0.8): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.startsWith('your_')) return null;
 
@@ -141,7 +141,7 @@ async function tryGemini(prompt: string): Promise<string | null> {
 
 // ─── OpenAI ───────────────────────────────────────────────────────────────────
 
-async function tryOpenAI(prompt: string): Promise<string | null> {
+async function tryOpenAI(prompt: string, temperature = 0.8): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey.startsWith('your_')) return null;
 
@@ -157,7 +157,7 @@ async function tryOpenAI(prompt: string): Promise<string | null> {
           model,
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 2048,
-          temperature: 0.7,
+          temperature,
         }),
         signal: AbortSignal.timeout(20000),
       });
@@ -179,11 +179,12 @@ async function tryOpenAI(prompt: string): Promise<string | null> {
 
 export async function generateWithAI(
   prompt: string,
-  options: { fieldType?: string; fallbackText?: string } = {}
+  options: { fieldType?: string; fallbackText?: string; temperature?: number } = {}
 ): Promise<string> {
   console.log('🤖 AI Request:', { fieldType: options.fieldType, hasText: !!options.fallbackText });
   
   // Try all AI providers in order — first one that works wins
+  const temperature = options.temperature ?? 0.8;
   const providers = [
     { name: 'Groq', fn: tryGroq },
     { name: 'Gemini', fn: tryGemini },
@@ -193,7 +194,7 @@ export async function generateWithAI(
   for (const provider of providers) {
     try {
       console.log(`🔄 Trying ${provider.name}...`);
-      const result = await provider.fn(prompt);
+      const result = await provider.fn(prompt, temperature);
       if (result && result.trim().length > 0) {
         console.log(`✅ ${provider.name} succeeded!`);
         return result;

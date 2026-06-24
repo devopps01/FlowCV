@@ -1,0 +1,1 @@
+console.log("Creating all block files..."); const fs=require("fs"); const path=require("path"); const DIR="d:/flowcv/src/blocks"; if(!fs.existsSync(DIR))fs.mkdirSync(DIR,{recursive:true}); function w(name,content){ fs.writeFileSync(path.join(DIR,name),content.replace(/\n+/,""),"utf8"); console.log("Created:",name); } 

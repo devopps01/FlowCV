@@ -4,12 +4,17 @@
   "description": "Free Online Resume Builder - Clone of FlowCV",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/network-info.js && next dev -H 0.0.0.0",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start -H 0.0.0.0",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.24.1",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.2",
@@ -20,6 +25,14 @@
     "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-toast": "^1.1.5",
     "@radix-ui/react-tooltip": "^1.0.7",
+    "@tiptap/extension-color": "^2.11.5",
+    "@tiptap/extension-highlight": "^2.11.5",
+    "@tiptap/extension-link": "^2.11.5",
+    "@tiptap/extension-text-align": "^2.11.5",
+    "@tiptap/extension-text-style": "^2.11.5",
+    "@tiptap/extension-underline": "^2.11.5",
+    "@tiptap/react": "^2.11.5",
+    "@tiptap/starter-kit": "^2.11.5",
     "@types/fabric": "^5.3.11",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
@@ -27,7 +40,8 @@
     "fabric": "^7.2.0",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1",
+    "immer": "^11.1.8",
+    "jspdf": "^2.5.2",
     "konva": "8.4.3",
     "lucide-react": "^0.378.0",
     "mongoose": "^8.3.4",
@@ -38,6 +52,7 @@
     "pdfjs-dist": "^5.5.207",
     "puppeteer": "^24.40.0",
     "react": "^18.3.1",
+    "react-contenteditable": "^3.3.7",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.72.0",
     "react-hot-toast": "^2.6.0",
@@ -45,9 +60,11 @@
     "react-redux": "^9.3.0",
     "tailwind-merge": "^2.3.0",
     "zod": "^4.3.6",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.2",
@@ -55,8 +72,10 @@
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
+    "jsdom": "^29.1.1",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
   }
 }

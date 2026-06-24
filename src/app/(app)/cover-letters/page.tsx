@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,7 +9,6 @@ import {
   Mail, Target, CreditCard, GraduationCap, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { AppSidebar } from '@/components/layout/AppSidebar';
 import { useConfirm } from '@/components/ui/ConfirmModal';
 
 interface CoverLetter {
@@ -35,8 +34,92 @@ interface CoverLetter {
     body?: string;
     signature?: {
       fullName?: string;
+      place?: string;
     };
   };
+}
+
+// ─── Cover Letter Thumbnail ────────────────────────────────────────
+function CoverLetterThumbnail({ letter }: { letter: CoverLetter }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.3);
+  const A4_W = 595; // letter width in px
+  const A4_H = 842; // letter height in px
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerW = el.offsetWidth || 200;
+    setScale(containerW / A4_W);
+  }, []);
+
+  const c = letter.content;
+
+  // Check if user has actually filled in meaningful data
+  const hasName = c?.personalInfo?.fullName && c.personalInfo.fullName.trim().length > 0;
+  const hasRecipient = c?.recipient?.name && c.recipient.name.trim().length > 0;
+  const hasRecipientCompany = c?.recipient?.company && c.recipient.company.trim().length > 0;
+  const hasSig = c?.signature?.fullName && c.signature.fullName.trim().length > 0;
+  const hasRealBody = c?.body && c.body.trim() !== 'Dear ______,' && c.body.trim().length > 20;
+  const hasRealData = hasName || hasRecipient || hasRecipientCompany || hasSig || hasRealBody;
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden pointer-events-none select-none" style={{ background: 'var(--app-bg-card)' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: hasRealData ? 'flex-start' : 'center' }}>
+        {hasRealData ? (
+        <div style={{ width: `${A4_W}px`, height: `${A4_H}px`, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+          <div className="w-full h-full p-10 font-serif flex flex-col" style={{ background: 'var(--app-bg-card)', fontFamily: 'Georgia, serif' }}>
+            {/* Title header */}
+            <div className="text-center font-bold text-sm" style={{ color: 'var(--app-text)', borderBottom: '1px solid var(--app-border)', paddingBottom: 8 }}>
+              {letter.title}
+            </div>
+
+            {/* Date */}
+            <div className="text-right text-xs mt-2" style={{ color: 'var(--app-text-muted)' }}>{c?.date}</div>
+
+            {/* Sender info */}
+            <div className="mt-4 space-y-0.5">
+              {c?.personalInfo?.fullName && <div className="font-bold text-base" style={{ color: 'var(--app-text)' }}>{c.personalInfo.fullName}</div>}
+              {c?.personalInfo?.professionalTitle && <div className="text-xs" style={{ color: 'var(--app-text-secondary)' }}>{c.personalInfo.professionalTitle}</div>}
+              {(c?.personalInfo?.email || c?.personalInfo?.phone) && (
+                <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>
+                  {c?.personalInfo?.email}{c?.personalInfo?.phone ? ` | ${c.personalInfo.phone}` : ''}
+                </div>
+              )}
+              {c?.personalInfo?.location && <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{c.personalInfo.location}</div>}
+            </div>
+
+            {/* Recipient */}
+            <div className="mt-6 space-y-0.5">
+              <div className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>To:</div>
+              {c?.recipient?.name && <div className="text-xs" style={{ color: 'var(--app-text-secondary)' }}>{c.recipient.name}</div>}
+              {c?.recipient?.company && <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{c.recipient.company}</div>}
+              {c?.recipient?.address && <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{c.recipient.address}</div>}
+            </div>
+
+            {/* Body */}
+            <div className="mt-6 flex-1 text-xs leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--app-text-secondary)' }}>
+              {c?.body}
+            </div>
+
+            {/* Signature */}
+            <div className="mt-8 border-t pt-3" style={{ borderColor: 'var(--app-border)' }}>
+              {c?.signature?.fullName && <div className="font-bold text-sm" style={{ color: 'var(--app-text)' }}>{c.signature.fullName}</div>}
+              {c?.signature?.place && <div className="text-xs" style={{ color: 'var(--app-text-muted)' }}>{c.signature.place}</div>}
+            </div>
+          </div>
+        </div>
+        ) : (
+          /* No real data — show clean placeholder with title */
+          <div style={{ textAlign: 'center', padding: 20 }}>
+            <FileText className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--app-text-muted)' }} />
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--app-text)' }}>{letter.title}</div>
+            <div style={{ fontSize: 11, marginTop: 4, color: 'var(--app-text-muted)' }}>{letter.template || 'Classic'} template</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function CoverLettersPage() {
@@ -101,7 +184,7 @@ export default function CoverLettersPage() {
       if (data.coverLetter?._id) {
         toast.success('Cover letter created!');
         // Redirect to editor - assuming same pattern as resume
-        router.push(`/cover-letter/${data.coverLetter._id}`);
+        router.push(`/cover-letter?id=${data.coverLetter._id}`);
       }
     } catch (error) {
       console.error('Failed to create cover letter:', error);
@@ -139,12 +222,10 @@ export default function CoverLettersPage() {
   if (!session) return null;
 
   return (
-    <>
-      <div className="flex min-h-screen" style={{ background: 'var(--app-bg-gray)' }}>
-        <AppSidebar />
+    <div style={{ background: 'var(--app-bg-gray)' }}>
 
         {/* Main Content */}
-        <main className="flex-1 ml-64 p-10">
+        <main className="p-6 lg:p-10">
           <div className="max-w-6xl mx-auto">
             <h1 className="text-3xl font-black mb-10" style={{ color: 'var(--app-text)' }}>My Cover Letters</h1>
 
@@ -167,7 +248,7 @@ export default function CoverLettersPage() {
 
               {coverLetters.map((letter) => (
                 <div key={letter._id} className="group flex flex-col">
-                  <div className="relative aspect-[3/4.2] bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1">
+                  <div className="relative aspect-[3/4.2] rounded-xl border shadow-sm overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1" style={{ background: 'var(--app-bg-card)', borderColor: 'var(--app-border)' }}>
                     {/* Preview Image */}
                     {letter.previewImage ? (
                        <div className="relative w-full h-full">
@@ -179,40 +260,15 @@ export default function CoverLettersPage() {
                          />
                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                        </div>
-                     ) : (
-                        /* Real Data Fallback Preview (No dummy text) */
-                        <div className="p-6 h-full flex flex-col gap-3 bg-white text-[8px] font-serif overflow-hidden select-none">
-                          <div className="text-right text-gray-400 mb-2">{letter.content?.date}</div>
-                          
-                          <div className="space-y-0.5">
-                            <div className="font-bold text-gray-900 text-[10px]">{letter.content?.personalInfo?.fullName}</div>
-                            <div className="text-gray-600">{letter.content?.personalInfo?.professionalTitle}</div>
-                            <div className="text-gray-400">
-                              {letter.content?.personalInfo?.email} {letter.content?.personalInfo?.phone && `| ${letter.content.personalInfo.phone}`}
-                            </div>
-                          </div>
-
-                          <div className="mt-4 space-y-0.5">
-                            <div className="font-bold text-gray-900">To:</div>
-                            <div className="text-gray-700">{letter.content?.recipient?.name}</div>
-                            <div className="text-gray-600">{letter.content?.recipient?.company}</div>
-                            <div className="text-gray-500">{letter.content?.recipient?.address}</div>
-                          </div>
-
-                          <div className="mt-4 flex-1 text-gray-700 leading-relaxed line-clamp-[12] whitespace-pre-wrap">
-                            {letter.content?.body}
-                          </div>
-
-                          <div className="mt-auto pt-4 border-t border-gray-50 flex flex-col gap-1">
-                            <div className="font-bold text-gray-900">{letter.content?.signature?.fullName}</div>
-                          </div>
-                        </div>
+                      ) : (
+                        /* Live Preview using A4-like scaled rendering */
+                        <CoverLetterThumbnail letter={letter} />
                       )}
                     
                     {/* Hover Actions */}
                     <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Link
-                        href={`/cover-letter/${letter._id}`}
+                        href={`/cover-letter?id=${letter._id}`}
                         className="px-6 py-3 bg-white text-gray-900 rounded-xl font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform"
                       >
                         Edit letter
@@ -251,8 +307,7 @@ export default function CoverLettersPage() {
             </div>
           </div>
         </main>
-      </div>
       {confirmModal}
-    </>
+    </div>
   );
 }

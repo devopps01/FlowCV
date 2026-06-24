@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { ResumeData } from './types';
 import { readApiResponse } from '@/lib/utils/api-client';
+import { FormatToolbar } from '@/lib/inline-editor/FormatToolbar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ interface StyleOverride {
   fontFamily?: string;
   color?: string;
   backgroundColor?: string;
+  _tag?: string;
 }
 
 interface InlineEditorProps {
@@ -65,6 +67,21 @@ const FONT_FAMILIES = [
 const COLOR_SWATCHES = [
   '#1f2937', '#6366f1', '#8b5cf6', '#ec4899',
   '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ffffff',
+];
+
+const HTML_TAGS = [
+  { value: 'h1', label: 'H1' },
+  { value: 'h2', label: 'H2' },
+  { value: 'h3', label: 'H3' },
+  { value: 'h4', label: 'H4' },
+  { value: 'h5', label: 'H5' },
+  { value: 'h6', label: 'H6' },
+  { value: 'p', label: 'P' },
+  { value: 'span', label: 'Span' },
+  { value: 'div', label: 'Div' },
+  { value: 'strong', label: 'Strong' },
+  { value: 'em', label: 'Em' },
+  { value: 'li', label: 'Li' },
 ];
 
 const TEXTAREA_AI_TAGS = ['impactful', 'metrics', 'shorter', 'professional', 'action_verbs', 'ats'];
@@ -334,6 +351,7 @@ function FloatingPanel({ target, data, updateNested, onClose, zoom }: FloatingPa
   const [textAlign, setTextAlign] = useState(existingStyle.textAlign || '');
   const [fontFamily, setFontFamily] = useState(existingStyle.fontFamily || '');
   const [color, setColor] = useState(existingStyle.color || '');
+  const [selectedTag, setSelectedTag] = useState(existingStyle._tag || '');
 
   const panelWidth = target.fieldType === 'textarea' || target.fieldType === 'date' ? 380 : 320;
 
@@ -570,7 +588,7 @@ function FloatingPanel({ target, data, updateNested, onClose, zoom }: FloatingPa
                 <Minus size={11} />
               </button>
               <span style={{ fontSize: 12, color: '#e2e8f0', minWidth: 28, textAlign: 'center' }}>
-                {fontSize || Math.round((data.design?.fontSize || 10.5) * 1.333)}
+                {fontSize || Math.round((data.design?.fontSize || 12) * 1)}
               </span>
               <button onClick={() => { const base = data.design?.fontSize || 10.5; const cur = fontSize || base; const v = Math.min(48, cur + 1); setFontSize(v); saveStyleOverride({ fontSize: v }); }} style={{ ...btnStyle(false), padding: '4px 6px' }}>
                 <Plus size={11} />
@@ -683,8 +701,41 @@ function FloatingPanel({ target, data, updateNested, onClose, zoom }: FloatingPa
             </div>
           </div>
 
+          {/* Tag selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 11, color: '#94a3b8', width: 70 }}>Tag</span>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <select
+                value={selectedTag}
+                onChange={e => {
+                  const v = e.target.value;
+                  setSelectedTag(v);
+                  saveStyleOverride({ _tag: v || undefined });
+                }}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 6,
+                  color: '#e2e8f0',
+                  fontSize: 12,
+                  padding: '5px 24px 5px 8px',
+                  outline: 'none',
+                  appearance: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="" style={{ background: '#1e1b4b' }}>Default</option>
+                {HTML_TAGS.map(t => (
+                  <option key={t.value} value={t.value} style={{ background: '#1e1b4b' }}>{t.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+            </div>
+          </div>
+
           {/* Reset */}
-          <button onClick={resetStyle} style={{ width: '100%', padding: '7px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#94a3b8', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <button onClick={() => { resetStyle(); setSelectedTag(''); }} style={{ width: '100%', padding: '7px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#94a3b8', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
             <RefreshCw size={11} /> Reset to default
           </button>
         </div>
@@ -752,7 +803,7 @@ function FloatingPanel({ target, data, updateNested, onClose, zoom }: FloatingPa
   );
 }
 
-  // ─── InlineEditor (main component) ───────────────────────────────────────────
+// ─── InlineEditor (main component) ───────────────────────────────────────────
 
 export function InlineEditor({ data, updateNested, children, containerRef, zoom }: InlineEditorProps) {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -897,7 +948,29 @@ export function InlineEditor({ data, updateNested, children, containerRef, zoom 
 
   return (
     <>
-      {/* Fixed overlay for the floating panel - ensures no scrolling when panel opens */}
+      {/* Persistent Google Docs-style Format Toolbar */}
+      <div
+        data-inline-panel="true"
+        style={{
+          position: 'sticky',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          padding: '4px 8px',
+          background: 'var(--app-bg)',
+          borderBottom: '1px solid var(--app-border)',
+        }}
+      >
+        <FormatToolbar
+          target={editTarget}
+          data={data}
+          updateNested={updateNested}
+          onClose={() => setEditTarget(null)}
+        />
+      </div>
+
+      {/* Preview area */}
       <div
         ref={wrapperRef}
         style={{ position: 'relative', width: '100%', height: '100%' }}

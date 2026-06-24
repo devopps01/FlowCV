@@ -7,93 +7,60 @@ type Preset = {
   designPatch: Record<string, any>;
 };
 
-// Deterministic pseudo-random generator (stable across reloads)
-const mulberry32 = (seed: number) => () => {
-  let t = (seed += 0x6D2B79F5);
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-const pick = <T,>(rng: () => number, arr: T[]) => arr[Math.floor(rng() * arr.length)];
-
-const palettes = [
-  { primary: '#ff4d7d', secondary: '#f8fafc', text: '#111827', bg: '#ffffff' },
-  { primary: '#2563eb', secondary: '#f1f5f9', text: '#0f172a', bg: '#ffffff' },
-  { primary: '#10b981', secondary: '#ecfeff', text: '#0f172a', bg: '#ffffff' },
-  { primary: '#f59e0b', secondary: '#fff7ed', text: '#111827', bg: '#ffffff' },
-  { primary: '#8b5cf6', secondary: '#faf5ff', text: '#111827', bg: '#ffffff' },
-  { primary: '#ef4444', secondary: '#fff1f2', text: '#111827', bg: '#ffffff' },
-  { primary: '#06b6d4', secondary: '#ecfeff', text: '#0f172a', bg: '#ffffff' },
-  { primary: '#0ea5e9', secondary: '#f0f9ff', text: '#0f172a', bg: '#ffffff' },
-  { primary: '#111827', secondary: '#f8fafc', text: '#111827', bg: '#ffffff' },
-];
-
 const layouts = ['single', 'sidebar-left', 'sidebar-right', 'modern-header', 'double-header'] as const;
 const headingSizes = ['s', 'm', 'l', 'xl'] as const;
 const nameSizes = ['s', 'm', 'l', 'xl'] as const;
 const shadows = ['none', 'sm', 'md', 'lg'] as const;
 const radii = ['none', 'md', 'lg', 'xl'] as const;
-
-const fontPacks = [
-  { cat: 'sans', family: 'Inter' },
-  { cat: 'sans', family: 'Poppins' },
-  { cat: 'sans', family: 'Montserrat' },
-  { cat: 'sans', family: 'Roboto' },
-  { cat: 'serif', family: 'Merriweather' },
-  { cat: 'serif', family: 'Lora' },
-  { cat: 'serif', family: 'Playfair Display' },
-  { cat: 'mono', family: 'Fira Code' },
-];
-
 const headingIds = HEADING_STYLES.map(h => h.id);
 
-export const DESIGN_PRESETS: Preset[] = Array.from({ length: 1000 }).map((_, i) => {
-  const rng = mulberry32(1337 + i * 97);
-  const pal = pick(rng, palettes);
-  const layout = pick(rng, [...layouts]);
-  const headingStyle = pick(rng, headingIds);
-  const headingSize = pick(rng, [...headingSizes]);
-  const nameSize = pick(rng, [...nameSizes]);
-  const sh = pick(rng, [...shadows]);
-  const rad = pick(rng, [...radii]);
-  const font = pick(rng, fontPacks);
+export const DESIGN_PRESETS: Preset[] = [
+  // ── 1-6: Single Column ──
+  { id: 'executive-pro', name: 'Executive Pro', description: 'single · underline · Inter', designPatch: { primaryColor: '#1e293b', secondaryColor: '#f8fafc', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10.5, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 16, entrySpacing: 8, headingStyle: 'underline_w60_t2', headingSize: 'm', nameSize: 'xl', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings', 'dates', 'dots'] } },
+  { id: 'minimal-clean', name: 'Minimal Clean', description: 'single · plain · Roboto', designPatch: { primaryColor: '#334155', secondaryColor: '#f1f5f9', textColor: '#1e293b', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Roboto', fontSize: 10, lineHeight: 1.6, marginLR: 28, marginTB: 20, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'none', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'headings'] } },
+  { id: 'modern-sleek', name: 'Modern Sleek', description: 'single · badge · Poppins', designPatch: { primaryColor: '#6366f1', secondaryColor: '#eef2ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Poppins', fontSize: 11, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 18, entrySpacing: 8, headingStyle: 'badge_r6', headingSize: 's', nameSize: 'xl', shadow: 'sm', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings', 'dates'] } },
+  { id: 'classic-elegant', name: 'Classic Elegant', description: 'single · double-line · Merriweather', designPatch: { primaryColor: '#92400e', secondaryColor: '#fffbeb', textColor: '#111827', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'serif', fontFamily: 'Merriweather', fontSize: 10.5, lineHeight: 1.55, marginLR: 26, marginTB: 26, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'double-line', headingSize: 'm', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'headingLine', 'dates'] } },
+  { id: 'bold-impact', name: 'Bold Impact', description: 'single · background · Montserrat', designPatch: { primaryColor: '#dc2626', secondaryColor: '#fef2f2', textColor: '#111827', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Montserrat', fontSize: 11, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 20, entrySpacing: 9, headingStyle: 'background_r4', headingSize: 'm', nameSize: 'xl', shadow: 'md', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings', 'dots'] } },
+  { id: 'clean-modern', name: 'Clean Modern', description: 'single · underline · Outfit', designPatch: { primaryColor: '#0891b2', secondaryColor: '#ecfeff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Outfit', fontSize: 10, lineHeight: 1.6, marginLR: 24, marginTB: 22, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'underline_w100_t1', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dates'] } },
 
-  const fontSize = 9 + Math.round(rng() * 6) / 2; // 9..12 with 0.5 steps
-  const lineHeight = 1.2 + Math.round(rng() * 14) / 20; // 1.2..1.9
-  const marginLR = Math.floor(rng() * 26) + 12; // 12..38
-  const marginTB = Math.floor(rng() * 26) + 12;
-  const sectionSpacing = Math.floor(rng() * 14) + 6;
-  const entrySpacing = Math.floor(rng() * 12) + 4;
+  // ── 7-12: Sidebar Left ──
+  { id: 'professional-sidebar', name: 'Professional Sidebar', description: 'sidebar-left · capsule · Inter', designPatch: { primaryColor: '#1e3a5f', secondaryColor: '#f0f4f8', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'capsule_r10', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dots'] } },
+  { id: 'corporate-blue', name: 'Corporate Blue', description: 'sidebar-left · underline · Roboto', designPatch: { primaryColor: '#2563eb', secondaryColor: '#eff6ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Roboto', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'underline_w60_t3', headingSize: 'm', nameSize: 'xl', shadow: 'sm', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'jobTitle', 'headings', 'headingLine', 'dates'] } },
+  { id: 'creative-sidebar', name: 'Creative Sidebar', description: 'sidebar-left · gradient · Space Grotesk', designPatch: { primaryColor: '#7c3aed', secondaryColor: '#f5f3ff', textColor: '#111827', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Space Grotesk', fontSize: 10.5, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 16, entrySpacing: 8, headingStyle: 'gradient', headingSize: 'm', nameSize: 'l', shadow: 'md', borderRadius: 'lg', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'dark-elegant', name: 'Dark Elegant', description: 'sidebar-left · overline · Lora', designPatch: { primaryColor: '#0f172a', secondaryColor: '#1e293b', textColor: '#e2e8f0', backgroundColor: '#0f172a', layout: 'sidebar-left', fontCategory: 'serif', fontFamily: 'Lora', fontSize: 10, lineHeight: 1.6, marginLR: 24, marginTB: 24, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'overline', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dots'] } },
+  { id: 'vibrant-sidebar', name: 'Vibrant Sidebar', description: 'sidebar-left · badge · Poppins', designPatch: { primaryColor: '#e11d48', secondaryColor: '#fff1f2', textColor: '#111827', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Poppins', fontSize: 11, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 18, entrySpacing: 8, headingStyle: 'badge_r20', headingSize: 's', nameSize: 'xl', shadow: 'md', borderRadius: 'md', personalAlign: 'left', applyAccentTo: ['name', 'jobTitle', 'headings'] } },
+  { id: 'tech-startup', name: 'Tech Startup', description: 'sidebar-left · dot · Inter', designPatch: { primaryColor: '#059669', secondaryColor: '#ecfdf5', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'dot', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dots'] } },
 
-  const align = pick(rng, ['left', 'center', 'right'] as const);
+  // ── 13-18: Sidebar Right ──
+  { id: 'executive-sidebar', name: 'Executive Sidebar', description: 'sidebar-right · shadow · Source Sans 3', designPatch: { primaryColor: '#1e293b', secondaryColor: '#f1f5f9', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'sans', fontFamily: 'Source Sans 3', fontSize: 10.5, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'shadow', headingSize: 'm', nameSize: 'xl', shadow: 'none', borderRadius: 'none', personalAlign: 'right', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'modern-sidebar', name: 'Modern Sidebar', description: 'sidebar-right · underline · Karla', designPatch: { primaryColor: '#6366f1', secondaryColor: '#eef2ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'sans', fontFamily: 'Karla', fontSize: 10, lineHeight: 1.55, marginLR: 22, marginTB: 22, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'underline_w80_t2', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'right', applyAccentTo: ['name', 'headings', 'dots'] } },
+  { id: 'luxury-gold', name: 'Luxury Gold', description: 'sidebar-right · double-side · Playfair Display', designPatch: { primaryColor: '#b45309', secondaryColor: '#fffbeb', textColor: '#111827', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'serif', fontFamily: 'Playfair Display', fontSize: 11, lineHeight: 1.5, marginLR: 26, marginTB: 26, sectionSpacing: 18, entrySpacing: 8, headingStyle: 'double-side', headingSize: 'm', nameSize: 'xl', shadow: 'md', borderRadius: 'lg', personalAlign: 'right', applyAccentTo: ['name', 'jobTitle', 'headings', 'headingLine'] } },
+  { id: 'minimal-sidebar', name: 'Minimal Sidebar', description: 'sidebar-right · plain · Inter', designPatch: { primaryColor: '#475569', secondaryColor: '#f8fafc', textColor: '#1e293b', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.6, marginLR: 28, marginTB: 20, sectionSpacing: 12, entrySpacing: 5, headingStyle: 'none', headingSize: 's', nameSize: 'm', shadow: 'none', borderRadius: 'none', personalAlign: 'right', applyAccentTo: ['name'] } },
+  { id: 'nature-green', name: 'Nature Green', description: 'sidebar-right · border-left · Lato', designPatch: { primaryColor: '#16a34a', secondaryColor: '#f0fdf4', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'sans', fontFamily: 'Lato', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'border-left', headingSize: 'm', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'right', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'midnight-sidebar', name: 'Midnight Sidebar', description: 'sidebar-right · badge · Montserrat', designPatch: { primaryColor: '#4338ca', secondaryColor: '#eef2ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'sidebar-right', fontCategory: 'sans', fontFamily: 'Montserrat', fontSize: 10, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'badge_r10', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'right', applyAccentTo: ['name', 'headings'] } },
 
-  return {
-    id: `preset_${i + 1}`,
-    name: `Preset ${i + 1}`,
-    description: `${layout.replace('-', ' ')} · ${headingStyle.split('_')[0]} · ${font.family}`,
-    designPatch: {
-      primaryColor: pal.primary,
-      secondaryColor: pal.secondary,
-      textColor: pal.text,
-      backgroundColor: pal.bg,
-      layout,
-      fontCategory: font.cat,
-      fontFamily: font.family,
-      fontSize,
-      lineHeight,
-      marginLR,
-      marginTB,
-      sectionSpacing,
-      entrySpacing,
-      headingStyle,
-      headingSize,
-      nameSize,
-      shadow: sh,
-      borderRadius: rad,
-      personalAlign: align,
-      applyAccentTo: ['name', 'jobTitle', 'headings', 'headingsLine', 'dates', 'dots'],
-    },
-  };
-});
+  // ── 19-24: Modern Header ──
+  { id: 'modern-header-pro', name: 'Modern Header Pro', description: 'modern-header · underline · Inter', designPatch: { primaryColor: '#0f172a', secondaryColor: '#f8fafc', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10.5, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 16, entrySpacing: 8, headingStyle: 'underline_w40_t2', headingSize: 's', nameSize: 'xl', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'headingLine'] } },
+  { id: 'header-dark', name: 'Header Dark', description: 'modern-header · capsule · Poppins', designPatch: { primaryColor: '#ffffff', secondaryColor: '#1e293b', textColor: '#ffffff', backgroundColor: '#1e293b', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Poppins', fontSize: 10, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'capsule_r20', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings'] } },
+  { id: 'header-gradient', name: 'Header Gradient', description: 'modern-header · gradient · Outfit', designPatch: { primaryColor: '#ffffff', secondaryColor: '#f0f9ff', textColor: '#ffffff', backgroundColor: 'linear-gradient(135deg, #6366f1, #8b5cf6)', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Outfit', fontSize: 10.5, lineHeight: 1.5, marginLR: 24, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'gradient', headingSize: 'm', nameSize: 'xl', shadow: 'md', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'header-split', name: 'Header Split', description: 'modern-header · double-line · Merriweather', designPatch: { primaryColor: '#92400e', secondaryColor: '#fff7ed', textColor: '#111827', backgroundColor: '#ffffff', layout: 'modern-header', fontCategory: 'serif', fontFamily: 'Merriweather', fontSize: 10, lineHeight: 1.55, marginLR: 26, marginTB: 26, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'double-line', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'headingLine'] } },
+  { id: 'header-coral', name: 'Header Coral', description: 'modern-header · badge · Roboto', designPatch: { primaryColor: '#ffffff', secondaryColor: '#fff1f2', textColor: '#ffffff', backgroundColor: '#e11d48', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Roboto', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 8, headingStyle: 'badge_r8', headingSize: 's', nameSize: 'xl', shadow: 'md', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings'] } },
+  { id: 'header-navy', name: 'Header Navy', description: 'modern-header · overline · Inter', designPatch: { primaryColor: '#ffffff', secondaryColor: '#f0f4f8', textColor: '#ffffff', backgroundColor: '#1e3a5f', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'overline', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings'] } },
+
+  // ── 25-30: Double Header ──
+  { id: 'double-header-bold', name: 'Double Header Bold', description: 'double-header · underline · Montserrat', designPatch: { primaryColor: '#0f172a', secondaryColor: '#f1f5f9', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'sans', fontFamily: 'Montserrat', fontSize: 11, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 18, entrySpacing: 8, headingStyle: 'underline_w100_t3', headingSize: 'm', nameSize: 'xl', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings', 'headingLine'] } },
+  { id: 'double-header-teal', name: 'Double Header Teal', description: 'double-header · badge · Inter', designPatch: { primaryColor: '#0d9488', secondaryColor: '#f0fdfa', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'badge_r12', headingSize: 's', nameSize: 'l', shadow: 'md', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'dots'] } },
+  { id: 'double-header-rose', name: 'Double Header Rose', description: 'double-header · dot · Karla', designPatch: { primaryColor: '#be185d', secondaryColor: '#fdf2f8', textColor: '#111827', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'sans', fontFamily: 'Karla', fontSize: 10, lineHeight: 1.55, marginLR: 24, marginTB: 24, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'dot', headingSize: 's', nameSize: 'l', shadow: 'sm', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'double-header-warm', name: 'Double Header Warm', description: 'double-header · double-side · Lora', designPatch: { primaryColor: '#d97706', secondaryColor: '#fffbeb', textColor: '#111827', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'serif', fontFamily: 'Lora', fontSize: 10.5, lineHeight: 1.5, marginLR: 26, marginTB: 26, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'double-side', headingSize: 'm', nameSize: 'xl', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'headingLine'] } },
+  { id: 'double-header-indigo', name: 'Double Header Indigo', description: 'double-header · background · Poppins', designPatch: { primaryColor: '#4338ca', secondaryColor: '#eef2ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'sans', fontFamily: 'Poppins', fontSize: 11, lineHeight: 1.5, marginLR: 20, marginTB: 20, sectionSpacing: 18, entrySpacing: 9, headingStyle: 'background_r6', headingSize: 's', nameSize: 'xl', shadow: 'md', borderRadius: 'md', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings'] } },
+  { id: 'double-header-slate', name: 'Double Header Slate', description: 'double-header · plain · Inter', designPatch: { primaryColor: '#334155', secondaryColor: '#f1f5f9', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'double-header', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.6, marginLR: 28, marginTB: 22, sectionSpacing: 12, entrySpacing: 5, headingStyle: 'none', headingSize: 's', nameSize: 'm', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name'] } },
+
+  // ── 31-36: Extra variations ──
+  { id: 'ats-optimized', name: 'ATS Optimized', description: 'single · underline · Arial', designPatch: { primaryColor: '#111827', secondaryColor: '#ffffff', textColor: '#111827', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Arial', fontSize: 11, lineHeight: 1.4, marginLR: 20, marginTB: 20, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'underline_w100_t1', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'headings'] } },
+  { id: 'compact-pro', name: 'Compact Pro', description: 'single · caps · Inter', designPatch: { primaryColor: '#0f172a', secondaryColor: '#f8fafc', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 9.5, lineHeight: 1.4, marginLR: 16, marginTB: 16, sectionSpacing: 12, entrySpacing: 4, headingStyle: 'underline_w30_t2', headingSize: 's', nameSize: 'm', shadow: 'none', borderRadius: 'none', personalAlign: 'left', applyAccentTo: ['name', 'headings'] } },
+  { id: 'creative-modern', name: 'Creative Modern', description: 'sidebar-left · strikethrough · Space Grotesk', designPatch: { primaryColor: '#c026d3', secondaryColor: '#faf5ff', textColor: '#111827', backgroundColor: '#ffffff', layout: 'sidebar-left', fontCategory: 'sans', fontFamily: 'Space Grotesk', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'strikethrough', headingSize: 'm', nameSize: 'xl', shadow: 'md', borderRadius: 'lg', personalAlign: 'left', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'elegant-serif', name: 'Elegant Serif', description: 'single · double-line · Playfair Display', designPatch: { primaryColor: '#78716c', secondaryColor: '#fafaf9', textColor: '#1c1917', backgroundColor: '#ffffff', layout: 'single', fontCategory: 'serif', fontFamily: 'Playfair Display', fontSize: 10.5, lineHeight: 1.55, marginLR: 28, marginTB: 28, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'double-line', headingSize: 'm', nameSize: 'xl', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'headingLine'] } },
+  { id: 'ocean-blue', name: 'Ocean Blue', description: 'modern-header · border-bottom · Lato', designPatch: { primaryColor: '#0284c7', secondaryColor: '#f0f9ff', textColor: '#0f172a', backgroundColor: '#ffffff', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Lato', fontSize: 10.5, lineHeight: 1.5, marginLR: 22, marginTB: 22, sectionSpacing: 16, entrySpacing: 7, headingStyle: 'border-bottom', headingSize: 'm', nameSize: 'l', shadow: 'sm', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'headings', 'dates'] } },
+  { id: 'premium-dark', name: 'Premium Dark', description: 'modern-header · badge · Inter', designPatch: { primaryColor: '#ffffff', secondaryColor: '#0f172a', textColor: '#ffffff', backgroundColor: '#0f172a', layout: 'modern-header', fontCategory: 'sans', fontFamily: 'Inter', fontSize: 10, lineHeight: 1.5, marginLR: 24, marginTB: 24, sectionSpacing: 14, entrySpacing: 6, headingStyle: 'badge_r6', headingSize: 's', nameSize: 'l', shadow: 'none', borderRadius: 'none', personalAlign: 'center', applyAccentTo: ['name', 'jobTitle', 'headings'] } },
+];
 

@@ -241,16 +241,47 @@ export interface ResumeData {
     photoGrayscale: boolean;
     photoSize: 'xs' | 's' | 'm' | 'l' | 'xl';
     photoShape: 'circle' | 'rounded' | 'square' | 'hexagon';
+    photoPosition: 'left' | 'center' | 'right';
+    profileLayout: 'top' | 'left' | 'right';
 
     // --- Component Specific ---
-    skillsStyle: 'grid' | 'level' | 'compact' | 'bubble';
+    skillsStyle: 'default' | 'grid' | 'level' | 'compact' | 'bubble';
     skillsColumns: number;
-    languagesStyle: 'grid' | 'level' | 'compact' | 'bubble';
+    languagesStyle: 'default' | 'grid' | 'level' | 'compact' | 'bubble';
     languagesColumns: number;
-    interestsStyle: 'grid' | 'compact' | 'bubble';
+    languagesGap?: number;
+    languagesWrap?: 'wrap' | 'nowrap';
+    languagesDirection?: 'row' | 'column';
+    languagesAlign?: 'start' | 'center' | 'end' | 'stretch';
+    languagesJustify?: 'start' | 'center' | 'end' | 'between';
+    interestsStyle: 'default' | 'grid' | 'compact' | 'bubble';
     interestsColumns: number;
-    certificationsStyle: 'grid' | 'compact' | 'bubble';
+    certificationsStyle: 'default' | 'grid' | 'compact' | 'bubble';
     certificationsColumns: number;
+    awardsStyle: 'default' | 'grid' | 'compact' | 'bubble';
+    coursesStyle: 'grid' | 'compact' | 'bubble';
+    projectsStyle: 'grid' | 'compact' | 'bubble';
+    linksStyle: 'inline' | 'list' | 'grid';
+    linksColumns?: number;
+    linksGap?: number;
+    linksDirection?: 'row' | 'column';
+    linksWrap?: 'wrap' | 'nowrap';
+    linksAlign?: 'start' | 'center' | 'end' | 'stretch';
+    linksJustify?: 'start' | 'center' | 'end' | 'between';
+    organisationsStyle: 'grid' | 'compact' | 'bubble';
+    publicationsStyle: 'grid' | 'compact' | 'bubble';
+    referencesStyle: 'default' | 'grid' | 'compact' | 'bubble';
+    referencesColumns: number;
+    referencesGap?: number;
+    referencesWrap?: 'wrap' | 'nowrap';
+    referencesDirection?: 'row' | 'column';
+    referencesAlign?: 'start' | 'center' | 'end' | 'stretch';
+    referencesJustify?: 'start' | 'center' | 'end' | 'between';
+
+    // --- Per-Section Heading Visibility ---
+    sectionHeadingShow?: Record<string, boolean>;
+    sectionHeadingStyle?: Record<string, string>;
+    sectionAccentColor?: Record<string, string>;
 
     // --- Summary ---
     showSummaryHeading: boolean;
@@ -265,6 +296,9 @@ export interface ResumeData {
     borderRadius?: 'none' | 'md' | 'lg' | 'xl';
     shadow?: 'none' | 'sm' | 'md' | 'lg';
     sectionTitles?: Record<string, string>;
+
+    // --- Page Size ---
+    pageSize?: 'a4' | 'letter' | 'legal' | 'a3' | 'b5' | 'a5';
   };
   activeSections: string[];
   // Per-element style overrides: key = data-edit-path, value = CSS properties

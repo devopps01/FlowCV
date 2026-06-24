@@ -113,6 +113,8 @@ function buildDesign(t: TemplateData): ResumeData['design'] {
     photoGrayscale: false,
     photoSize: 'm' as const,
     photoShape: 'circle' as const,
+    photoPosition: 'center' as const,
+    profileLayout: 'top' as const,
     skillsStyle: 'grid' as const,
     skillsColumns: 2,
     languagesStyle: 'grid' as const,
@@ -121,10 +123,37 @@ function buildDesign(t: TemplateData): ResumeData['design'] {
     interestsColumns: 2,
     certificationsStyle: 'grid' as const,
     certificationsColumns: 2,
+    awardsStyle: 'grid' as const,
+    coursesStyle: 'grid' as const,
+    projectsStyle: 'grid' as const,
+    linksStyle: 'inline' as const,
+    organisationsStyle: 'grid' as const,
+    publicationsStyle: 'grid' as const,
+    referencesStyle: 'grid' as const,
+    sectionAccentColor: {},
+    sectionHeadingShow: {},
+    sectionHeadingStyle: {},
     showSummaryHeading: true,
     educationOrder: 'degree-school' as const,
     workOrder: 'title-employer' as const,
     workGroupPromotions: false,
+    referencesColumns: 1,
+    referencesGap: 4,
+    referencesDirection: 'row',
+    referencesWrap: 'wrap',
+    referencesAlign: 'start',
+    referencesJustify: 'start',
+    languagesGap: 4,
+    languagesDirection: 'row',
+    languagesWrap: 'wrap',
+    languagesAlign: 'start',
+    languagesJustify: 'start',
+    linksColumns: 2,
+    linksGap: 4,
+    linksDirection: 'row',
+    linksWrap: 'wrap',
+    linksAlign: 'start',
+    linksJustify: 'start',
     applyAccentTo: ['headings', 'headingLine'],
   };
 }
@@ -156,7 +185,7 @@ function TemplateCard({ template, selected, creating, onUse, onPreview }: any) {
   }, []);
 
   return (
-    <motion.div 
+    <motion.div
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -167,13 +196,14 @@ function TemplateCard({ template, selected, creating, onUse, onPreview }: any) {
         ref={cardRef}
         className={`relative rounded-3xl overflow-hidden cursor-pointer transition-all duration-500
           shadow-md hover:shadow-2xl hover:-translate-y-2
+          !bg-white
           ${selected ? 'ring-4 ring-[var(--app-primary)]' : 'ring-1 ring-[var(--app-border)]'}`}
-        style={{ aspectRatio: '210/297', backgroundColor: 'var(--app-bg-card)' }}
+        style={{ aspectRatio: '210/297', backgroundColor: '#ffffff !important' }}
       >
         <div
           style={{
             width: '794px',
-            height: `${794 * (297 / 210)}px`,
+            height: '1123px',
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
             pointerEvents: 'none',
@@ -186,6 +216,7 @@ function TemplateCard({ template, selected, creating, onUse, onPreview }: any) {
             numPages={1}
             zoomLevel={100}
             isThumbnail={true}
+            contentWidth={770}
           />
         </div>
 
@@ -271,7 +302,7 @@ export default function TemplatesPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--app-primary-light)] text-[var(--app-primary)] text-sm font-black mb-6"
@@ -279,7 +310,7 @@ export default function TemplatesPage() {
             <Sparkles className="w-4 h-4" />
             200+ Premium Templates
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -287,7 +318,7 @@ export default function TemplatesPage() {
           >
             Choose Your <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--app-primary)] to-[var(--app-secondary)]">Perfect</span> Design
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -336,7 +367,7 @@ export default function TemplatesPage() {
             <p className="font-black uppercase tracking-widest text-[10px] text-[var(--app-text-muted)]">Loading Masterpieces...</p>
           </div>
         ) : (
-          <motion.div 
+          <motion.div
             layout
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 lg:gap-10"
           >
@@ -369,14 +400,14 @@ export default function TemplatesPage() {
       {/* Full Screen Preview Modal */}
       <AnimatePresence>
         {previewTemplate && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 bg-black/80 backdrop-blur-md"
             onClick={() => setPreviewTemplate(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -398,7 +429,7 @@ export default function TemplatesPage() {
                     {creatingId === previewTemplate.mainsection.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <LayoutIcon className="w-5 h-5" />}
                     Use Template
                   </button>
-                  <button 
+                  <button
                     onClick={() => setPreviewTemplate(null)}
                     className="p-3 rounded-2xl bg-[var(--app-bg-gray)] hover:bg-[var(--app-border)] transition-all"
                   >
@@ -408,24 +439,24 @@ export default function TemplatesPage() {
               </div>
 
               <div className="flex-1 overflow-auto bg-[var(--app-bg-medium)] p-8 flex justify-center">
-                 <div className="w-[794px] bg-white shadow-2xl origin-top" style={{ transform: 'scale(0.85)' }}>
-                    <ResumePreview
-                      data={buildResumeData(previewTemplate)}
-                      numPages={1}
-                      zoomLevel={100}
-                    />
-                 </div>
+                <div className="w-[794px] bg-white shadow-2xl origin-top" style={{ transform: 'scale(0.85)' }}>
+                  <ResumePreview
+                    data={buildResumeData(previewTemplate)}
+                    numPages={1}
+                    zoomLevel={100}
+                  />
+                </div>
               </div>
 
               <div className="p-6 sm:hidden border-t border-[var(--app-border)]">
-                 <button
-                    onClick={() => handleUseTemplate(previewTemplate)}
-                    disabled={creatingId === previewTemplate.mainsection.id}
-                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white shadow-xl"
-                    style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
-                  >
-                    Use Template
-                  </button>
+                <button
+                  onClick={() => handleUseTemplate(previewTemplate)}
+                  disabled={creatingId === previewTemplate.mainsection.id}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-white shadow-xl"
+                  style={{ background: 'linear-gradient(135deg, var(--app-primary), var(--app-secondary))' }}
+                >
+                  Use Template
+                </button>
               </div>
             </motion.div>
           </motion.div>

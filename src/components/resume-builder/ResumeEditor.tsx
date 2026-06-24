@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useResponsive } from '@/hooks/useResponsive';
 import {
   Loader2, FileDown, ZoomIn, ZoomOut, RotateCcw,
   Save, Share2, Printer, Undo2, Redo2, Copy,
   Clipboard, FileText, Palette, ArrowLeft, Settings2,
-  Sparkles,
+  Sparkles, Menu, X, Eye, ChevronLeft,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,6 +21,7 @@ import TemplateModal from './TemplateModal';
 import { DESIGN_PRESETS } from './design-presets';
 import { EditorTopBar } from './EditorTopBar';
 import { InlineEditor } from './InlineEditor';
+import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
 
 interface ResumeEditorProps {
   id: string;
@@ -37,24 +40,62 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
   const [isExporting, setIsExporting] = useState(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [showAdvancedStyle, setShowAdvancedStyle] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [editorWidth, setEditorWidth] = useState(380);
+  const [isResizing, setIsResizing] = useState(false);
   const [history, setHistory] = useState<ResumeData[]>([initialData]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [clipboard, setClipboard] = useState<any>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const { isMobile, isTablet, isDesktop } = useResponsive();
+  const isSmallScreen = isMobile || isTablet;
 
-  // Build template list from design presets (first 200 for performance)
+  const A4_WIDTH = 794;
+  const A4_HEIGHT = 1123;
+  // Calculate mobile zoom so A4 page fits screen width with padding
+  const [screenWidth, setScreenWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 375);
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const maxMobileWidth = screenWidth - 16;
+  const mobileZoom = Math.min(Math.floor((maxMobileWidth / A4_WIDTH) * 100), 85);
+  const mobileScaledHeight = Math.round(A4_HEIGHT * (mobileZoom / 100));
+  const mobileNegativeMargin = A4_HEIGHT - mobileScaledHeight;
+  const effectivePreviewZoom = isSmallScreen && previewOpen ? mobileZoom : zoomLevel;
+
+  // Drag resize handler
+  useEffect(() => {
+    if (isSmallScreen || !isDesktop) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = e.clientX;
+      if (newWidth >= 300 && newWidth <= 900) {
+        setEditorWidth(newWidth);
+      }
+    };
+    const handleMouseUp = () => setIsResizing(false);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, isSmallScreen, isDesktop]);
+
+  useEffect(() => {
+    if (isSmallScreen) setSidebarCollapsed(false);
+  }, [isSmallScreen]);
+
   const builtTemplates = useMemo(() => {
-    return DESIGN_PRESETS.slice(0, 200).map(preset => ({
-      mainsection: {
-        id: preset.id,
-        name: preset.name,
-        resumeinfo: { isPremium: false },
-      },
-      secondary: {
-        style: { ...initialData.design, ...preset.designPatch },
-        data: {},
-      },
+    return DESIGN_PRESETS.map(preset => ({
+      mainsection: { id: preset.id, name: preset.name, resumeinfo: { isPremium: false } },
+      secondary: { style: { ...initialData.design, ...preset.designPatch }, data: {} },
     }));
   }, [initialData.design]);
 
@@ -65,79 +106,53 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
       const response = await fetch(`/api/resumes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: data.title,
-          template: data.template,
-          content: data.content,
-          design: data.design,
-          activeSections: data.activeSections,
-          styleOverrides: data.styleOverrides,
-        }),
+        body: JSON.stringify({ title: data.title, template: data.template, content: data.content, design: data.design, activeSections: data.activeSections, styleOverrides: data.styleOverrides }),
       });
-
-      if (response.ok) {
-        if (showToast) toast.success('Changes saved', { icon: '💾' });
-      } else {
-        throw new Error('Save failed');
-      }
-    } catch (e) {
-      if (showToast) toast.error('Save failed');
-    } finally {
-      setSaving(false);
-    }
+      if (response.ok) { if (showToast) toast.success('Changes saved', { icon: '💾', id: 'save-toast' }); }
+      else throw new Error('Save failed');
+    } catch (e) { if (showToast) toast.error('Save failed', { id: 'save-toast' }); }
+    finally { setSaving(false); }
   };
 
-  // Capture a screenshot of the resume and save it to the server
   const captureScreenshot = useCallback(async () => {
-    const el = document.getElementById('resume-preview');
-    if (!el) return;
-    try {
-      // Dynamically import html2canvas to avoid SSR issues
-      const html2canvas = (await import('html2canvas')).default;
-      // Wait for fonts/layout to settle
-      await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 300));
-
-      const canvas = await html2canvas(el, {
-        scale: 0.5,           // 50% scale — enough for a thumbnail, small file size
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-        windowWidth: el.offsetWidth,
-        windowHeight: el.offsetHeight,
-      });
-
-      const imageData = canvas.toDataURL('image/png');
-
-      // POST to screenshot API — fire and forget
-      fetch(`/api/resumes/${id}/screenshot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageData }),
-      }).catch(() => {/* silent fail */});
-    } catch {
-      // Screenshot capture is non-critical — fail silently
+    // Try multiple times to find the preview element — it may not be rendered yet
+    let el = document.getElementById('resume-preview');
+    if (!el) {
+      await new Promise(r => setTimeout(r, 1000));
+      el = document.getElementById('resume-preview');
     }
+    if (!el) {
+      await new Promise(r => setTimeout(r, 1000));
+      el = document.getElementById('resume-preview');
+    }
+    if (!el) return false;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      await document.fonts.ready;
+      await new Promise(r => setTimeout(r, 800));
+      const canvas = await html2canvas(el, { scale: 0.5, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false, width: el.offsetWidth, height: el.offsetHeight });
+      const res = await fetch(`/api/resumes/${id}/screenshot`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageData: canvas.toDataURL('image/png') }) });
+      return res.ok;
+    } catch (err) { console.error('Screenshot capture failed:', err); }
+    return false;
   }, [id]);
 
-  useEffect(() => {
-    // Auto-save with 500ms delay
-    const timeoutId = setTimeout(() => handleSave(false), 500);
-    return () => clearTimeout(timeoutId);
-  }, [data, id]);
+  // Auto-save on data change
+  useEffect(() => { const t = setTimeout(() => handleSave(false), 500); return () => clearTimeout(t); }, [data, id]);
+  // Auto-capture screenshot after data change (delayed)
+  useEffect(() => { const t = setTimeout(() => captureScreenshot(), 4000); return () => clearTimeout(t); }, [data, id]);
 
-  // Screenshot capture — debounced at 4s after last change (non-blocking)
-  useEffect(() => {
-    const timeoutId = setTimeout(() => captureScreenshot(), 4000);
-    return () => clearTimeout(timeoutId);
-  }, [data, id]);
+  const goToDashboard = useCallback(async () => {
+    // Force save first
+    if (!saving) {
+      await handleSave(false);
+    }
+    // Then capture screenshot synchronously
+    await captureScreenshot();
+    // Small delay to let screenshot API complete
+    setTimeout(() => router.push('/dashboard'), 500);
+  }, [id, saving, handleSave, captureScreenshot, router]);
 
-  // numPages is now synced from ResumePreview via onPageCountChange
-
-  // History management
   const addToHistory = useCallback((newData: ResumeData) => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(newData);
@@ -146,24 +161,12 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
   }, [history, historyIndex]);
 
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setData(history[newIndex]);
-      toast.success('Undo successful');
-    }
+    if (historyIndex > 0) { setHistoryIndex(historyIndex - 1); setData(history[historyIndex - 1]); toast.success('Undo successful'); }
   }, [history, historyIndex]);
-
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setData(history[newIndex]);
-      toast.success('Redo successful');
-    }
+    if (historyIndex < history.length - 1) { setHistoryIndex(historyIndex + 1); setData(history[historyIndex + 1]); toast.success('Redo successful'); }
   }, [history, historyIndex]);
 
-  // Update nested data
   const updateNested = useCallback((path: string, value: any) => {
     setData(prev => {
       const newData = JSON.parse(JSON.stringify(prev));
@@ -180,472 +183,235 @@ const ResumeEditor: React.FC<ResumeEditorProps> = ({ id, initialData, templates 
     });
   }, [addToHistory]);
 
-  // Copy/Paste functionality
   const copySection = useCallback(() => {
-    if (selectedSectionId) {
-      const sectionData = data[selectedSectionId as keyof ResumeData];
-      setClipboard({ type: 'section', data: sectionData });
-      toast.success('Section copied');
-    }
+    if (selectedSectionId) { setClipboard({ type: 'section', data: data[selectedSectionId as keyof ResumeData] }); toast.success('Section copied'); }
   }, [selectedSectionId, data]);
-
   const pasteSection = useCallback(() => {
-    if (clipboard && clipboard.type === 'section') {
-      const newSectionId = `${clipboard.type}_${Date.now()}`;
-      setData(prev => ({
-        ...prev,
-        [newSectionId]: clipboard.data
-      }));
-      toast.success('Section pasted');
-    }
+    if (clipboard && clipboard.type === 'section') { setData(prev => ({ ...prev, [`${clipboard.type}_${Date.now()}`]: clipboard.data })); toast.success('Section pasted'); }
   }, [clipboard]);
 
-  // Export PDF — uses server-side Puppeteer for pixel-perfect output matching the preview
   const exportPDF = useCallback(async () => {
-    const pageElements = document.querySelectorAll('.resume-page');
+    const pageElements = document.querySelectorAll('.resume-print-page');
     if (pageElements.length === 0) return;
-
     setIsExporting(true);
     toast.loading('Generating PDF...', { id: 'pdf' });
-
     try {
       await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 600));
-
-      const usedFonts = new Set<string>();
-      usedFonts.add(data.design.fontFamily || 'Inter');
-      if (data.styleOverrides) {
-        Object.values(data.styleOverrides).forEach((style: any) => {
-          if (style.fontFamily) usedFonts.add(style.fontFamily);
-        });
-      }
-      
-      const fontLinks = Array.from(usedFonts).map(font => {
-        const query = font.replace(/\s+/g, '+');
-        return `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${query}:wght@400;500;600;700;900&display=swap">`;
-      }).join('\n');
-
-      const allStyles = Array.from(document.styleSheets)
-        .map(sheet => {
-          try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); }
-          catch { return ''; }
-        })
-        .join('\n');
-
-      const getAbsoluteUrl = (url: string) => {
-        if (!url) return '';
-        if (url.startsWith('http') || url.startsWith('data:')) return url;
-        return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
-      };
-
-      const container = document.createElement('div');
-      pageElements.forEach((el, index) => {
+      await new Promise(r => setTimeout(r, 500));
+      const fontFamily = data.design.fontFamily || 'Inter';
+      const fontQuery = fontFamily.replace(/\s+/g, '+');
+      const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
+      const allStyles = Array.from(document.styleSheets).map(sheet => { try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); } catch { return ''; } }).join('\n');
+      const pageSizeKey = data.design.pageSize || 'a4';
+      const PAGE_SIZES_MM: Record<string, { width: string; height: string }> = { a4: { width: '210mm', height: '297mm' }, letter: { width: '216mm', height: '279mm' }, legal: { width: '216mm', height: '356mm' }, a3: { width: '297mm', height: '420mm' }, b5: { width: '176mm', height: '250mm' }, a5: { width: '148mm', height: '210mm' } };
+      const pageMM = PAGE_SIZES_MM[pageSizeKey] || PAGE_SIZES_MM.a4;
+      const filteredPages = Array.from(pageElements).filter(el => el.querySelectorAll('[data-resume-section]').length > 0 || el.querySelectorAll('[data-resume-block]').length > 0 || el.querySelectorAll('img').length > 0);
+      const pagesHtml = filteredPages.map(el => {
         const clone = el.cloneNode(true) as HTMLElement;
-        clone.style.transform = 'none';
-        clone.style.boxShadow = 'none';
-        clone.style.margin = '0 auto 20px auto';
-        clone.style.pageBreakAfter = index === pageElements.length - 1 ? 'auto' : 'always';
-        
-        clone.querySelectorAll('img').forEach(img => {
-          const src = img.getAttribute('src');
-          if (src) img.setAttribute('src', getAbsoluteUrl(src));
-        });
-
+        const isLastPage = el === filteredPages[filteredPages.length - 1];
+        clone.style.cssText = `width: ${pageMM.width} !important; height: ${pageMM.height} !important; transform: none !important; box-shadow: none !important; overflow: hidden !important; margin: 0 !important; border-radius: 0 !important; font-family: '${fontFamily}', sans-serif !important; page-break-after: ${isLastPage ? 'auto' : 'always'}; break-after: ${isLastPage ? 'auto' : 'page'};`;
         clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
         clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
-        
-        container.appendChild(clone);
-      });
-
-      const fullHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  ${fontLinks}
-  <style>
-    ${allStyles}
-    body { margin: 0; background: #eee; }
-    .resume-page {
-      width: 794px;
-      margin: 0 auto;
-      background: white;
-      box-sizing: border-box;
-      overflow: hidden;
-      page-break-after: always;
-    }
-  </style>
-</head>
-<body>${container.innerHTML}</body>
-</html>`;
-
-      const response = await fetch('/api/export/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: fullHtml, title: data.title }),
-      });
-
+        return clone.outerHTML;
+      }).join('\n');
+      const response = await fetch('/api/export/pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ html: `<!DOCTYPE html><html><head><link rel="stylesheet" href="${fontUrl}"><style>${allStyles}*,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}@page{size:${pageMM.width} ${pageMM.height};margin:0}</style></head><body>${pagesHtml}</body></html>`, title: data.title || 'Resume', pageSize: pageSizeKey }) });
       if (!response.ok) throw new Error('PDF generation failed');
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${data.title || 'Resume'}.pdf`;
-      a.click();
+      a.href = url; a.download = `${data.title || 'Resume'}.pdf`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success('PDF downloaded!', { id: 'pdf' });
-    } catch (err: any) {
-      toast.error('Failed to export PDF', { id: 'pdf' });
-    } finally {
-      setIsExporting(false);
-    }
+    } catch (err: any) { toast.error('Failed to export PDF: ' + (err.message || 'Unknown error'), { id: 'pdf' }); }
+    finally { setIsExporting(false); }
   }, [id, data]);
 
-  // Print functionality — proper A4 single-page print
   const printResume = useCallback(() => {
-    const el = document.getElementById('resume-preview');
-    if (!el) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
+    const pageElements = document.querySelectorAll('.resume-print-page');
+    if (pageElements.length === 0) return;
+    const pw = window.open('', '_blank');
+    if (!pw) return;
     const fontFamily = data.design.fontFamily || 'Inter';
-    const fontQuery = fontFamily.replace(/\s+/g, '+');
-    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
-
-    // Collect all computed CSS rules
-    const allStyles = Array.from(document.styleSheets)
-      .map(sheet => {
-        try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n'); }
-        catch { return ''; }
-      })
-      .join('\n');
-
-    // Clone and clean the resume element
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.style.cssText = `
-      width: 210mm !important;
-      min-height: auto !important;
-      height: auto !important;
-      transform: none !important;
-      box-shadow: none !important;
-      overflow: visible !important;
-      margin: 0 !important;
-      font-family: '${fontFamily}', sans-serif !important;
-    `;
-    // Remove interactive UI elements
-    clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
-    clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
-    // Ensure all children overflow visible
-    clone.querySelectorAll('*').forEach(child => {
-      const c = child as HTMLElement;
-      if (c.style?.overflow === 'hidden') c.style.overflow = 'visible';
-      if (c.style?.maxHeight) c.style.maxHeight = 'none';
-    });
-
-    printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>${data.title || 'Resume'}</title>
-  <link rel="stylesheet" href="${fontUrl}">
-  <style>
-    ${allStyles}
-    *, *::before, *::after {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      box-sizing: border-box;
-    }
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      background: white !important;
-      width: 210mm;
-    }
-    @page {
-      size: A4 portrait;
-      margin: 0;
-    }
-    @media print {
-      html, body { margin: 0 !important; padding: 0 !important; }
-      #resume-preview {
-        min-height: auto !important;
-        height: auto !important;
-        page-break-after: avoid;
-        break-after: avoid;
-      }
-    }
-  </style>
-</head>
-<body>${clone.outerHTML}</body>
-</html>`);
-
-    printWindow.document.close();
-
-    const doPrint = () => {
-      printWindow.focus();
-      printWindow.print();
-      setTimeout(() => { if (!printWindow.closed) printWindow.close(); }, 1000);
-    };
-
-    // Wait for fonts then print
-    if (printWindow.document.fonts) {
-      printWindow.document.fonts.ready.then(() => setTimeout(doPrint, 300));
-    } else {
-      setTimeout(doPrint, 800);
-    }
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700;900&display=swap`;
+    const pageSizeKey = data.design.pageSize || 'a4';
+    const PAGE_SIZES_MM: Record<string, { width: string; height: string }> = { a4: { width: '210mm', height: '297mm' }, letter: { width: '216mm', height: '279mm' }, legal: { width: '216mm', height: '356mm' }, a3: { width: '297mm', height: '420mm' }, b5: { width: '176mm', height: '250mm' }, a5: { width: '148mm', height: '210mm' } };
+    const pageMM = PAGE_SIZES_MM[pageSizeKey] || PAGE_SIZES_MM.a4;
+    const pagesHtml = Array.from(pageElements).map(el => {
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.style.cssText = `width: ${pageMM.width} !important; height: ${pageMM.height} !important; min-height: auto !important; transform: none !important; box-shadow: none !important; overflow: hidden !important; margin: 0 !important; border-radius: 0 !important; font-family: '${fontFamily}', sans-serif !important; page-break-after: always; break-after: page;`;
+      clone.querySelectorAll('[data-drag-handle]').forEach(e => e.remove());
+      clone.querySelectorAll('.group\\/section > button').forEach(e => e.remove());
+      return clone.outerHTML;
+    }).join('\n');
+    pw.document.write(`<!DOCTYPE html><html><head><link rel="stylesheet" href="${fontUrl}"><style>@page{size:${pageMM.width} ${pageMM.height};margin:0}*,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head><body>${pagesHtml}</body></html>`);
+    pw.document.close();
+    const doPrint = () => { pw.focus(); pw.print(); setTimeout(() => { if (!pw.closed) pw.close(); }, 1000); };
+    if (pw.document.fonts) pw.document.fonts.ready.then(() => setTimeout(doPrint, 300)); else setTimeout(doPrint, 800);
   }, [data]);
 
-  // Share functionality
   const shareResume = useCallback(async () => {
     try {
-      const shareData = {
-        title: data.title || 'My Resume',
-        text: 'Check out my resume',
-        url: window.location.href
-      };
-
-      if (navigator.share) {
-        await navigator.share(shareData);
-        toast.success('Resume shared successfully');
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        toast.success('Resume link copied to clipboard');
-      }
-    } catch (err) {
-      console.error('Share failed', err);
-      toast.error('Failed to share resume');
-    }
+      if (navigator.share) { await navigator.share({ title: data.title || 'My Resume', text: 'Check out my resume', url: window.location.href }); toast.success('Resume shared successfully'); }
+      else { await navigator.clipboard.writeText(window.location.href); toast.success('Resume link copied to clipboard'); }
+    } catch { toast.error('Failed to share resume'); }
   }, [data]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key) {
-          case 'z':
-            e.preventDefault();
-            if (e.shiftKey) {
-              redo();
-            } else {
-              undo();
-            }
-            break;
-          case 'y':
-            e.preventDefault();
-            redo();
-            break;
-          case 's':
-            e.preventDefault();
-            exportPDF();
-            break;
-          case 'c':
-            if (selectedSectionId) {
-              e.preventDefault();
-              copySection();
-            }
-            break;
-          case 'v':
-            if (clipboard) {
-              e.preventDefault();
-              pasteSection();
-            }
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, exportPDF, copySection, pasteSection, selectedSectionId, clipboard]);
-
   return (
-    <div className="flex flex-col h-screen overflow-hidden font-sans" style={{ background: 'var(--app-bg)' }}>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: 'var(--app-bg-card)',
-            color: 'var(--app-text)',
-            border: '1px solid var(--app-border)',
-            borderRadius: '12px',
-            fontSize: '13px',
-            fontWeight: '600',
-            boxShadow: 'var(--app-shadow-md)',
-          },
-          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
-          error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-        }}
-      />
+    <div className="flex flex-col h-screen font-sans" style={{ background: 'var(--app-bg)' }}>
+      <Toaster position="top-center" toastOptions={{ duration: 3000, style: { background: 'var(--app-bg-card)', color: 'var(--app-text)', border: '1px solid var(--app-border)', borderRadius: '12px', fontSize: '13px', fontWeight: '600', boxShadow: 'var(--app-shadow-md)' }, success: { iconTheme: { primary: '#10b981', secondary: '#fff' } }, error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } } }} />
 
-      {/* ── Top Bar ── */}
-      <EditorTopBar
-        data={data}
-        updateDesign={(key, value) => updateNested(`design.${key}`, value)}
-        updateNested={updateNested}
-        onUndo={undo}
-        onRedo={redo}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        onSave={() => handleSave(true)}
-        onExport={exportPDF}
-        onPrint={printResume}
-        onShare={shareResume}
-        saving={saving}
-        isExporting={isExporting}
-        zoomLevel={zoomLevel}
-        onZoomIn={() => setZoomLevel(z => Math.min(z + 10, 150))}
-        onZoomOut={() => setZoomLevel(z => Math.max(z - 10, 50))}
-        onZoomReset={() => setZoomLevel(100)}
-        numPages={numPages}
-      />
+      {/* Top Bar */}
+      {isDesktop ? (
+        <div className="relative shrink-0" style={{ zIndex: 99999 }}>
+          <EditorTopBar data={data} updateDesign={(k,v) => updateNested(`design.${k}`, v)} updateNested={updateNested}
+            onUndo={undo} onRedo={redo} canUndo={historyIndex > 0} canRedo={historyIndex < history.length - 1}
+            onSave={() => handleSave(true)} onExport={exportPDF} onPrint={printResume} onShare={shareResume}
+            saving={saving} isExporting={isExporting} onMenuToggle={() => undefined}
+            zoomLevel={zoomLevel} onZoomIn={() => setZoomLevel(z => Math.min(z + 10, 150))}
+            onZoomOut={() => setZoomLevel(z => Math.max(z - 10, 50))} onZoomReset={() => setZoomLevel(100)} numPages={numPages}
+            onDashboard={goToDashboard} />
+        </div>
+      ) : (
+        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ background: 'var(--app-bg-card)', borderColor: 'var(--app-border)' }}>
+          <div className="flex-1 pr-3">
+            <input value={data.title} onChange={e => updateNested('title', e.target.value)} className="w-full text-sm font-black bg-transparent border-none focus:ring-0 truncate" style={{ color: 'var(--app-text)' }} placeholder="Resume title" />
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`w-2.5 h-2.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>{saving ? 'Saving...' : 'Saved'}</span>
+            </div>
+          </div>
+          <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-xl hover:bg-gray-100" style={{ color: 'var(--app-text-secondary)' }}><Settings2 className="w-5 h-5" /></button>
+        </div>
+      )}
 
-      {/* ── Main area ── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Left Sidebar ── */}
-        <div
-          className="w-[420px] flex flex-col border-r z-20 shrink-0 overflow-hidden"
-          style={{ background: 'var(--app-bg-card)', borderColor: 'var(--app-border)' }}
-        >
-          {/* Back + Title */}
-          <div
-            className="px-4 py-3 flex items-center justify-between border-b shrink-0"
-            style={{ borderColor: 'var(--app-border)' }}
-          >
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="p-2 rounded-xl transition-all hover:bg-gray-100 group"
-                style={{ color: 'var(--app-text-secondary)' }}
+      <div className="flex flex-1 overflow-hidden relative">
+        {!previewOpen || !isSmallScreen ? (
+          <div className="flex flex-1 overflow-hidden">
+              {/* Editor Panel — Collapsible with smooth animation */}
+              <CollapsiblePanel
+                collapsed={sidebarCollapsed}
+                onToggle={() => setSidebarCollapsed(v => !v)}
+                expandedWidth={isSmallScreen ? 600 : editorWidth}
+                collapsedWidth={48}
+                duration={300}
+                side="left"
+                className={`pb-24 lg:pb-0 ${isSmallScreen ? 'flex-1' : ''}`}
+                header={
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+                    <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>{saving ? 'Saving...' : 'Saved'}</span>
+                    <span className="mx-2 text-[var(--app-border)]">|</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>{activeTab === 'content' ? 'Content' : 'Design'}</span>
+                  </div>
+                }
               >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-              </button>
-              <div>
-                <input
-                  value={data.title}
-                  onChange={e => updateNested('title', e.target.value)}
-                  className="text-sm font-black bg-transparent border-none focus:ring-0 w-36 truncate"
-                  style={{ color: 'var(--app-text)' }}
-                />
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-green-400'}`} />
-                  <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>
-                    {saving ? 'Saving...' : 'Saved'}
-                  </span>
+                <div className="flex gap-1.5 px-3 pt-2 pb-1 shrink-0">
+                  <button onClick={() => setActiveTab('content')} className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-center ${activeTab === 'content' ? 'bg-[var(--app-primary)] text-white' : 'text-[var(--app-text-secondary)] hover:bg-gray-100'}`}>
+                    <FileText className="w-3.5 h-3.5 inline-block mr-1" /> Content
+                  </button>
+                  <button onClick={() => setActiveTab('design')} className={`flex-1 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-center ${activeTab === 'design' ? 'bg-[var(--app-primary)] text-white' : 'text-[var(--app-text-secondary)] hover:bg-gray-100'}`}>
+                    <Palette className="w-3.5 h-3.5 inline-block mr-1" /> Design
+                  </button>
                 </div>
+                {/* NOTE: No overflow-y here — ContentEditor & DesignEditor handle
+                    their own scrolling. overflow-y creates a stacking context that
+                    clips native <select> dropdown menus (browser popups get cut off
+                    by overflow:auto/hidden on any ancestor). */}
+                <div className="flex-1 min-h-0 flex flex-col">
+                  {activeTab === 'content' ? (
+                    <ContentEditor data={data} updateNested={updateNested} setData={setData} onExport={exportPDF} isExporting={isExporting} />
+                  ) : (
+                    <DesignEditor data={data} updateDesign={(k,v) => updateNested(`design.${k}`, v)} updateContent={updateNested}
+                      selectedSectionId={selectedSectionId || undefined} setSelectedSectionId={id => setSelectedSectionId(id || null)} onOpenTemplates={() => setShowTemplateModal(true)} />
+                  )}
+                </div>
+              </CollapsiblePanel>
+
+            {/* Resize Handle */}
+            {isDesktop && (
+              <div ref={resizeRef} className="w-2 cursor-col-resize shrink-0 relative group z-10" onMouseDown={() => setIsResizing(true)}>
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[4px] group-hover:bg-[var(--app-primary)]/50 transition-colors rounded-full" />
+              </div>
+            )}
+
+            {/* Preview Panel */}
+            {isDesktop && (
+              <div className="min-h-0 flex flex-col relative" style={{ flex: 1, background: 'var(--app-bg-medium)' }}>
+                <div className="flex-1 overflow-y-auto custom-scrollbar" ref={previewContainerRef}>
+                  <InlineEditor data={data} updateNested={updateNested} containerRef={previewContainerRef} zoom={zoomLevel / 100}>
+                    <ResumePreview data={data} numPages={numPages} previewRef={previewRef} zoomLevel={zoomLevel} isExporting={isExporting}
+                      selectedSectionId={selectedSectionId} updateNested={updateNested}
+                      onSelectSection={sid => { setSelectedSectionId(sid); setActiveTab('design'); }}
+                      onReorderSections={newOrder => updateNested('activeSections', newOrder)} onPageCountChange={setNumPages} />
+                  </InlineEditor>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="absolute inset-0 z-40 flex flex-col bg-[var(--app-bg)]">
+            <div className="flex items-center justify-between px-3 py-2 border-b shrink-0" style={{ borderColor: 'var(--app-border)', background: 'var(--app-bg-card)' }}>
+              <button onClick={() => setPreviewOpen(false)} className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100" style={{ color: 'var(--app-text)' }}>
+                <ChevronLeft className="w-4 h-4" /> <span className="text-[11px] font-black">Editor</span>
+              </button>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${saving ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <span className="text-[8px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>{saving ? 'Saving' : 'Saved'}</span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto" style={{ background: 'var(--app-bg-medium)' }} ref={previewContainerRef}>
+              <div style={{ width: `${A4_WIDTH}px`, margin: '16px auto' }}>
+                <ResumePreview data={data} numPages={numPages} previewRef={previewRef} zoomLevel={mobileZoom} isExporting={isExporting}
+                  selectedSectionId={selectedSectionId} updateNested={updateNested}
+                  onSelectSection={sid => { setSelectedSectionId(sid); setActiveTab('design'); setPreviewOpen(false); }}
+                  onReorderSections={newOrder => updateNested('activeSections', newOrder)} onPageCountChange={setNumPages} />
               </div>
             </div>
           </div>
+        )}
 
-          {/* Tab Navigation */}
-          <div
-            className="flex mx-3 my-2 rounded-xl p-1"
-            style={{ background: 'var(--app-bg-gray)' }}
-          >
-            <button
-              onClick={() => setActiveTab('content')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === 'content'
-                  ? 'shadow-sm'
-                  : 'opacity-50 hover:opacity-75'
-              }`}
-              style={activeTab === 'content'
-                ? { background: 'var(--app-bg-card)', color: 'var(--app-text)' }
-                : { color: 'var(--app-text-secondary)' }}
-            >
-              <FileText className="w-3.5 h-3.5" /> Content
-            </button>
-            <button
-              onClick={() => setActiveTab('design')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === 'design'
-                  ? 'shadow-sm'
-                  : 'opacity-50 hover:opacity-75'
-              }`}
-              style={activeTab === 'design'
-                ? { background: 'var(--app-bg-card)', color: 'var(--app-text)' }
-                : { color: 'var(--app-text-secondary)' }}
-            >
-              <Palette className="w-3.5 h-3.5" /> Design
-            </button>
+        {settingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-4 md:px-8 md:py-8">
+            <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => setSettingsOpen(false)} />
+            <div className="relative w-full max-w-[1040px] h-full md:h-auto rounded-3xl overflow-hidden shadow-2xl bg-[var(--app-bg-card)] border border-[var(--app-border)]">
+              <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'var(--app-border)' }}>
+                <span className="text-sm font-black" style={{ color: 'var(--app-text)' }}>Settings</span>
+                <button onClick={() => setSettingsOpen(false)} className="p-2 rounded-xl hover:bg-gray-100" style={{ color: 'var(--app-text-secondary)' }}><X className="w-5 h-5" /></button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 p-4">
+                <button onClick={() => handleSave(true)} className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-widest text-white" style={{ background: 'var(--app-primary)' }}><Save className="w-4 h-4" /> Save resume</button>
+                <button onClick={exportPDF} className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-widest" style={{ background: 'var(--app-bg-medium)', color: 'var(--app-text)' }}><FileDown className="w-4 h-4" /> Download PDF</button>
+                <button onClick={printResume} className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-widest" style={{ background: 'var(--app-bg-medium)', color: 'var(--app-text)' }}><Printer className="w-4 h-4" /> Print resume</button>
+                <button onClick={shareResume} className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-widest" style={{ background: 'var(--app-bg-medium)', color: 'var(--app-text)' }}><Share2 className="w-4 h-4" /> Share resume</button>
+              </div>
+            </div>
           </div>
-
-          {/* Tab Content */}
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {activeTab === 'content' ? (
-              <ContentEditor
-                data={data}
-                updateNested={updateNested}
-                setData={setData}
-                onExport={exportPDF}
-                isExporting={isExporting}
-              />
-            ) : (
-              <DesignEditor
-                data={data}
-                updateDesign={(key, value) => updateNested(`design.${key}`, value)}
-                updateContent={updateNested}
-                selectedSectionId={selectedSectionId || undefined}
-                setSelectedSectionId={(id) => setSelectedSectionId(id || null)}
-                onOpenTemplates={() => setShowTemplateModal(true)}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* ── Preview Area ── */}
-        <div
-          className="flex-1 min-h-0 flex flex-col relative overflow-auto custom-scrollbar"
-          style={{ 
-            background: 'var(--app-bg-medium)',
-            padding: '40px 0',
-            scrollBehavior: 'smooth'
-          }}
-          ref={previewContainerRef}
-        >
-          <InlineEditor
-            data={data}
-            updateNested={updateNested}
-            containerRef={previewContainerRef}
-            zoom={zoomLevel / 100}
-          >
-            <ResumePreview
-              data={data}
-              numPages={numPages}
-              previewRef={previewRef}
-              zoomLevel={zoomLevel}
-              isExporting={isExporting}
-              selectedSectionId={selectedSectionId}
-              updateNested={updateNested}
-              onSelectSection={(sid) => {
-                setSelectedSectionId(sid);
-                setActiveTab('design');
-              }}
-              onReorderSections={(newOrder) => updateNested('activeSections', newOrder)}
-              onPageCountChange={setNumPages}
-            />
-          </InlineEditor>
-        </div>
+        )}
       </div>
 
-      <TemplateModal
-        isOpen={showTemplateModal}
-        onClose={() => setShowTemplateModal(false)}
-        templates={builtTemplates}
-        isLoading={false}
-        onSelect={(t) => {
-          setData(prev => ({
-            ...prev,
-            template: t.mainsection?.id || t.id,
-            design: { ...prev.design, ...(t.secondary?.style || {}) },
-          }));
-          setShowTemplateModal(false);
-          toast.success(`Template applied: ${t.mainsection?.name || t.name}`);
-        }}
-        currentTemplateId={data.template}
-      />
+      {/* Mobile Bottom Nav */}
+      <div className={`${settingsOpen ? 'hidden' : 'lg:hidden'} fixed inset-x-0 bottom-0 z-[50] flex items-center justify-around border-t bg-[rgba(15,23,42,0.96)] px-2 py-2 shadow-[0_-10px_20px_rgba(0,0,0,0.12)]`} style={{ borderColor: 'rgba(148,163,184,0.12)', paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}>
+        <button onClick={() => { setActiveTab('content'); setPreviewOpen(false); }} className={`flex flex-col items-center gap-1 py-2 px-2 rounded-2xl ${activeTab === 'content' && !previewOpen ? 'text-[var(--app-primary)]' : 'text-[var(--app-text-secondary)]'}`}>
+          <FileText className="w-5 h-5" /> <span className="text-[9px] font-black uppercase">Content</span>
+        </button>
+        <button onClick={() => { setActiveTab('design'); setPreviewOpen(false); }} className={`flex flex-col items-center gap-1 py-2 px-2 rounded-2xl ${activeTab === 'design' && !previewOpen ? 'text-[var(--app-primary)]' : 'text-[var(--app-text-secondary)]'}`}>
+          <Palette className="w-5 h-5" /> <span className="text-[9px] font-black uppercase">Design</span>
+        </button>
+        <button onClick={() => setPreviewOpen(true)} className={`flex flex-col items-center gap-1 py-2 px-2 rounded-2xl ${previewOpen ? 'text-[var(--app-primary)]' : 'text-[var(--app-text-secondary)]'}`}>
+          <Eye className="w-5 h-5" /> <span className="text-[9px] font-black uppercase">Preview</span>
+        </button>
+        <button onClick={() => handleSave(true)} className="flex flex-col items-center gap-1 py-2 px-2 rounded-2xl text-[var(--app-text-secondary)]">
+          <Save className="w-5 h-5" /> <span className="text-[9px] font-black uppercase">Save</span>
+        </button>
+        <button onClick={exportPDF} className="flex flex-col items-center gap-1 py-2 px-2 rounded-2xl text-[var(--app-text-secondary)]">
+          <FileDown className="w-5 h-5" /> <span className="text-[9px] font-black uppercase">Export</span>
+        </button>
+      </div>
+
+      <TemplateModal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} templates={builtTemplates} isLoading={false}
+        onSelect={t => { setData(prev => ({ ...prev, template: t.mainsection?.id || t.id, design: { ...prev.design, ...(t.secondary?.style || {}) } })); setShowTemplateModal(false); toast.success(`Template applied: ${t.mainsection?.name || t.name}`); }}
+        currentTemplateId={data.template} />
     </div>
   );
 };

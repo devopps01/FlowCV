@@ -327,21 +327,21 @@ export default function AIResumeGenerator() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-600 border-t-transparent"></div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
+        <div className="animate-spin rounded-full h-12 w-12 border-4" style={{ borderColor: 'var(--app-primary)', borderTopColor: 'transparent' }}></div>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--app-bg)' }}>
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Please Sign In</h1>
-          <p className="text-gray-600 mb-8">You need to be signed in to access the AI Resume Generator.</p>
+          <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--app-text)' }}>Please Sign In</h1>
+          <p style={{ color: 'var(--app-text-secondary)' }} className="mb-8">You need to be signed in to access the AI Resume Generator.</p>
           <button
             onClick={() => router.push('/login')}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="btn-primary px-6 py-3"
           >
             Sign In
           </button>
@@ -351,9 +351,9 @@ export default function AIResumeGenerator() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="app-page-gray">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-purple-100">
+      <div style={{ background: 'var(--app-bg-card)', borderBottom: '1px solid var(--app-border)' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -361,23 +361,21 @@ export default function AIResumeGenerator() {
                 <Sparkles className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  AI Resume Generator
-                </h1>
-                <p className="text-gray-600">Create professional resumes with AI</p>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--app-text)' }}>AI Resume Generator</h1>
+                <p style={{ color: 'var(--app-text-secondary)', fontSize: 14 }}>Create professional resumes with AI</p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="btn-ghost px-4 py-2"
               >
                 Dashboard
               </button>
               <button
                 onClick={() => router.push('/templates')}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="btn-ghost px-4 py-2"
               >
                 Templates
               </button>
@@ -391,9 +389,9 @@ export default function AIResumeGenerator() {
           {/* Input Section */}
           <div className="lg:col-span-2 space-y-6">
             {/* Template Selection */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <Wand2 className="h-6 w-6 text-purple-600" />
+            <div className="app-card">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--app-text)' }}>
+                <Wand2 className="h-6 w-6" style={{ color: 'var(--app-primary)' }} />
                 Choose Template Style
               </h2>
               
@@ -402,17 +400,18 @@ export default function AIResumeGenerator() {
                   <button
                     key={template.id}
                     onClick={() => setSelectedTemplate(template.id)}
-                    className={`p-4 rounded-xl border-2 transition-all ${
-                      selectedTemplate === template.id
-                        ? 'border-purple-600 bg-purple-50 text-purple-600'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                    }`}
+                    className="p-4 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: selectedTemplate === template.id ? 'var(--app-primary)' : 'var(--app-border)',
+                      background: selectedTemplate === template.id ? 'var(--app-primary-light)' : 'transparent',
+                      color: selectedTemplate === template.id ? 'var(--app-primary)' : 'var(--app-text)',
+                    }}
                   >
                     <div className="flex items-center gap-3 mb-2">
-                      <template.icon className="h-8 w-8 text-purple-600" />
-                      <div>
-                        <h3 className="font-semibold">{template.name}</h3>
-                        <p className="text-sm text-gray-600">{template.description}</p>
+                      <template.icon className="h-8 w-8" style={{ color: 'var(--app-primary)' }} />
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 600 }}>{template.name}</div>
+                        <div style={{ fontSize: 13, color: 'var(--app-text-secondary)' }}>{template.description}</div>
                       </div>
                     </div>
                   </button>
@@ -421,17 +420,22 @@ export default function AIResumeGenerator() {
               </div>
 
               {/* Tab Navigation */}
-              <div className="border-b border-gray-200 mb-6">
+              <div style={{ borderBottom: '1px solid var(--app-border)', marginBottom: 24 }}>
                 <nav className="flex space-x-1">
                   {['personal', 'experience', 'education', 'skills', 'languages', 'projects'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`px-4 py-2 font-medium transition-all ${
-                        activeTab === tab
-                          ? 'text-purple-600 border-b-2 border-purple-600'
-                          : 'text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300'
-                      }`}
+                      style={{
+                        padding: '8px 16px',
+                        fontWeight: 600,
+                        fontSize: 14,
+                        color: activeTab === tab ? 'var(--app-primary)' : 'var(--app-text-secondary)',
+                        borderBottom: activeTab === tab ? `2px solid var(--app-primary)` : '2px solid transparent',
+                        background: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
                     >
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
@@ -446,7 +450,7 @@ export default function AIResumeGenerator() {
                   <div className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Full Name</label>
                         <input
                           type="text"
                           value={resumeData.personalInfo.fullName}
@@ -454,13 +458,13 @@ export default function AIResumeGenerator() {
                             ...prev,
                             personalInfo: { ...prev.personalInfo, fullName: e.target.value }
                           }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="app-input"
                           placeholder="John Doe"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Email</label>
                         <input
                           type="email"
                           value={resumeData.personalInfo.email}
@@ -468,13 +472,13 @@ export default function AIResumeGenerator() {
                             ...prev,
                             personalInfo: { ...prev.personalInfo, email: e.target.value }
                           }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="app-input"
                           placeholder="john.doe@example.com"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Phone</label>
                         <input
                           type="tel"
                           value={resumeData.personalInfo.phone}
@@ -482,13 +486,13 @@ export default function AIResumeGenerator() {
                             ...prev,
                             personalInfo: { ...prev.personalInfo, phone: e.target.value }
                           }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="app-input"
                           placeholder="+1 (555) 123-4567"
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                        <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Location</label>
                         <input
                           type="text"
                           value={resumeData.personalInfo.location}
@@ -496,21 +500,21 @@ export default function AIResumeGenerator() {
                             ...prev,
                             personalInfo: { ...prev.personalInfo, location: e.target.value }
                           }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="app-input"
                           placeholder="San Francisco, CA"
                         />
                       </div>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Professional Title</label>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Professional Title</label>
                       <select
                         value={resumeData.personalInfo.professionalTitle}
                         onChange={(e) => setResumeData(prev => ({
                           ...prev,
                           personalInfo: { ...prev.personalInfo, professionalTitle: e.target.value }
                           }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        className="app-input"
                       >
                         <option value="">Select a title...</option>
                         {jobTitles.map((title) => (
@@ -520,7 +524,7 @@ export default function AIResumeGenerator() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Professional Summary</label>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Professional Summary</label>
                       <textarea
                         value={resumeData.personalInfo.summary}
                         onChange={(e) => setResumeData(prev => ({
@@ -528,8 +532,8 @@ export default function AIResumeGenerator() {
                           personalInfo: { ...prev.personalInfo, summary: e.target.value }
                           }))}
                         rows={4}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        placeholder="Experienced software engineer with 5+ years of experience in developing scalable web applications..."
+                        className="app-input"
+                        placeholder="Experienced software engineer with 5+ years of experience developing scalable web applications..."
                       />
                     </div>
                   </div>
@@ -539,10 +543,10 @@ export default function AIResumeGenerator() {
                 {activeTab === 'experience' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Work Experience</h3>
+                      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--app-text)' }}>Work Experience</h3>
                       <button
                         onClick={addExperience}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="btn-primary px-4 py-2 flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Add Experience
@@ -550,12 +554,12 @@ export default function AIResumeGenerator() {
                     </div>
                     
                     {resumeData.experience.map((exp, index) => (
-                      <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div key={index} className="app-card p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">Experience {index + 1}</h4>
+                          <h4 style={{ fontWeight: 600, color: 'var(--app-text)' }}>Experience {index + 1}</h4>
                           <button
                             onClick={() => removeItem('experience', index)}
-                            className="text-red-600 hover:text-red-700 transition-colors"
+                            style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -563,7 +567,7 @@ export default function AIResumeGenerator() {
                         
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Company</label>
                             <input
                               type="text"
                               value={exp.company}
@@ -572,13 +576,13 @@ export default function AIResumeGenerator() {
                                 newExperience[index] = { ...newExperience[index], company: e.target.value };
                                 setResumeData(prev => ({ ...prev, experience: newExperience }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="Google"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Position</label>
                             <input
                               type="text"
                               value={exp.position}
@@ -587,7 +591,7 @@ export default function AIResumeGenerator() {
                                 newExperience[index] = { ...newExperience[index], position: e.target.value };
                                 setResumeData(prev => ({ ...prev, experience: newExperience }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="Software Engineer"
                             />
                           </div>
@@ -595,7 +599,7 @@ export default function AIResumeGenerator() {
                         
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Start Date</label>
                             <input
                               type="month"
                               value={exp.startDate}
@@ -604,12 +608,12 @@ export default function AIResumeGenerator() {
                                 newExperience[index] = { ...newExperience[index], startDate: e.target.value };
                                 setResumeData(prev => ({ ...prev, experience: newExperience }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>End Date</label>
                             <input
                               type="month"
                               value={exp.endDate}
@@ -618,13 +622,13 @@ export default function AIResumeGenerator() {
                                 newExperience[index] = { ...newExperience[index], endDate: e.target.value };
                                 setResumeData(prev => ({ ...prev, experience: newExperience }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                             />
                           </div>
                         </div>
                         
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <div>
+                          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Description</label>
                           <textarea
                             value={exp.description}
                             onChange={(e) => {
@@ -633,7 +637,7 @@ export default function AIResumeGenerator() {
                               setResumeData(prev => ({ ...prev, experience: newExperience }));
                               }}
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="app-input"
                             placeholder="Developed and maintained web applications using React and Node.js..."
                           />
                         </div>
@@ -646,10 +650,10 @@ export default function AIResumeGenerator() {
                 {activeTab === 'education' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Education</h3>
+                      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--app-text)' }}>Education</h3>
                       <button
                         onClick={addEducation}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="btn-primary px-4 py-2 flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Add Education
@@ -657,12 +661,12 @@ export default function AIResumeGenerator() {
                     </div>
                     
                     {resumeData.education.map((edu, index) => (
-                      <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div key={index} className="app-card p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">Education {index + 1}</h4>
+                          <h4 style={{ fontWeight: 600, color: 'var(--app-text)' }}>Education {index + 1}</h4>
                           <button
                             onClick={() => removeItem('education', index)}
-                            className="text-red-600 hover:text-red-700 transition-colors"
+                            style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -670,7 +674,7 @@ export default function AIResumeGenerator() {
                         
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">School</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>School</label>
                             <input
                               type="text"
                               value={edu.school}
@@ -679,13 +683,13 @@ export default function AIResumeGenerator() {
                                 newEducation[index] = { ...newEducation[index], school: e.target.value };
                                 setResumeData(prev => ({ ...prev, education: newEducation }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="Stanford University"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Degree</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Degree</label>
                             <input
                               type="text"
                               value={edu.degree}
@@ -694,7 +698,7 @@ export default function AIResumeGenerator() {
                                 newEducation[index] = { ...newEducation[index], degree: e.target.value };
                                 setResumeData(prev => ({ ...prev, education: newEducation }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="Bachelor of Science in Computer Science"
                             />
                           </div>
@@ -702,7 +706,7 @@ export default function AIResumeGenerator() {
                         
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Graduation Year</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Graduation Year</label>
                             <input
                               type="number"
                               value={edu.graduationYear}
@@ -711,16 +715,14 @@ export default function AIResumeGenerator() {
                                 newEducation[index] = { ...newEducation[index], graduationYear: e.target.value };
                                 setResumeData(prev => ({ ...prev, education: newEducation }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="2020"
-                              min="1950"
-                              max="2030"
                             />
                           </div>
                         </div>
                         
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <div>
+                          <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Description</label>
                           <textarea
                             value={edu.description}
                             onChange={(e) => {
@@ -729,7 +731,7 @@ export default function AIResumeGenerator() {
                               setResumeData(prev => ({ ...prev, education: newEducation }));
                               }}
                             rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="app-input"
                             placeholder="Graduated with honors, GPA 3.8/4.0..."
                           />
                         </div>
@@ -742,10 +744,10 @@ export default function AIResumeGenerator() {
                 {activeTab === 'skills' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Skills</h3>
+                      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--app-text)' }}>Skills</h3>
                       <button
                         onClick={addSkill}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="btn-primary px-4 py-2 flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Add Skill
@@ -754,7 +756,7 @@ export default function AIResumeGenerator() {
                     
                     <div className="flex flex-wrap gap-2 mb-4">
                       {resumeData.skills.map((skill, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                        <div key={index} className="flex items-center gap-2 app-card px-3 py-2">
                           <input
                             type="text"
                             value={skill}
@@ -763,12 +765,12 @@ export default function AIResumeGenerator() {
                               newSkills[index] = e.target.value;
                               setResumeData(prev => ({ ...prev, skills: newSkills }));
                             }}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="app-input flex-1"
                             placeholder="JavaScript"
                           />
                           <button
                             onClick={() => removeItem('skills', index)}
-                            className="text-red-600 hover:text-red-700 transition-colors"
+                            style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -777,15 +779,15 @@ export default function AIResumeGenerator() {
                     </div>
                     
                     <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Quick Add Common Skills:</label>
-                      <div className="grid grid-cols-4 gap-2">
+                      <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Quick Add Common Skills:</label>
+                      <div className="flex flex-wrap gap-2">
                         {['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python'].map((skill) => (
                           <button
                             key={skill}
                             onClick={() => {
                               setResumeData(prev => ({ ...prev, skills: [...prev.skills, skill] }));
                             }}
-                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+                            className="btn-ghost px-3 py-2 text-sm"
                           >
                             {skill}
                           </button>
@@ -799,7 +801,7 @@ export default function AIResumeGenerator() {
                 {activeTab === 'languages' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Languages</h3>
+                      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--app-text)' }}>Languages</h3>
                       <button
                         onClick={() => {
                           setResumeData(prev => ({
@@ -807,7 +809,7 @@ export default function AIResumeGenerator() {
                             languages: [...prev.languages, { language: '', proficiency: 'Fluent' }]
                           }));
                         }}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="btn-primary px-4 py-2 flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Add Language
@@ -816,12 +818,12 @@ export default function AIResumeGenerator() {
                     
                     <div className="space-y-4">
                       {resumeData.languages.map((lang, index) => (
-                        <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                        <div key={index} className="app-card p-4">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">Language {index + 1}</h4>
+                            <h4 style={{ fontWeight: 600, color: 'var(--app-text)' }}>Language {index + 1}</h4>
                             <button
                               onClick={() => removeItem('languages', index)}
-                              className="text-red-600 hover:text-red-700 transition-colors"
+                              style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -829,7 +831,7 @@ export default function AIResumeGenerator() {
                           
                           <div className="grid md:grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Language</label>
                               <select
                                 value={lang.language}
                                 onChange={(e) => {
@@ -837,7 +839,7 @@ export default function AIResumeGenerator() {
                                   newLanguages[index] = { ...newLanguages[index], language: e.target.value };
                                   setResumeData(prev => ({ ...prev, languages: newLanguages }));
                                 }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="app-input"
                               >
                                 <option value="">Select language...</option>
                                 <option value="English">English</option>
@@ -855,7 +857,7 @@ export default function AIResumeGenerator() {
                             </div>
                             
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Proficiency</label>
+                              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Proficiency</label>
                               <select
                                 value={lang.proficiency}
                                 onChange={(e) => {
@@ -863,7 +865,7 @@ export default function AIResumeGenerator() {
                                   newLanguages[index] = { ...newLanguages[index], proficiency: e.target.value };
                                   setResumeData(prev => ({ ...prev, languages: newLanguages }));
                                 }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="app-input"
                               >
                                 <option value="Native">Native</option>
                                 <option value="Fluent">Fluent</option>
@@ -883,7 +885,7 @@ export default function AIResumeGenerator() {
                 {activeTab === 'projects' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Projects</h3>
+                      <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--app-text)' }}>Projects</h3>
                       <button
                         onClick={() => {
                           setResumeData(prev => ({
@@ -891,7 +893,7 @@ export default function AIResumeGenerator() {
                             projects: [...prev.projects, { name: '', description: '', technologies: [] }]
                           }));
                         }}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+                        className="btn-primary px-4 py-2 flex items-center gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         Add Project
@@ -899,12 +901,12 @@ export default function AIResumeGenerator() {
                     </div>
                     
                     {resumeData.projects.map((project, index) => (
-                      <div key={index} className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div key={index} className="app-card p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold">Project {index + 1}</h4>
+                          <h4 style={{ fontWeight: 600, color: 'var(--app-text)' }}>Project {index + 1}</h4>
                           <button
                             onClick={() => removeItem('projects', index)}
-                            className="text-red-600 hover:text-red-700 transition-colors"
+                            style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer' }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -912,7 +914,7 @@ export default function AIResumeGenerator() {
                         
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Project Name</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Project Name</label>
                             <input
                               type="text"
                               value={project.name}
@@ -921,13 +923,13 @@ export default function AIResumeGenerator() {
                                 newProjects[index] = { ...newProjects[index], name: e.target.value };
                                 setResumeData(prev => ({ ...prev, projects: newProjects }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="E-commerce Platform"
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Description</label>
                             <textarea
                               value={project.description}
                               onChange={(e) => {
@@ -936,13 +938,13 @@ export default function AIResumeGenerator() {
                                 setResumeData(prev => ({ ...prev, projects: newProjects }));
                               }}
                               rows={3}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="Built a full-stack e-commerce platform with React and Node.js..."
                             />
                           </div>
                           
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Technologies</label>
+                            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--app-text-secondary)', display: 'block', marginBottom: 6 }}>Technologies</label>
                             <input
                               type="text"
                               value={project.technologies.join(', ')}
@@ -951,7 +953,7 @@ export default function AIResumeGenerator() {
                                 newProjects[index] = { ...newProjects[index], technologies: e.target.value.split(', ') };
                                 setResumeData(prev => ({ ...prev, projects: newProjects }));
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              className="app-input"
                               placeholder="React, Node.js, MongoDB, AWS"
                             />
                           </div>
@@ -968,7 +970,7 @@ export default function AIResumeGenerator() {
             <button
               onClick={handleGenerateResume}
               disabled={isGenerating}
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full px-6 py-3 flex items-center justify-center gap-2"
             >
               {isGenerating ? (
                 <>
@@ -986,7 +988,7 @@ export default function AIResumeGenerator() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 onClick={handleSaveResume}
-                className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                className="btn-primary px-6 py-3 flex items-center justify-center gap-2"
               >
                 <FileText className="h-5 w-5" />
                 Save Resume
@@ -994,7 +996,7 @@ export default function AIResumeGenerator() {
               
               <button
                 onClick={handleDownloadPDF}
-                className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                className="btn-primary px-6 py-3 flex items-center justify-center gap-2"
               >
                 <Download className="h-5 w-5" />
                 Download PDF
@@ -1003,7 +1005,7 @@ export default function AIResumeGenerator() {
             
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className="w-full px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className="btn-ghost w-full px-6 py-3 flex items-center justify-center gap-2"
             >
               <Eye className="h-5 w-5" />
               {showPreview ? 'Hide Preview' : 'Show Preview'}
@@ -1014,23 +1016,23 @@ export default function AIResumeGenerator() {
         {/* Preview Section */}
         {showPreview && (
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="app-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <FileText className="h-6 w-6 text-purple-600" />
+                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--app-text)' }} className="flex items-center gap-2">
+                  <FileText className="h-6 w-6" style={{ color: 'var(--app-primary)' }} />
                   Resume Preview
                 </h3>
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
+                  style={{ color: 'var(--app-text-secondary)', cursor: 'pointer', border: 'none', background: 'none' }}
                 >
                   <RefreshCw className="h-5 w-5" />
                 </button>
               </div>
               
-              <div className="border-t border-gray-200 pt-4">
-                <h4 className="font-semibold mb-2">Generated Content:</h4>
-                <pre className="bg-gray-50 p-4 rounded-lg text-sm overflow-auto max-h-96">
+              <div style={{ borderTop: '1px solid var(--app-border)', paddingTop: 16 }}>
+                <h4 style={{ fontWeight: 600, marginBottom: 8, color: 'var(--app-text)' }}>Generated Content:</h4>
+                <pre style={{ background: 'var(--app-bg-gray)', padding: 16, borderRadius: 8, fontSize: 13, overflow: 'auto', maxHeight: 384, color: 'var(--app-text)' }}>
                   {generatedContent || 'No content generated yet. Click "Generate Resume with AI" to create your resume.'}
                 </pre>
               </div>

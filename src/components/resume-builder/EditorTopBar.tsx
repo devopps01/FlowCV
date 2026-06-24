@@ -12,7 +12,7 @@ import {
   Bold, Italic, Underline, Minus, Plus, RotateCcw,
   Sparkles, ChevronDown, Check, Layers, Grid,
   FileDown, Printer, Share2, Save, Loader2,
-  Undo2, Redo2, ZoomIn, ZoomOut, Eye,
+  Undo2, Redo2, ZoomIn, ZoomOut, Eye, FileText, Menu,
 } from 'lucide-react';
 import { ResumeData } from './types';
 
@@ -109,6 +109,15 @@ const LAYOUT_OPTIONS = [
   { id: 'double-header', label: 'Double' },
 ];
 
+const PAPER_SIZE_OPTIONS = [
+  { id: 'a4', label: 'A4', desc: '210×297mm' },
+  { id: 'letter', label: 'Letter', desc: '8.5×11in' },
+  { id: 'legal', label: 'Legal', desc: '8.5×14in' },
+  { id: 'a3', label: 'A3', desc: '297×420mm' },
+  { id: 'b5', label: 'B5', desc: '176×250mm' },
+  { id: 'a5', label: 'A5', desc: '148×210mm' },
+];
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const TBBtn = ({
@@ -163,6 +172,8 @@ interface EditorTopBarProps {
   onShare: () => void;
   saving: boolean;
   isExporting: boolean;
+  onMenuToggle?: () => void;
+  onDashboard?: () => void;
   zoomLevel: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
@@ -174,13 +185,15 @@ export function EditorTopBar({
   data, updateDesign, updateNested,
   onUndo, onRedo, canUndo, canRedo,
   onSave, onExport, onPrint, onShare,
-  saving, isExporting,
+  saving, isExporting, onMenuToggle,
+  onDashboard,
   zoomLevel, onZoomIn, onZoomOut, onZoomReset,
   numPages,
 }: EditorTopBarProps) {
   const d = data.design;
   const [showPresets, setShowPresets] = useState(false);
   const [showLayoutPicker, setShowLayoutPicker] = useState(false);
+  const [showPaperSize, setShowPaperSize] = useState(false);
   const [showSpacings, setShowSpacings] = useState(false);
 
   const applyPreset = (preset: typeof STYLE_PRESETS[0]) => {
@@ -199,6 +212,31 @@ export function EditorTopBar({
         height: '48px',
       }}
     >
+      {/* ── Dashboard Button ── */}
+      {onDashboard && (
+        <button
+          onClick={onDashboard}
+          className="flex items-center gap-1 p-2 rounded-lg transition-all"
+          style={{ color: 'var(--app-text-secondary)' }}
+          title="Back to Dashboard"
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; (e.currentTarget as HTMLElement).style.color = 'var(--app-text)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--app-text-secondary)'; }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+      )}
+
+      {/* ── Resume Title (editable on click) ── */}
+      <input
+        value={data.title}
+        onChange={e => updateNested('title', e.target.value)}
+        className="text-xs font-black bg-transparent border-none focus:ring-0 w-40 lg:w-56 truncate px-2 py-1 rounded-lg hover:bg-gray-100 focus:bg-gray-100 transition-colors"
+        style={{ color: 'var(--app-text)' }}
+        title="Click to edit resume name"
+      />
+
+      <TBDivider />
+
       {/* ── History ── */}
       <TBBtn onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">
         <Undo2 className="w-4 h-4" />
@@ -265,7 +303,7 @@ export function EditorTopBar({
       {/* ── Layout ── */}
       <div className="relative">
         <button
-          onClick={() => { setShowLayoutPicker(p => !p); setShowPresets(false); setShowSpacings(false); }}
+          onClick={() => { setShowLayoutPicker(p => !p); setShowPresets(false); setShowSpacings(false); setShowPaperSize(false); }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
           style={{ color: 'var(--app-text)', background: showLayoutPicker ? 'var(--app-bg-gray)' : 'transparent' }}
           onMouseEnter={e => { if (!showLayoutPicker) (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; }}
@@ -292,6 +330,46 @@ export function EditorTopBar({
               >
                 {opt.label}
                 {d.layout === opt.id && <Check className="w-3 h-3" style={{ color: 'var(--app-primary)' }} />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Paper Size ── */}
+      <div className="relative">
+        <button
+          onClick={() => { setShowPaperSize(p => !p); setShowPresets(false); setShowLayoutPicker(false); setShowSpacings(false); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+          style={{ color: 'var(--app-text)', background: showPaperSize ? 'var(--app-bg-gray)' : 'transparent' }}
+          onMouseEnter={e => { if (!showPaperSize) (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'; }}
+          onMouseLeave={e => { if (!showPaperSize) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+        >
+          <FileText className="w-3.5 h-3.5" style={{ color: 'var(--app-primary)' }} />
+          {(d.pageSize || 'a4').toUpperCase()}
+          <ChevronDown className={`w-3 h-3 transition-transform ${showPaperSize ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showPaperSize && (
+          <div
+            className="absolute top-full left-0 mt-1 z-50 rounded-xl shadow-2xl p-2"
+            style={{ background: 'var(--app-bg-card)', border: '1px solid var(--app-border)', width: '180px', boxShadow: 'var(--app-shadow-lg)' }}
+          >
+            <p className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 mb-1" style={{ color: 'var(--app-text-muted)' }}>Paper Size</p>
+            {PAPER_SIZE_OPTIONS.map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => { updateDesign('pageSize', opt.id); setShowPaperSize(false); }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all"
+                style={{ color: 'var(--app-text)' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--app-bg-gray)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
+                <div className="flex flex-col items-start">
+                  <span className="font-bold">{opt.label}</span>
+                  <span className="text-[9px] opacity-50">{opt.desc}</span>
+                </div>
+                {(d.pageSize || 'a4') === opt.id && <Check className="w-3 h-3" style={{ color: 'var(--app-primary)' }} />}
               </button>
             ))}
           </div>
@@ -399,15 +477,31 @@ export function EditorTopBar({
             {/* Margin TB */}
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center text-[10px] font-bold" style={{ color: 'var(--app-text-secondary)' }}>
-                <span>Page Margin</span>
+                <span>Top/Bottom Margin</span>
                 <span className="opacity-75">{d.marginTB ?? 14}mm</span>
               </div>
               <input
                 type="range"
-                min="8"
+                min="0"
                 max="28"
                 value={d.marginTB ?? 14}
                 onChange={e => updateDesign('marginTB', Number(e.target.value))}
+                className="w-full accent-indigo-500 h-1 bg-gray-200 dark:bg-white/10 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Margin LR */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold" style={{ color: 'var(--app-text-secondary)' }}>
+                <span>Left/Right Margin</span>
+                <span className="opacity-75">{d.marginLR ?? 12}mm</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="30"
+                value={d.marginLR ?? 12}
+                onChange={e => updateDesign('marginLR', Number(e.target.value))}
                 className="w-full accent-indigo-500 h-1 bg-gray-200 dark:bg-white/10 rounded-lg cursor-pointer"
               />
             </div>
@@ -420,7 +514,7 @@ export function EditorTopBar({
               </div>
               <input
                 type="range"
-                min="4"
+                min="0"
                 max="20"
                 value={d.sectionSpacing ?? 10}
                 onChange={e => updateDesign('sectionSpacing', Number(e.target.value))}
@@ -436,7 +530,7 @@ export function EditorTopBar({
               </div>
               <input
                 type="range"
-                min="2"
+                min="0"
                 max="16"
                 value={d.entrySpacing ?? 6}
                 onChange={e => updateDesign('entrySpacing', Number(e.target.value))}
@@ -448,6 +542,7 @@ export function EditorTopBar({
             <button
               onClick={() => {
                 updateDesign('marginTB', 14);
+                updateDesign('marginLR', 12);
                 updateDesign('sectionSpacing', 10);
                 updateDesign('entrySpacing', 6);
                 updateDesign('fontSize', 10.5);
@@ -563,10 +658,10 @@ export function EditorTopBar({
       </button>
 
       {/* Close dropdowns on outside click */}
-      {(showPresets || showLayoutPicker || showSpacings) && (
+      {(showPresets || showLayoutPicker || showPaperSize || showSpacings) && (
         <div
           className="fixed inset-0 z-40"
-          onClick={() => { setShowPresets(false); setShowLayoutPicker(false); setShowSpacings(false); }}
+          onClick={() => { setShowPresets(false); setShowLayoutPicker(false); setShowPaperSize(false); setShowSpacings(false); }}
         />
       )}
     </div>

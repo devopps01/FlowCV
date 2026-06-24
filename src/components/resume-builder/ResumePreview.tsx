@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { User, Mail, Phone, MapPin, Globe, Linkedin, Award, BookOpen, Briefcase, GraduationCap, Languages, BadgeCheck, Heart, FolderGit2, FileText, Check, Plus, Users, Building, PenTool, Layers, GripVertical, ChevronUp, ChevronDown, Trash, X } from 'lucide-react';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { ResumeData } from './types';
-import { HEADING_STYLES } from './design-options';
+import React from 'react';
+import { createDynamicResume } from '@/core/resumeFactory';
+import { DynamicResumePreview } from '@/preview/DynamicResumePreview';
+import type { LayoutId, ResumeBlock, ResumeData, ResumeSection, ThemeId } from '@/types/resume-builder.types';
+import '@/styles/resume-engine.css';
 
 interface ResumePreviewProps {
-  data: ResumeData;
-  numPages: number;
+  data: any;
+  numPages?: number;
   previewRef?: React.RefObject<HTMLDivElement>;
-  zoomLevel: number;
+  zoomLevel?: number;
   onReorderSections?: (newOrder: string[]) => void;
   isThumbnail?: boolean;
   isExporting?: boolean;
@@ -18,2991 +18,803 @@ interface ResumePreviewProps {
   onSelectSection?: (sid: string) => void;
   onPageCountChange?: (count: number) => void;
   updateNested?: (path: string, value: any) => void;
+  contentWidth?: number;
 }
 
-interface PageBlock {
-  sid: string;
-  itemIndices?: number[];
+const MM_TO_PX = 3.7795;
+
+interface PageSizeDef {
+  label: string;
+  widthMm: number;
+  heightMm: number;
+  widthPx: number;
+  heightPx: number;
 }
 
-interface PageData {
-  main: PageBlock[];
-  sidebar?: PageBlock[];
-}
+const PAGE_SIZES: Record<string, PageSizeDef> = {
+  a4: {
+    label: 'A4 (210×297mm)',
+    widthMm: 210,
+    heightMm: 297,
+    widthPx: 794,
+    heightPx: 1123,
+  },
 
-/* --- Dynamic Font Loader --- */
-const GoogleFontsLoader = ({ fontFamily }: { fontFamily: string }) => {
-  useEffect(() => {
-    if (!fontFamily || ['serif', 'sans-serif', 'monospace', 'system-ui'].includes(fontFamily)) return;
+  letter: {
+    label: 'Letter (8.5×11in)',
+    widthMm: 216,
+    heightMm: 279,
+    widthPx: 816,
+    heightPx: 1056,
+  },
 
-    const linkId = `font-${fontFamily.replace(/\s+/g, '-').toLowerCase()}`;
-    if (!document.getElementById(linkId)) {
-      const link = document.createElement('link');
-      link.id = linkId;
-      link.rel = 'stylesheet';
-      const fontQuery = fontFamily.replace(/\s+/g, '+');
-      link.href = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700;900&display=swap`;
-      document.head.appendChild(link);
-    }
+  legal: {
+    label: 'Legal (8.5×14in)',
+    widthMm: 216,
+    heightMm: 356,
+    widthPx: 816,
+    heightPx: 1344,
+  },
 
-    // Force the browser to load the font into memory so it's ready for canvas
-    document.fonts.load(`700 12px '${fontFamily}'`).catch(() => { });
-    document.fonts.load(`400 12px '${fontFamily}'`).catch(() => { });
-  }, [fontFamily]);
+  a3: {
+    label: 'A3 (297×420mm)',
+    widthMm: 297,
+    heightMm: 420,
+    widthPx: 1123,
+    heightPx: 1587,
+  },
 
-  return null;
+  b5: {
+    label: 'B5 (176×250mm)',
+    widthMm: 176,
+    heightMm: 250,
+    widthPx: 665,
+    heightPx: 945,
+  },
+
+  a5: {
+    label: 'A5 (148×210mm)',
+    widthMm: 148,
+    heightMm: 210,
+    widthPx: 559,
+    heightPx: 794,
+  },
 };
 
-const getLevelPercentage = (proficiency: string): number => {
-  const p = proficiency.toLowerCase();
-  if (p.includes('native') || p.includes('expert') || p.includes('fluent') || p.includes('5/5')) return 100;
-  if (p.includes('advanced') || p.includes('4/5')) return 80;
-  if (p.includes('intermediate') || p.includes('3/5')) return 60;
-  if (p.includes('beginner') || p.includes('elementary') || p.includes('2/5')) return 40;
-  if (p.includes('limited') || p.includes('1/5')) return 20;
-  return 50; // default
+const PAGE_GAP_PX = 20;
+
+const SIDEBAR_CUSTOM_TITLES = new Set(['certifications', 'interests', 'courses', 'awards']);
+const SIDEBAR_TYPES = new Set(['skills', 'social', 'languages', 'certifications', 'header']);
+
+const isSidebarSection = (s: ResumeSection): boolean => {
+  if (SIDEBAR_TYPES.has(s.type)) return true;
+  if (s.type === 'custom') return SIDEBAR_CUSTOM_TITLES.has(s.title.toLowerCase());
+  return false;
 };
 
-const COLOR_SWATCHES = ['#1f2937', '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#ffffff'];
+const normalizeSections = (legacy: any): ResumeSection[] => {
+  const sections: ResumeSection[] = [];
+  let order = 0;
+  const content = legacy?.content || {};
+  const activeSections: string[] = legacy?.activeSections || ['summary', 'experience', 'education', 'skills'];
 
-const ResumePreview: React.FC<ResumePreviewProps> = ({ data, numPages, previewRef, zoomLevel, onReorderSections, isThumbnail = false, isExporting = false, selectedSectionId = null, onSelectSection, onPageCountChange, updateNested }) => {
-  const A4_HEIGHT_PX = 1122;
+  // Stable IDs: use a counter instead of Date.now() so style override paths remain
+  // consistent across re-renders. Date.now() changed every render, making saved
+  // styleOverrides unreachable because their keys no longer matched.
+  let sectionIdx = 0;
+  let blockIdx = 0;
+  const pushSection = (section: Omit<ResumeSection, 'id' | 'order'>) => {
+    sections.push({ ...section, order: order++, id: `s-${section.type || 'custom'}-${sectionIdx++}` });
+  };
+  const bId = (prefix: string) => `b-${prefix}-${blockIdx++}`;
 
-  // Fallback design if missing
-  const design = data.design || {
-    fontFamily: 'Inter',
-    fontSize: 10.5,
-    lineHeight: 1.45,
-    marginLR: 20,
-    marginTB: 20,
-    textColor: '#000000',
-    primaryColor: '#000000',
-    backgroundColor: '#ffffff',
-    layout: 'single',
-    applyAccentTo: [],
-    entrySpacing: 8,
-    sectionSpacing: 10,
+  const stripHtml = (html: string): string => {
+    if (!html) return '';
+    const a = String.fromCharCode(38);
+    const l = String.fromCharCode(60);
+    const g = String.fromCharCode(62);
+    let text = html
+      .replace(new RegExp(l + 'br[^' + g + ']*' + g, 'gi'), '\n')
+      .replace(new RegExp(l + '/p' + g, 'gi'), '\n')
+      .replace(new RegExp(l + '/li' + g, 'gi'), '\n')
+      .replace(new RegExp(l + 'li[^' + g + ']*' + g, 'gi'), '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(new RegExp(a + 'amp;', 'g'), a)
+      .replace(new RegExp(a + 'lt;', 'g'), l)
+      .replace(new RegExp(a + 'gt;', 'g'), g)
+      .replace(new RegExp(a + 'nbsp;', 'g'), ' ')
+      .replace(new RegExp(a + 'quot;', 'g'), '"')
+      .replace(new RegExp(a + '#x27;', 'g'), "'")
+      .replace(new RegExp(a + '#39;', 'g'), "'");
+    return text.trim();
   };
 
-  // Helper to get accent color ONLY if enabled for a specific target, otherwise use textColor
-  const getAccentColor = (target: string, fallback: string = design.textColor || '#1f2937'): string => {
-    const overridden = design.accentOverrides?.[target];
-    if (overridden) return overridden;
-    if (design.applyAccentTo?.includes(target)) return design.primaryColor || '#ff4d7d';
-    return fallback;
-  };
-
-  const parseHeadingStyleId = (idRaw: string | undefined) => {
-    const id = (idRaw || 'none').trim() || 'none';
-    const base = id.split('_')[0];
-    const params: Record<string, number> = {};
-    const matches = id.match(/_(w|t|r|s|a|o|p)(\d+)/g) || [];
-    for (const match of matches) {
-      const parts = match.match(/_(w|t|r|s|a|o|p)(\d+)/);
-      if (parts) {
-        params[parts[1]] = Number(parts[2]);
-      }
-    }
-    return { id, base, params };
-  };
-
-  const getHeadingMeta = (isSidebar: boolean) => {
-    const parsed = parseHeadingStyleId(design.headingStyle);
-    const lineColor = isSidebar
-      ? (design.textColor || '#1f2937')
-      : getAccentColor('headingsLine', design.primaryColor || '#ff4d7d');
-
-    const thicknessPx = parsed.params.t ?? (design.headingLineThickness ?? 2);
-    const widthPct = parsed.params.w ?? (design.headingLineWidth ?? 100);
-
-    return {
-      headingStyleId: parsed.id,
-      headingStyleBase: parsed.base,
-      params: parsed.params,
-      lineColor,
-      lineThick: `${thicknessPx}px`,
-      lineWidth: `${widthPct}%`,
-    };
-  };
-
-  const getSectionStyle = (isSidebar = false): React.CSSProperties => {
-    const headingColor = isSidebar
-      ? (design.textColor || '#1f2937')
-      : getAccentColor('headings', design.primaryColor || '#ff4d7d');
-
-    const base: React.CSSProperties = {
-      color: headingColor,
-      textAlign: 'left' as const,
-      textTransform: design.headingCapitalization === 'none' ? 'none' : (design.headingCapitalization || 'uppercase') as any,
-      marginBottom: `${Math.min(8, Math.max(2, (design.entrySpacing ?? 8) / 3))}mm`,
-      fontWeight: '700',
-      // Heading sizes: s=11px, m=12px, l=13px, xl=14px — never exceeds 14px
-      fontSize: design.headingSize === 's' ? '11px' : design.headingSize === 'm' ? '12px' : design.headingSize === 'l' ? '13px' : design.headingSize === 'xl' ? '14px' : '12px',
-      letterSpacing: '0.05em',
-      display: 'inline-block',
-      width: 'auto',
-      lineHeight: '1.2',
-    };
-
-    if (isSidebar) return base;
-
-    const meta = getHeadingMeta(false);
-    const knownBase = HEADING_STYLES.some(s => s.id === meta.headingStyleBase) ? meta.headingStyleBase : meta.headingStyleBase;
-    const radiusPx = meta.params.r;
-    const align = meta.params.a; // 0 left, 1 center, 2 right
-    const opacityStep = meta.params.o; // 1..10
-    const padStep = meta.params.p; // 0..8
-    const lineThick = meta.lineThick;
-    const lineWidth = meta.lineWidth;
-    const lineColor = meta.lineColor;
-
-    const alignStyle: React.CSSProperties =
-      align === 1
-        ? { marginLeft: 'auto', marginRight: 'auto', textAlign: 'center' as const }
-        : align === 2
-          ? { marginLeft: 'auto', marginRight: 0, textAlign: 'right' as const }
-          : { marginLeft: 0, marginRight: 'auto', textAlign: 'left' as const };
-
-    switch (knownBase) {
-      // ── Linear styles ──────────────────────────────────────────────────────
-      case 'underline':
-        return { ...base, ...alignStyle, display: 'block', borderBottom: `${lineThick} solid ${lineColor}`, paddingBottom: '3px', width: lineWidth };
-      case 'border-bottom':
-        return { ...base, borderBottom: `${lineThick} solid ${lineColor}`, paddingBottom: '4px', width: '100%', display: 'block' };
-      case 'overline':
-        return { ...base, ...alignStyle, display: 'block', borderTop: `${lineThick} solid ${lineColor}`, paddingTop: '4px', width: lineWidth };
-      case 'border-left':
-        return { ...base, borderLeft: `${lineThick} solid ${lineColor}`, paddingLeft: '10px' };
-      case 'border-right':
-        return { ...base, borderRight: `${lineThick} solid ${lineColor}`, paddingRight: '10px' };
-      case 'double-line':
-        return { ...base, borderTop: `${lineThick} solid ${lineColor}`, borderBottom: `${lineThick} solid ${lineColor}`, paddingTop: '3px', paddingBottom: '3px', width: '100%', display: 'block' };
-      case 'dot':
-        return { ...base }; // handled in SectionHeader with prefix element
-      // ── Fill styles ────────────────────────────────────────────────────────
-      case 'background':
-        return {
-          ...base,
-          backgroundColor: `${lineColor}${Math.max(8, Math.min(40, (opacityStep ?? 2) * 8)).toString(12).padStart(2, '0')}`,
-          padding: `${3 + (padStep ?? 1)}px ${8 + (padStep ?? 1) * 2}px`,
-          borderRadius: radiusPx != null ? `${radiusPx}px` : '6px',
-          width: '100%',
-          display: 'block',
-        };
-      case 'badge':
-        return { ...base, backgroundColor: lineColor, color: '#ffffff', padding: '3px 10px', borderRadius: radiusPx != null ? (radiusPx >= 999 ? '999px' : `${radiusPx}px`) : '6px', display: 'inline-block' };
-      case 'capsule':
-        return { ...base, border: `${lineThick} solid ${lineColor}`, padding: '2px 12px', borderRadius: '999px', display: 'inline-block' };
-      case 'shadow':
-        return { ...base, backgroundColor: `${lineColor}12`, padding: '4px 10px', borderRadius: radiusPx != null ? `${radiusPx}px` : '6px', boxShadow: `3px 3px 0 ${lineColor}22`, width: '100%', display: 'block' };
-      case 'gradient':
-        return { ...base, background: `linear-gradient(90deg, ${lineColor}22, transparent)`, padding: '4px 10px', borderRadius: radiusPx != null ? `${radiusPx}px` : '6px', width: '100%', display: 'block' };
-      // ── Special styles (handled in SectionHeader component) ─────────────────
-      case 'double-side':
-      case 'strikethrough':
-        return { ...base };
-      default:
-        return base;
-    }
-  };
-
-  // Harmonize data to handle schema variations
-  const harmonizedContent: any = (data.content || {}) as any;
-  const pInfo = (harmonizedContent.personalInfo || {}) as any;
-  const fullName = pInfo.fullName || `${pInfo.firstName || ''} ${pInfo.lastName || ''}`.trim() || 'Name';
-  const displayImage = pInfo.image || pInfo.photo || '';
-
-  const harmonizedData = {
-    ...data,
-    content: {
-      ...harmonizedContent,
-      personalInfo: {
-        ...pInfo,
-        fullName,
-        image: displayImage
-      }
-    }
-  };
-
-  const measureSidebarWidth = design.layout?.includes('wide') ? '40%' : design.layout?.includes('narrow') ? '25%' : '32%';
-
-  // State to hold page distributions calculated dynamically
-  const [pageDistributions, setPageDistributions] = useState<PageData[]>([
-    { main: (data.activeSections || []).map(sid => ({ sid })) }
-  ]);
-
-  const [stylePopup, setStylePopup] = useState<{ sid: string; index: number } | null>(null);
-
-  const onMoveItem = (sid: string, index: number, direction: 'up' | 'down') => {
-    if (!updateNested) return;
-    const contentMap = data.content as Record<string, any>;
-    const list: any = [...(contentMap?.[sid] || [])];
-    if (direction === 'up') {
-      if (index === 0) return;
-      const temp = list[index];
-      list[index] = list[index - 1];
-      list[index - 1] = temp;
-    } else {
-      if (index === list.length - 1) return;
-      const temp = list[index];
-      list[index] = list[index + 1];
-      list[index + 1] = temp;
-    }
-    updateNested(`content.${sid}`, list);
-  };
-
-  const onDeleteItem = (sid: string, index: number) => {
-    if (!updateNested) return;
-    const contentMap = data.content as Record<string, any>;
-    const list: any = contentMap?.[sid] || [];
-    const updated = list.filter((_: any, idx: any) => idx !== index);
-    updateNested(`content.${sid}`, updated);
-  };
-
-  const onOpenStylePopup = (sid: string, index: number) => {
-    setStylePopup({ sid, index });
-  };
-
-  // Pagination and Height Measurement Engine
-  const measureAndPaginate = () => {
-    const container = document.getElementById('resume-measuring-container');
-    if (!container) return;
-
-    const marginTB = design.marginTB ?? 14;
-    const marginTB_px = marginTB * 3.77952755906;
-
-    const A4_HEIGHT = 1122; // A4 height in pixels at 96 DPI
-    const maxContentHeight = A4_HEIGHT - (marginTB_px * 2) - 15; // 15px safety buffer to prevent bottom cutoff
-
-    // Measure the header height
-    const headerEl = container.querySelector('#measure-personal-header');
-    const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
-
-    const sectionSpacing_mm = design.sectionSpacing ?? 10;
-    const sectionSpacing_px = sectionSpacing_mm * 3.77952755906;
-
-    const entrySpacing_mm = design.entrySpacing ?? 8;
-    const entrySpacing_px = entrySpacing_mm * 3.77952755906;
-
-    const getItemHeight = (el: Element) => {
-      const actualHeight = el.getBoundingClientRect().height;
-
-      const text = el.textContent?.trim() || '';
-      if (text.length === 0) return actualHeight > 0 ? actualHeight : 0;
-
-      const listItems = el.querySelectorAll('li').length;
-      const paragraphs = el.querySelectorAll('p').length;
-      const lineBreaks = (el.innerHTML.match(/<br\s*\/?>/gi) || []).length;
-      const structuralLines = Math.max(1, listItems + paragraphs + lineBreaks);
-
-      const charLines = Math.ceil(text.length / 65);
-      const estimatedLines = Math.max(structuralLines, charLines);
-
-      const lineH = Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)) * (design.fontSize ?? 10.5) * 1.333;
-      const estimatedHeight = estimatedLines * lineH + 28; // 28px padding buffer
-
-      if (actualHeight > 0) {
-        return actualHeight;
-      }
-
-      return estimatedHeight;
-    };
-
-    const pages: PageData[] = [];
-    const isSidebar = design.layout?.includes('sidebar');
-
-    if (isSidebar) {
-      const sidebarSections = (data.activeSections || []).filter(sid => ['skills', 'languages', 'interests', 'awards', 'certifications', 'socials'].includes(sid));
-      const mainSections = (data.activeSections || []).filter(sid => !['skills', 'languages', 'interests', 'awards', 'certifications', 'socials', 'personalInfo'].includes(sid));
-
-      // Main column pagination
-      const mainPages: PageBlock[][] = [];
-      let currentMainPage: PageBlock[] = [];
-      let currentMainHeight = 0;
-
-      for (const sid of mainSections) {
-        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
-        if (!sectionEl) continue;
-
-        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
-        const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
-        const headerH = headerEl ? headerEl.getBoundingClientRect().height : 30;
-
-        const isSkills = sid === 'skills';
-        const isLanguages = sid === 'languages';
-        const isInterests = sid === 'interests';
-        const isCertifications = sid === 'certifications';
-        const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
-        const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
-        const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-
-        // Group items by rows to correctly paginate columns and grids side-by-side
-        const cols = (isActualGrid && !isSidebar)
-          ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
-          : 1;
-
-        const rows: number[][] = [];
-        for (let i = 0; i < items.length; i += cols) {
-          const rowIndices: number[] = [];
-          for (let j = 0; j < cols && i + j < items.length; j++) {
-            rowIndices.push(i + j);
-          }
-          rows.push(rowIndices);
-        }
-
-        let totalItemsHeight = 0;
-        for (let r = 0; r < rows.length; r++) {
-          const rowIndices = rows[r];
-          const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-          totalItemsHeight += rowHeight + (r < rows.length - 1 ? entrySpacing_px : 0);
-        }
-
-        const totalSectionHeight = Math.max(sectionEl.getBoundingClientRect().height, totalItemsHeight + headerH);
-
-        if (totalSectionHeight <= maxContentHeight - currentMainHeight) {
-          currentMainPage.push({ sid });
-          currentMainHeight += totalSectionHeight + sectionSpacing_px;
-        } else if (rows.length > 1) {
-          let tempItems: number[] = [];
-          let currentItemHeight = headerH;
-
-          for (let r = 0; r < rows.length; r++) {
-            const rowIndices = rows[r];
-            const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-
-            if (currentItemHeight + rowHeight <= maxContentHeight - currentMainHeight) {
-              tempItems.push(...rowIndices);
-              currentItemHeight += rowHeight + entrySpacing_px;
-            } else {
-              if (tempItems.length > 0) {
-                currentMainPage.push({ sid, itemIndices: tempItems });
-              }
-              if (currentMainPage.length > 0) {
-                mainPages.push(currentMainPage);
-              }
-
-              currentMainPage = [];
-              currentMainHeight = 0;
-              tempItems = [...rowIndices];
-              currentItemHeight = headerH + rowHeight + entrySpacing_px;
-            }
-          }
-          if (tempItems.length > 0) {
-            currentMainPage.push({ sid, itemIndices: tempItems });
-            currentMainHeight = currentItemHeight + sectionSpacing_px;
-          }
-        } else {
-          if (currentMainPage.length > 0) {
-            mainPages.push(currentMainPage);
-          }
-          currentMainPage = [{ sid }];
-          currentMainHeight = totalSectionHeight + sectionSpacing_px;
-        }
-      }
-      if (currentMainPage.length > 0) {
-        mainPages.push(currentMainPage);
-      }
-
-      // Sidebar column pagination
-      const sidebarPages: PageBlock[][] = [];
-      let currentSidebarPage: PageBlock[] = [];
-      let currentSidebarHeight = headerHeight; // Page 1 has personal details header in sidebar
-
-      for (const sid of sidebarSections) {
-        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
-        if (!sectionEl) continue;
-
-        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
-        const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
-        const headerH = headerEl ? headerEl.getBoundingClientRect().height : 25;
-
-        const isSkills = sid === 'skills';
-        const isLanguages = sid === 'languages';
-        const isInterests = sid === 'interests';
-        const isCertifications = sid === 'certifications';
-        const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
-        const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
-        const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-
-        // Group items by rows to correctly paginate columns and grids side-by-side (cols=1 in sidebar usually)
-        const cols = (isActualGrid && false) // Sidebar layout sidebar is always 1 column
-          ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
-          : 1;
-
-        const rows: number[][] = [];
-        for (let i = 0; i < items.length; i += cols) {
-          const rowIndices: number[] = [];
-          for (let j = 0; j < cols && i + j < items.length; j++) {
-            rowIndices.push(i + j);
-          }
-          rows.push(rowIndices);
-        }
-
-        let totalItemsHeight = 0;
-        for (let r = 0; r < rows.length; r++) {
-          const rowIndices = rows[r];
-          const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-          totalItemsHeight += rowHeight + (r < rows.length - 1 ? entrySpacing_px : 0);
-        }
-
-        const totalSectionHeight = Math.max(sectionEl.getBoundingClientRect().height, totalItemsHeight + headerH);
-
-        if (totalSectionHeight <= maxContentHeight - currentSidebarHeight) {
-          currentSidebarPage.push({ sid });
-          currentSidebarHeight += totalSectionHeight + sectionSpacing_px;
-        } else if (rows.length > 1) {
-          let tempItems: number[] = [];
-          let currentItemHeight = headerH;
-
-          for (let r = 0; r < rows.length; r++) {
-            const rowIndices = rows[r];
-            const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-
-            if (currentItemHeight + rowHeight <= maxContentHeight - currentSidebarHeight) {
-              tempItems.push(...rowIndices);
-              currentItemHeight += rowHeight + entrySpacing_px;
-            } else {
-              if (tempItems.length > 0) {
-                currentSidebarPage.push({ sid, itemIndices: tempItems });
-              }
-              if (currentSidebarPage.length > 0) {
-                sidebarPages.push(currentSidebarPage);
-              }
-
-              currentSidebarPage = [];
-              currentSidebarHeight = 0; // Page 2+ sidebar doesn't have details header
-              tempItems = [...rowIndices];
-              currentItemHeight = headerH + rowHeight + entrySpacing_px;
-            }
-          }
-          if (tempItems.length > 0) {
-            currentSidebarPage.push({ sid, itemIndices: tempItems });
-            currentSidebarHeight = currentItemHeight + sectionSpacing_px;
-          }
-        } else {
-          if (currentSidebarPage.length > 0) {
-            sidebarPages.push(currentSidebarPage);
-          }
-          currentSidebarPage = [{ sid }];
-          currentSidebarHeight = totalSectionHeight + sectionSpacing_px;
-        }
-      }
-      if (currentSidebarPage.length > 0) {
-        sidebarPages.push(currentSidebarPage);
-      }
-
-      const totalPageCount = Math.max(mainPages.length, sidebarPages.length, 1);
-      for (let i = 0; i < totalPageCount; i++) {
-        pages.push({
-          main: mainPages[i] || [],
-          sidebar: sidebarPages[i] || [],
-        });
-      }
-    } else {
-      // Single continuous vertical stream layout
-      let currentPage: PageBlock[] = [];
-      let currentHeight = headerHeight; // Page 1 starts with personal header
-
-      for (const sid of (data.activeSections || [])) {
-        const sectionEl = container.querySelector(`.measure-section[data-sid="${sid}"]`);
-        if (!sectionEl) continue;
-
-        const items = sectionEl.querySelectorAll(`.measure-item[data-sid="${sid}"]`);
-        const headerEl = sectionEl.querySelector(`.measure-header[data-sid="${sid}"]`);
-        const headerH = headerEl ? headerEl.getBoundingClientRect().height : 30;
-
-        const isSkills = sid === 'skills';
-        const isLanguages = sid === 'languages';
-        const isInterests = sid === 'interests';
-        const isCertifications = sid === 'certifications';
-        const isGridSection = ['skills', 'languages', 'interests', 'certifications', 'socials'].includes(sid);
-        const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
-        const isActualGrid = isGridSection && styleType !== 'compact' && styleType !== 'bubble';
-
-        // Group items by rows to correctly paginate columns and grids side-by-side
-        const cols = (isActualGrid && !isSidebar)
-          ? ((isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2)
-          : 1;
-
-        const rows: number[][] = [];
-        for (let i = 0; i < items.length; i += cols) {
-          const rowIndices: number[] = [];
-          for (let j = 0; j < cols && i + j < items.length; j++) {
-            rowIndices.push(i + j);
-          }
-          rows.push(rowIndices);
-        }
-
-        let totalItemsHeight = 0;
-        for (let r = 0; r < rows.length; r++) {
-          const rowIndices = rows[r];
-          const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-          totalItemsHeight += rowHeight + (r < rows.length - 1 ? entrySpacing_px : 0);
-        }
-
-        const totalSectionHeight = Math.max(sectionEl.getBoundingClientRect().height, totalItemsHeight + headerH);
-
-        if (totalSectionHeight <= maxContentHeight - currentHeight) {
-          currentPage.push({ sid });
-          currentHeight += totalSectionHeight + sectionSpacing_px;
-        } else if (rows.length > 1) {
-          let tempItems: number[] = [];
-          let currentItemHeight = headerH;
-
-          for (let r = 0; r < rows.length; r++) {
-            const rowIndices = rows[r];
-            const rowHeight = rowIndices.reduce((max, idx) => Math.max(max, getItemHeight(items[idx])), 0);
-
-            if (currentItemHeight + rowHeight <= maxContentHeight - currentHeight) {
-              tempItems.push(...rowIndices);
-              currentItemHeight += rowHeight + entrySpacing_px;
-            } else {
-              if (tempItems.length > 0) {
-                currentPage.push({ sid, itemIndices: tempItems });
-              }
-              if (currentPage.length > 0) {
-                pages.push({ main: currentPage });
-              }
-
-              currentPage = [];
-              currentHeight = 0;
-              tempItems = [...rowIndices];
-              currentItemHeight = headerH + rowHeight + entrySpacing_px;
-            }
-          }
-          if (tempItems.length > 0) {
-            currentPage.push({ sid, itemIndices: tempItems });
-            currentHeight = currentItemHeight + sectionSpacing_px;
-          }
-        } else {
-          if (currentPage.length > 0) {
-            pages.push({ main: currentPage });
-          }
-          currentPage = [{ sid }];
-          currentHeight = totalSectionHeight + sectionSpacing_px;
-        }
-      }
-      if (currentPage.length > 0) {
-        pages.push({ main: currentPage });
-      }
-    }
-
-    if (pages.length > 0) {
-      setPageDistributions(pages);
-      onPageCountChange?.(pages.length);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      measureAndPaginate();
-    }, 150);
-    return () => clearTimeout(timer);
-  }, [data, design]);
-
-  const onDragEnd = (result: any) => {
-    if (!result.destination || !onReorderSections) return;
-
-    const sourceDroppableId = result.source.droppableId;
-    const destDroppableId = result.destination.droppableId;
-
-    const sourcePageMatch = sourceDroppableId.match(/page-main-(\d+)/) || sourceDroppableId.match(/page-sidebar-(\d+)/);
-    const destPageMatch = destDroppableId.match(/page-main-(\d+)/) || destDroppableId.match(/page-sidebar-(\d+)/);
-
-    if (sourcePageMatch && destPageMatch) {
-      const sourcePageNum = parseInt(sourcePageMatch[1]);
-      const destPageNum = parseInt(destPageMatch[1]);
-
-      const isSourceSidebar = sourceDroppableId.includes('sidebar');
-      const isDestSidebar = destDroppableId.includes('sidebar');
-
-      const sourceBlocks = isSourceSidebar
-        ? (pageDistributions[sourcePageNum - 1]?.sidebar || [])
-        : (pageDistributions[sourcePageNum - 1]?.main || []);
-
-      const destBlocks = isDestSidebar
-        ? (pageDistributions[destPageNum - 1]?.sidebar || [])
-        : (pageDistributions[destPageNum - 1]?.main || []);
-
-      const draggedSid = sourceBlocks[result.source.index]?.sid;
-      if (!draggedSid) return;
-
-      const items = Array.from(data.activeSections || []);
-      const sourceIdx = items.indexOf(draggedSid);
-      items.splice(sourceIdx, 1);
-
-      const targetSid = destBlocks[result.destination.index]?.sid;
-      if (targetSid) {
-        const destIdx = items.indexOf(targetSid);
-        items.splice(destIdx, 0, draggedSid);
-      } else {
-        items.push(draggedSid);
-      }
-
-      onReorderSections(items);
-    } else {
-      const items = Array.from(data.activeSections || []);
-      const [reorderedItem] = items.splice(result.source.index, 1);
-      items.splice(result.destination.index, 0, reorderedItem);
-      onReorderSections(items);
-    }
-  };
-
-  return (
-    <div
-      className={`w-full flex flex-col items-center ${isThumbnail ? 'p-0 overflow-hidden bg-transparent' : 'pt-0 pb-0 px-0'}`}
-      style={isThumbnail ? {} : { backgroundColor: 'var(--app-bg-medium)' }}
-    >
-      <GoogleFontsLoader fontFamily={design.fontFamily || 'Inter'} />
-
-      {/* Zoom wrapper */}
-      <div
-        className="relative flex flex-col items-center"
-        style={{
-          transform: `scale(${zoomLevel / 100})`,
-          transformOrigin: 'top center',
-          marginBottom: isThumbnail ? '0' : zoomLevel < 100 ? `${(zoomLevel / 100 - 1) * (pageDistributions.length * A4_HEIGHT_PX)}px` : '0',
-        }}
-      >
-        <DragDropContext onDragEnd={onDragEnd}>
-          {pageDistributions.map((pageBlocks, pageIdx) => {
-            const pageNum = pageIdx + 1;
-
-            return (
-              <div
-                key={pageIdx}
-                ref={pageIdx === 0 ? previewRef : undefined}
-                id={pageIdx === 0 ? "resume-preview" : `resume-preview-page-${pageNum}`}
-                className={`resume-page resume-paper bg-white relative ${isExporting ? 'shadow-none' : 'shadow-2xl mb-8'}`}
-                style={{
-                  fontFamily: design.fontFamily ?? 'Inter',
-                  fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
-                  lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
-                  width: '210mm',
-                  height: '297mm',
-                  color: design.textColor || '#1f2937',
-                  paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-                  paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-                  paddingTop: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-                  paddingBottom: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-                  backgroundColor: design.backgroundColor || '#ffffff',
-                  boxSizing: 'border-box',
-                  overflow: 'hidden',
-                  colorScheme: 'light',
-                  pageBreakAfter: 'always',
-                  breakAfter: 'always',
-                }}
-              >
-                {design.layout?.includes('sidebar') ? (
-                  <SidebarLayout
-                    data={harmonizedData}
-                    getSectionStyle={getSectionStyle}
-                    isThumbnail={isThumbnail}
-                    isExporting={isExporting}
-                    selectedSectionId={selectedSectionId}
-                    onSelectSection={onSelectSection}
-                    getAccentColor={getAccentColor}
-                    getHeadingMeta={getHeadingMeta}
-                    pageNum={pageNum}
-                    pageBlocks={pageBlocks}
-                    onMoveItem={onMoveItem}
-                    onDeleteItem={onDeleteItem}
-                    onOpenStylePopup={onOpenStylePopup}
-                  />
-                ) : design.layout === 'modern-header' ? (
-                  <ModernHeaderLayout
-                    data={harmonizedData}
-                    getSectionStyle={getSectionStyle}
-                    isThumbnail={isThumbnail}
-                    isExporting={isExporting}
-                    selectedSectionId={selectedSectionId}
-                    onSelectSection={onSelectSection}
-                    getAccentColor={getAccentColor}
-                    getHeadingMeta={getHeadingMeta}
-                    pageNum={pageNum}
-                    pageBlocks={pageBlocks}
-                    onMoveItem={onMoveItem}
-                    onDeleteItem={onDeleteItem}
-                    onOpenStylePopup={onOpenStylePopup}
-                  />
-                ) : design.layout === 'double-header' ? (
-                  <DoubleHeaderLayout
-                    data={harmonizedData}
-                    getSectionStyle={getSectionStyle}
-                    isThumbnail={isThumbnail}
-                    isExporting={isExporting}
-                    selectedSectionId={selectedSectionId}
-                    onSelectSection={onSelectSection}
-                    getAccentColor={getAccentColor}
-                    getHeadingMeta={getHeadingMeta}
-                    pageNum={pageNum}
-                    pageBlocks={pageBlocks}
-                    onMoveItem={onMoveItem}
-                    onDeleteItem={onDeleteItem}
-                    onOpenStylePopup={onOpenStylePopup}
-                  />
-                ) : (
-                  <SingleColumnLayout
-                    data={harmonizedData}
-                    getSectionStyle={getSectionStyle}
-                    isThumbnail={isThumbnail}
-                    isExporting={isExporting}
-                    selectedSectionId={selectedSectionId}
-                    onSelectSection={onSelectSection}
-                    getAccentColor={getAccentColor}
-                    getHeadingMeta={getHeadingMeta}
-                    pageNum={pageNum}
-                    pageBlocks={pageBlocks}
-                    onMoveItem={onMoveItem}
-                    onDeleteItem={onDeleteItem}
-                    onOpenStylePopup={onOpenStylePopup}
-                  />
-                )}
-
-                {/* Page number badge inside preview */}
-                {!isThumbnail && !isExporting && (
-                  <div
-                    className="absolute bottom-2 right-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest pointer-events-none select-none"
-                    style={{
-                      background: 'rgba(0,0,0,0.03)',
-                      border: '1px solid rgba(0,0,0,0.05)',
-                      color: 'var(--app-text-muted)',
-                    }}
-                  >
-                    Page {pageNum} of {pageDistributions.length}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </DragDropContext>
-      </div>
-
-      {/* Hidden measuring container for high-fidelity A4 page calculations */}
-      <div
-        id="resume-measuring-container"
-        style={{
-          position: 'absolute',
-          visibility: 'hidden',
-          pointerEvents: 'none',
-          top: '-9999px',
-          left: '-9999px',
-          width: '210mm',
-          fontFamily: design.fontFamily ?? 'Inter',
-          fontSize: `${Math.min(14, Math.max(10, Math.round((design.fontSize ?? 10.5) * 1.333)))}px`,
-          lineHeight: Math.min(1.8, Math.max(1.2, design.lineHeight ?? 1.45)),
-          paddingLeft: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-          paddingRight: `${Math.min(25, Math.max(6, design.marginLR ?? 12))}mm`,
-          paddingTop: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-          paddingBottom: `${Math.min(25, Math.max(6, design.marginTB ?? 14))}mm`,
-          boxSizing: 'border-box',
-          backgroundColor: design.backgroundColor || '#ffffff',
-          color: design.textColor || '#1f2937',
-        }}
-      >
-        {/* Personal Details Header for height calculations */}
-        <div id="measure-personal-header" style={{ display: 'block', width: '100%' }}>
-          {design.layout?.includes('sidebar') ? (
-            <div
-              className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} gap-4 mb-6`}
-              style={{ width: '32%', padding: '24px', boxSizing: 'border-box' }}
-            >
-              {design.photoShow && harmonizedData.content.personalInfo.image && (
-                <div
-                  className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all"
-                  style={{
-                    borderColor: design.primaryColor || '#ff4d7d',
-                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                  }}
-                >
-                  <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                </div>
-              )}
-              <div>
-                <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : '18px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
-                <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-              </div>
-
-              <div className="flex flex-col gap-2 font-bold uppercase tracking-wide text-slate-400" style={{ fontSize: '10px' }}>
-                {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.email}</div>}
-                {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.phone}</div>}
-                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.location}</div>}
-              </div>
-            </div>
-          ) : design.layout === 'modern-header' ? (
-            <div
-              className={`flex flex-col py-10 px-8 border-b border-slate-100/50 ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
-              style={{ backgroundColor: design.secondaryColor || '#f8fafc', marginBottom: `${design.sectionSpacing || 8}mm` }}
-            >
-              {design.photoShow && harmonizedData.content.personalInfo.image && (
-                <div
-                  className="w-24 h-24 overflow-hidden border-2 mb-4 shadow-lg"
-                  style={{
-                    borderColor: design.primaryColor || '#ff4d7d',
-                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                  }}
-                >
-                  <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                </div>
-              )}
-              <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} mb-1 capitalize tracking-tight leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '28px' : design.nameSize === 'l' ? '24px' : design.nameSize === 's' ? '18px' : design.nameSize === 'xs' ? '15px' : '22px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
-              <p className="font-bold opacity-40 uppercase tracking-[0.15em] mb-3" style={{ fontSize: '10px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-
-              <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold opacity-70 ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
-                {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-900">{harmonizedData.content.personalInfo.email}</span></div>}
-                {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-900">{harmonizedData.content.personalInfo.phone}</span></div>}
-                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-900">{harmonizedData.content.personalInfo.location}</span></div>}
-              </div>
-            </div>
-          ) : design.layout === 'double-header' ? (
-            <div style={{ marginBottom: `${design.sectionSpacing || 8}mm` }}>
-              <div className="h-32 flex items-center justify-between px-12 text-white overflow-hidden relative" style={{ backgroundColor: design.primaryColor || 'black' }}>
-                <div className="flex items-center gap-6 z-10">
-                  {design.photoShow && harmonizedData.content.personalInfo.image && (
-                    <div
-                      className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
-                      style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
-                    >
-                      <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                    </div>
-                  )}
-                  <div>
-                    <h1 className={`${design.nameBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
-                    <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-                  </div>
-                </div>
-                <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
-                  <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
-                    {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.email}</div>}
-                    {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.phone}</div>}
-                  </div>
-                </div>
-              </div>
-              <div className="bg-slate-50 border-b border-slate-100 flex flex-wrap justify-center gap-6 items-center py-3 font-bold tracking-[0.15em] uppercase text-slate-400" style={{ fontSize: '10px' }}>
-                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {harmonizedData.content.personalInfo.location}</div>}
-                {harmonizedData.content.personalInfo.linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
-              </div>
-            </div>
-          ) : (
-            <div
-              className={`flex flex-col space-y-3 relative pb-6 w-full ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
-              style={{ marginBottom: `${Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}
-            >
-              <div className={`absolute bottom-0 w-32 h-1 ${design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || 'black' }} />
-
-              {design.photoShow && harmonizedData.content.personalInfo.image && (
-                <div
-                  className="w-28 h-28 bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2"
-                  style={{
-                    borderColor: design.primaryColor || 'black',
-                    borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-                  }}
-                >
-                  <img src={harmonizedData.content.personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                </div>
-              )}
-
-              <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{harmonizedData.content.personalInfo.fullName || 'Name'}</h1>
-              <p className="font-bold opacity-40 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{harmonizedData.content.personalInfo.professionalTitle || ''}</p>
-
-              <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start'}`} style={{ fontSize: '10px' }}>
-                {harmonizedData.content.personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.email}</div>}
-                {harmonizedData.content.personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.phone}</div>}
-                {harmonizedData.content.personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {harmonizedData.content.personalInfo.location}</div>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Section List for continuous layout height calculations */}
-        {design.layout?.includes('sidebar') ? (
-          <div style={{ display: 'block', width: '100%' }}>
-            {/* Float left column for sidebar */}
-            <div style={{ float: 'left', width: measureSidebarWidth, padding: '24px', boxSizing: 'border-box' }}>
-              {(harmonizedData.activeSections || [])
-                .filter(sid => ['skills', 'languages', 'interests', 'awards', 'certifications', 'socials'].includes(sid))
-                .map(sid => (
-                  <div
-                    key={sid}
-                    className="measure-section"
-                    data-sid={sid}
-                    style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
-                  >
-                    <DynamicSectionRenderer
-                      sid={sid}
-                      data={harmonizedData}
-                      layout="sidebar"
-                      getStyle={getSectionStyle}
-                      getAccentColor={getAccentColor}
-                      getHeadingMeta={getHeadingMeta}
-                      isExporting={true}
-                      isMeasuring={true}
-                    />
-                  </div>
-                ))}
-            </div>
-            {/* Margin left column for main sections */}
-            <div style={{ marginLeft: measureSidebarWidth, padding: '24px', boxSizing: 'border-box' }}>
-              {(harmonizedData.activeSections || [])
-                .filter(sid => !['skills', 'languages', 'interests', 'awards', 'certifications', 'socials', 'personalInfo'].includes(sid))
-                .map(sid => (
-                  <div
-                    key={sid}
-                    className="measure-section"
-                    data-sid={sid}
-                    style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
-                  >
-                    <DynamicSectionRenderer
-                      sid={sid}
-                      data={harmonizedData}
-                      layout="single"
-                      getStyle={getSectionStyle}
-                      getAccentColor={getAccentColor}
-                      getHeadingMeta={getHeadingMeta}
-                      isExporting={true}
-                      isMeasuring={true}
-                    />
-                  </div>
-                ))}
-            </div>
-            <div style={{ clear: 'both' }} />
-          </div>
-        ) : (
-          /* Non-sidebar continuous layouts */
-          (harmonizedData.activeSections || []).map(sid => (
-            <div
-              key={sid}
-              className="measure-section"
-              data-sid={sid}
-              style={{ marginBottom: `${design.sectionSpacing ?? 10}mm` }}
-            >
-              <DynamicSectionRenderer
-                sid={sid}
-                data={harmonizedData}
-                layout="single"
-                getStyle={getSectionStyle}
-                getAccentColor={getAccentColor}
-                getHeadingMeta={getHeadingMeta}
-                isExporting={true}
-                isMeasuring={true}
-              />
-            </div>
-          ))
-        )}
-      </div>
-
-      {stylePopup && (() => {
-        // Non-array sections (declaration) use the sid directly, without [index]
-        const overrideKey = stylePopup.index === -1
-          ? `content.${stylePopup.sid}`
-          : `content.${stylePopup.sid}[${stylePopup.index}]`;
-        const currentOverrides = data.styleOverrides?.[overrideKey] || {};
-        return (
-          <div
-            className="fixed bottom-8 right-8 w-80 bg-slate-900 border border-slate-700/60 text-white rounded-2xl shadow-2xl p-5 z-[99999] backdrop-blur-md transition-all duration-300 flex flex-col gap-4 font-sans pointer-events-auto select-none"
-            onMouseDown={e => e.stopPropagation()}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Item Style Customizer</span>
-                <span className="text-xs font-bold text-slate-200 capitalize">{stylePopup.sid} item #{stylePopup.index + 1}</span>
-              </div>
-              <button
-                onClick={() => setStylePopup(null)}
-                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-300 hover:text-white"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {/* Controls Container */}
-            <div className="flex flex-col gap-4 max-h-[350px] overflow-y-auto pr-1">
-
-              {/* Font Size */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
-                  <span>Text Size</span>
-                  <span className="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                    {currentOverrides.fontSize !== undefined ? `${currentOverrides.fontSize}px` : 'Default'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="8"
-                    max="24"
-                    value={currentOverrides.fontSize !== undefined ? currentOverrides.fontSize : 11}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, fontSize: val } });
-                    }}
-                    className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
-                  />
-                  {currentOverrides.fontSize !== undefined && (
-                    <button
-                      onClick={() => {
-                        const current = { ...(data.styleOverrides || {}) };
-                        const nextOverrides = { ...currentOverrides };
-                        delete nextOverrides.fontSize;
-                        current[overrideKey] = nextOverrides;
-                        updateNested?.('styleOverrides', current);
-                      }}
-                      className="text-[9px] font-bold text-red-400 hover:underline shrink-0"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Spacing / Margin Bottom */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
-                  <span>Item Spacing (Margin Bottom)</span>
-                  <span className="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                    {currentOverrides.marginBottom !== undefined ? `${currentOverrides.marginBottom}px` : 'Default'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="60"
-                    value={currentOverrides.marginBottom !== undefined ? currentOverrides.marginBottom : 8}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, marginBottom: val } });
-                    }}
-                    className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
-                  />
-                  {currentOverrides.marginBottom !== undefined && (
-                    <button
-                      onClick={() => {
-                        const current = { ...(data.styleOverrides || {}) };
-                        const nextOverrides = { ...currentOverrides };
-                        delete nextOverrides.marginBottom;
-                        current[overrideKey] = nextOverrides;
-                        updateNested?.('styleOverrides', current);
-                      }}
-                      className="text-[9px] font-bold text-red-400 hover:underline shrink-0"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Padding */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
-                  <span>Item Padding</span>
-                  <span className="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                    {currentOverrides.padding !== undefined ? `${currentOverrides.padding}px` : '0px'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="40"
-                    value={currentOverrides.padding !== undefined ? currentOverrides.padding : 0}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, padding: val } });
-                    }}
-                    className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* Border Style */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-300">Border Style</span>
-                <div className="flex flex-wrap gap-1">
-                  {['none', 'solid', 'dashed', 'dotted', 'double'].map(st => (
-                    <button
-                      key={st}
-                      onClick={() => {
-                        const current = data.styleOverrides || {};
-                        updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderStyle: st } });
-                      }}
-                      className={`text-[10px] px-2.5 py-1 rounded-md font-bold uppercase transition-all duration-150 ${currentOverrides.borderStyle === st ? 'bg-indigo-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/15'}`}
-                    >
-                      {st}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Border Thickness */}
-              {currentOverrides.borderStyle && currentOverrides.borderStyle !== 'none' && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
-                    <span>Border Thickness</span>
-                    <span className="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                      {currentOverrides.borderWidth !== undefined ? `${currentOverrides.borderWidth}px` : '1px'}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    value={currentOverrides.borderWidth !== undefined ? currentOverrides.borderWidth : 1}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderWidth: val } });
-                    }}
-                    className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
-                  />
-                </div>
-              )}
-
-              {/* Border Color */}
-              {currentOverrides.borderStyle && currentOverrides.borderStyle !== 'none' && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-semibold text-slate-300">Border Color</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COLOR_SWATCHES.map(col => (
-                      <button
-                        key={col}
-                        onClick={() => {
-                          const current = data.styleOverrides || {};
-                          updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderColor: col } });
-                        }}
-                        className={`w-6 h-6 rounded-md cursor-pointer transition-all duration-150 ${currentOverrides.borderColor === col ? 'scale-110 ring-2 ring-indigo-400' : 'opacity-85 hover:opacity-100'}`}
-                        style={{ backgroundColor: col }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Background Color */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-300">Background Color</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {['transparent', '#ffffff', '#f8fafc', '#f1f5f9', '#fef3c7', '#ecfdf5', '#eff6ff'].map(bg => (
-                    <button
-                      key={bg}
-                      onClick={() => {
-                        const current = data.styleOverrides || {};
-                        updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, backgroundColor: bg } });
-                      }}
-                      className={`w-6 h-6 rounded-md cursor-pointer transition-all duration-150 border border-white/20 flex items-center justify-center ${currentOverrides.backgroundColor === bg ? 'scale-110 ring-2 ring-indigo-400' : 'opacity-85 hover:opacity-100'}`}
-                      style={{ backgroundColor: bg === 'transparent' ? 'rgba(255,255,255,0.05)' : bg }}
-                    >
-                      {bg === 'transparent' && <span className="text-[9px] text-slate-400">×</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Border Radius */}
-              {currentOverrides.backgroundColor && currentOverrides.backgroundColor !== 'transparent' && (
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300">
-                    <span>Border Radius (Rounded Corners)</span>
-                    <span className="bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded text-[10px]">
-                      {currentOverrides.borderRadius !== undefined ? `${currentOverrides.borderRadius}px` : '0px'}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="24"
-                    value={currentOverrides.borderRadius !== undefined ? currentOverrides.borderRadius : 0}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      const current = data.styleOverrides || {};
-                      updateNested?.('styleOverrides', { ...current, [overrideKey]: { ...currentOverrides, borderRadius: val } });
-                    }}
-                    className="w-full accent-indigo-500 h-1 bg-white/20 rounded-lg cursor-pointer"
-                  />
-                </div>
-              )}
-
-            </div>
-
-            {/* Reset All & Apply */}
-            <div className="flex gap-2 pt-2 border-t border-white/10">
-              <button
-                onClick={() => {
-                  const current = { ...(data.styleOverrides || {}) };
-                  delete current[overrideKey];
-                  updateNested?.('styleOverrides', current);
-                }}
-                className="flex-1 py-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-xs font-bold text-red-400 transition-colors"
-              >
-                Reset All
-              </button>
-              <button
-                onClick={() => setStylePopup(null)}
-                className="flex-1 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-indigo-500/20"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-    </div>
-  );
-};
-
-/* --- Shared Components --- */
-
-const RichContent = ({ html, path, overrides, className = '', style }: { html: string; path?: string; overrides?: Record<string, React.CSSProperties>; className?: string; style?: React.CSSProperties }) => {
-  if (!html || html === '<p></p>') return null;
-  const errorPatterns = [
-    /error:\s*gemini[_\s]api[_\s]key[^.]*\./gi,
-    /error:\s*GEMINI_API_KEY[^.]*\./gi,
-    /add it to \.env\.local[^.]*\./gi,
-    /AI service temporarily unavailable[^.]*\./gi,
-    /Rate limit reached[^.]*\./gi,
+  const contactBlocks: ResumeBlock[] = [];
+  if (content.personalInfo?.email) contactBlocks.push({ id: bId('email'), type: 'text' as const, content: { text: content.personalInfo.email, _editPath: 'content.personalInfo.email' }, visible: true, order: 0 });
+  if (content.personalInfo?.phone) contactBlocks.push({ id: bId('phone'), type: 'text' as const, content: { text: content.personalInfo.phone, _editPath: 'content.personalInfo.phone' }, visible: true, order: 1 });
+  if (content.personalInfo?.location) contactBlocks.push({ id: bId('location'), type: 'text' as const, content: { text: content.personalInfo.location, _editPath: 'content.personalInfo.location' }, visible: true, order: 2 });
+
+  const imageBlock = content.personalInfo?.image || content.personalInfo?.photo ? [{
+    id: bId('photo') as string,
+    type: 'image' as const,
+    content: { src: content.personalInfo?.image || content.personalInfo?.photo || '', alt: content.personalInfo?.fullName || 'Profile', _editPath: 'content.personalInfo.image' },
+    visible: true,
+    order: -1,
+  }] : [];
+
+  const headerBlocks: ResumeBlock[] = [
+    ...imageBlock,
+    { id: bId('name'), type: 'heading', content: { text: content.personalInfo?.fullName || '', level: 1, _editPath: 'content.personalInfo.fullName' }, visible: true, order: 0 },
+    { id: bId('title'), type: 'text', content: { text: content.personalInfo?.professionalTitle || '', _editPath: 'content.personalInfo.professionalTitle' }, visible: true, order: 1 },
+    ...contactBlocks,
   ];
-  let cleaned = html;
-  for (const pattern of errorPatterns) {
-    cleaned = cleaned.replace(pattern, '');
-  }
-  cleaned = cleaned.trim();
-  if (!cleaned || cleaned === '<p></p>' || cleaned === '<p> </p>') return null;
+  pushSection({ type: 'header', title: 'Header', visible: true, blocks: headerBlocks });
 
-  if (path) {
-    let pIndex = 0;
-    let liIndex = 0;
-    cleaned = cleaned.replace(/<(p|li)(>|\s[^>]*>)/gi, (match, rawTag, rest) => {
-      const tag = rawTag.toLowerCase();
-      const idx = tag === 'p' ? pIndex++ : liIndex++;
-      const stylePath = `${path}.${tag}[${idx}]`;
-      let inlineStyle = '';
-      if (overrides && overrides[stylePath]) {
-        const styleObj = overrides[stylePath];
-        const styleStr = Object.entries(styleObj).map(([k, v]) => {
-          const dashKey = k.replace(/([A-Z])/g, "-$1").toLowerCase();
-          const value = typeof v === 'number' && k !== 'fontWeight' ? `${v}px` : v;
-          return `${dashKey}:${value}`;
-        }).join(';');
-        if (styleStr) inlineStyle = ` style="${styleStr}"`;
-      }
-      return `<${rawTag} data-style-path="${stylePath}"${inlineStyle}${rest}`;
-    });
+  if (content.personalInfo?.summary && stripHtml(content.personalInfo.summary).trim()) {
+    pushSection({ type: 'summary', title: 'Summary', visible: true, blocks: [{ id: bId('summary'), type: 'text', content: { text: stripHtml(content.personalInfo.summary), _editPath: 'content.personalInfo.summary' }, visible: true, order: 0 }] });
   }
 
-  const wrapperStyle = path && overrides && overrides[path] ? { ...style, ...overrides[path] } : style;
-  return <div className={`rich-content ${className}`} style={wrapperStyle} dangerouslySetInnerHTML={{ __html: cleaned }} {...(path ? { 'data-edit-path': path, 'data-edit-type': 'richtext' } : {})} />;
+  if (activeSections.includes('experience') && Array.isArray(content.experience)) {
+    const visibleBlocks = content.experience.map((exp: any, idx: number) => ({
+      id: bId('exp'), type: 'experience' as const,
+      content: { role: exp.position || '', company: exp.company || '', startDate: exp.startDate || '', endDate: exp.endDate || '', bullets: typeof exp.description === 'string' ? stripHtml(exp.description).split('\n').filter(Boolean).map(s => s.replace(/^-\s*/, '')) : [], _editPath: `content.experience.${idx}.position` },
+      visible: exp.hidden !== true, order: idx,
+    })).filter((b: any) => (b.content as any).role || (b.content as any).company || ((b.content as any).bullets?.length));
+    if (visibleBlocks.length > 0) pushSection({ type: 'experience', title: 'Experience', visible: true, blocks: visibleBlocks });
+  }
+
+  if (activeSections.includes('education') && Array.isArray(content.education)) {
+    pushSection({ type: 'education', title: 'Education', visible: true, blocks: content.education.map((edu: any, idx: number) => ({ id: bId('edu'), type: 'education', content: { school: edu.school || '', degree: edu.degree || '', year: edu.graduationYear || '', field: edu.field || '', _editPath: `content.education.${idx}.degree` }, visible: edu.hidden !== true, order: idx })) });
+  }
+
+  if (activeSections.includes('skills') && Array.isArray(content.skills)) {
+    const vs = content.skills.filter((s: any) => s.hidden !== true);
+    if (vs.length > 0) pushSection({ type: 'skills', title: 'Skills', visible: true, blocks: [{ id: bId('skills'), type: 'skills', content: { items: vs.map((s: any) => typeof s === 'string' ? s : s.name).filter(Boolean), _editPath: 'content.skills' }, visible: true, order: 0 }] });
+  }
+
+  if (activeSections.includes('languages') && Array.isArray(content.languages)) {
+    const v = content.languages.filter((l: any) => l.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'languages', title: 'Languages', visible: true, blocks: [{ id: bId('lang'), type: 'skills', content: { items: v.map((l: any) => [l.language, l.proficiency].filter(Boolean).join(' \u2014 ')).filter(Boolean), _editPath: 'content.languages' }, visible: true, order: 0 }] });
+  }
+
+  if (activeSections.includes('certifications') && Array.isArray(content.certifications)) {
+    const v = content.certifications.filter((c: any) => c.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Certifications', visible: true, blocks: v.map((cert: any, idx: number) => ({ id: bId('cert'), type: 'education', content: { school: cert.issuer || '', degree: cert.name || '', year: cert.date || '', _editPath: `content.certifications.${idx}.name`, _editPathSecondary: `content.certifications.${idx}.issuer` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('projects') && Array.isArray(content.projects)) {
+    const v = content.projects.filter((p: any) => p.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Projects', visible: true, blocks: v.map((proj: any, idx: number) => ({ id: bId('proj'), type: 'experience', content: { role: proj.name || '', company: Array.isArray(proj.technologies) ? proj.technologies.join(', ') : '', startDate: '', endDate: '', bullets: typeof proj.description === 'string' ? stripHtml(proj.description).split('\n').filter(Boolean).map(s => s.replace(/^-\s*/, '')) : [], _editPath: `content.projects.${idx}.name` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('awards') && Array.isArray(content.awards)) {
+    const v = content.awards.filter((a: any) => a.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Awards', visible: true, blocks: v.map((award: any, idx: number) => ({ id: bId('award'), type: 'education', content: { school: award.issuer || '', degree: award.title || '', year: award.date || '', _editPath: `content.awards.${idx}.title`, _editPathSecondary: `content.awards.${idx}.issuer` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('interests') && Array.isArray(content.interests)) {
+    const v = content.interests.filter((i: any) => i.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Interests', visible: true, blocks: [{ id: bId('interests'), type: 'skills', content: { items: v.map((i: any) => i.name || '').filter(Boolean), _editPath: 'content.interests' }, visible: true, order: 0 }] });
+  }
+
+  if (activeSections.includes('courses') && Array.isArray(content.courses)) {
+    const v = content.courses.filter((c: any) => c.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Courses', visible: true, blocks: v.map((course: any, idx: number) => ({ id: bId('course'), type: 'education', content: { school: course.provider || '', degree: course.title || '', year: course.date || '', _editPath: `content.courses.${idx}.title`, _editPathSecondary: `content.courses.${idx}.provider` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('organisations') && Array.isArray(content.organisations)) {
+    const v = content.organisations.filter((o: any) => o.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Organisations', visible: true, blocks: v.map((org: any, idx: number) => ({ id: bId('org'), type: 'experience', content: { role: org.role || '', company: org.name || '', startDate: org.startDate || '', endDate: org.endDate || '', bullets: typeof org.description === 'string' ? stripHtml(org.description).split('\n').filter(Boolean).map(s => s.replace(/^-\s*/, '')) : [], _editPath: `content.orgs.${idx}.role` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('publications') && Array.isArray(content.publications)) {
+    const v = content.publications.filter((p: any) => p.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Publications', visible: true, blocks: v.map((pub: any, idx: number) => ({ id: bId('pub'), type: 'experience', content: { role: pub.title || '', company: pub.publisher || '', startDate: pub.date || '', endDate: '', bullets: typeof pub.description === 'string' ? stripHtml(pub.description).split('\n').filter(Boolean).map(s => s.replace(/^-\s*/, '')) : [], _editPath: `content.publications.${idx}.title` }, visible: true, order: idx })) });
+  }
+
+  if (activeSections.includes('references') && Array.isArray(content.references)) {
+    const v = content.references.filter((r: any) => r.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'References', visible: true, blocks: [{ id: bId('ref'), type: 'skills', content: { items: v.map((ref: any) => [ref.name, ref.position, ref.company].filter(Boolean).join(' — ')).filter(Boolean), _editPath: 'content.references' }, visible: true, order: 0 }] });
+  }
+
+  if (activeSections.includes('socials') && Array.isArray(content.socials)) {
+    const v = content.socials.filter((s: any) => s.hidden !== true);
+    if (v.length > 0) pushSection({ type: 'custom', title: 'Links', visible: true, blocks: [{
+      id: bId('social'),
+      type: 'social',
+      content: {
+        items: v.map((s: any) => ({ label: s.label || s.platform || '', url: s.url || '' })),
+        _editPath: 'content.socials',
+      },
+      visible: true,
+      order: 0,
+    }] });
+  }
+
+  if (activeSections.includes('custom') && Array.isArray(content.custom)) {
+    const v = content.custom.filter((c: any) => c.hidden !== true);
+    if (v.length > 0) v.forEach((custom: any, idx: number) => { pushSection({ type: 'custom', title: custom.title || 'Custom', visible: true, blocks: [{ id: bId('custom'), type: 'text', content: { text: custom.content || '', _editPath: `content.custom.${idx}.content` }, visible: true, order: 0 }] }); });
+  }
+
+  if (activeSections.includes('declaration') && content.declaration?.text) {
+    pushSection({ type: 'custom', title: 'Declaration', visible: true, blocks: [{ id: bId('declaration'), type: 'text', content: { text: [content.declaration.text, content.declaration.signature ? `Signature: ${content.declaration.signature}` : '', content.declaration.date ? `Date: ${content.declaration.date}` : '', content.declaration.place ? `Place: ${content.declaration.place}` : ''].filter(Boolean).join('\n'), _editPath: 'content.declaration.text' }, visible: true, order: 0 }] });
+  }
+
+  return sections;
 };
 
-const SectionHeader = ({
-  title,
-  style,
-  headingStyle,
-  lineColor,
-  lineThick,
-  lineWidth,
-  editPath,
-  editValue,
-  editLabel,
-  textStylePath,
-  wrapperStylePath,
-  overrides,
-}: {
-  title: string;
-  style: React.CSSProperties;
-  headingStyle?: string;
-  lineColor?: string;
-  lineThick?: string;
-  lineWidth?: string;
-  editPath?: string;
-  editValue?: string;
-  editLabel?: string;
-  textStylePath?: string;
-  wrapperStylePath?: string;
-  overrides?: Record<string, React.CSSProperties>;
-}) => {
-  const lc = lineColor || '#1f2937';
-  const lt = lineThick || '2px';
-  const titleStyle = textStylePath && overrides?.[textStylePath] ? { ...style, ...overrides[textStylePath] } : style;
-  const blockStyle = wrapperStylePath && overrides?.[wrapperStylePath] ? overrides[wrapperStylePath] : {};
-  const wrapperEditableProps = editPath ? {
-    'data-edit-path': editPath,
-    'data-edit-value': editValue || title,
-    'data-edit-label': editLabel || 'Section Heading',
-  } : {};
-  const wrapperStyleProps = wrapperStylePath ? { 'data-style-path': wrapperStylePath } : {};
-  const titleEditableProps = editPath ? {
-    'data-edit-path': editPath,
-    'data-edit-value': editValue || title,
-    'data-edit-label': editLabel || 'Section Heading',
-  } : {};
-  const titleStyleProps = textStylePath ? { 'data-style-path': textStylePath } : {};
-
-  // default line width
-  const lw = lineWidth || '100%';
-
-  // convert number to %
-  const parsedWidth = lw.includes('%') ? lw : `${lw}%`;
-
-  // =========================
-  // DOT STYLE
-  // =========================
-  if ((headingStyle || '').startsWith('dot')) {
-    const sizeMatch = ((headingStyle || '').match(/_s(\d+)/) || [])[1];
-    const dotSize = sizeMatch ? `${Number(sizeMatch)}px` : '7px';
-
-    return (
-      <div
-        className="section-header-container mb-3 flex items-center gap-2"
-        style={{
-          width: parsedWidth,
-          ...blockStyle,
-        }}
-        {...wrapperEditableProps}
-        {...wrapperStyleProps}
-      >
-        <div
-          style={{
-            width: dotSize,
-            height: dotSize,
-            borderRadius: '50%',
-            backgroundColor: lc,
-            flexShrink: 0,
-          }}
-        />
-
-        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
-
-        {/* right line */}
-        <div
-          style={{
-            flex: 1,
-            height: lt,
-            backgroundColor: lc,
-            opacity: 0.3,
-          }}
-        />
-      </div>
-    );
-  }
-
-  // =========================
-  // DOUBLE SIDE STYLE
-  // =========================
-  if ((headingStyle || '').startsWith('double-side')) {
-    return (
-      <div
-        className="section-header-container mb-3 flex items-center gap-3"
-        style={{
-          width: parsedWidth,
-          ...blockStyle,
-        }}
-        {...wrapperEditableProps}
-        {...wrapperStyleProps}
-      >
-        <div
-          style={{
-            flex: 1,
-            height: lt,
-            backgroundColor: lc,
-            opacity: 0.4,
-          }}
-        />
-
-        <h2
-          style={{
-            ...titleStyle,
-            display: 'inline-block',
-            whiteSpace: 'nowrap',
-          }}
-          {...titleEditableProps}
-          {...titleStyleProps}
-        >
-          {title}
-        </h2>
-
-        <div
-          style={{
-            flex: 1,
-            height: lt,
-            backgroundColor: lc,
-            opacity: 0.4,
-          }}
-        />
-      </div>
-    );
-  }
-
-  // =========================
-  // STRIKETHROUGH STYLE
-  // =========================
-  if ((headingStyle || '').startsWith('strikethrough')) {
-    const tMatch = ((headingStyle || '').match(/_t(\d+)/) || [])[1];
-
-    const strikeH = tMatch
-      ? `${Number(tMatch)}px`
-      : lt;
-
-    return (
-      <div
-        className="section-header-container mb-3 relative flex items-center"
-        style={{
-          width: parsedWidth,
-          ...blockStyle,
-        }}
-        {...wrapperEditableProps}
-        {...wrapperStyleProps}
-      >
-        {/* line */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            width: '100%',
-            height: strikeH,
-            backgroundColor: lc,
-            opacity: 0.25,
-          }}
-        />
-
-        {/* title */}
-        <h2
-          style={{
-            ...titleStyle,
-            display: 'inline-block',
-            backgroundColor: 'white',
-            paddingLeft: '6px',
-            paddingRight: '10px',
-            position: 'relative',
-            zIndex: 2,
-          }}
-          {...titleEditableProps}
-          {...titleStyleProps}
-        >
-          {title}
-        </h2>
-      </div>
-    );
-  }
-
-  // =========================
-  // UNDERLINE STYLE
-  // =========================
-  if ((headingStyle || '').startsWith('underline')) {
-    return (
-      <div
-        className="section-header-container mb-3"
-        style={{
-          width: parsedWidth,
-          ...blockStyle,
-        }}
-        {...wrapperEditableProps}
-        {...wrapperStyleProps}
-      >
-        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
-
-        <div
-          style={{
-            marginTop: '6px',
-            width: '100%',
-            height: lt,
-            backgroundColor: lc,
-            borderRadius: '999px',
-          }}
-        />
-      </div>
-    );
-  }
-
-  // =========================
-  // LEFT BORDER STYLE
-  // =========================
-  if ((headingStyle || '').startsWith('left-border')) {
-    return (
-      <div
-        className="section-header-container mb-3 flex items-center"
-        style={{
-          width: parsedWidth,
-          borderLeft: `${lt} solid ${lc}`,
-          paddingLeft: '10px',
-          ...blockStyle,
-        }}
-        {...wrapperEditableProps}
-        {...wrapperStyleProps}
-      >
-        <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
-      </div>
-    );
-  }
-
-  // =========================
-  // DEFAULT STYLE
-  // =========================
-  return (
-    <div
-      className="section-header-container mb-3"
-      style={{
-        width: parsedWidth,
-        ...blockStyle,
-      }}
-      {...wrapperEditableProps}
-      {...wrapperStyleProps}
-    >
-      <h2 style={titleStyle} {...titleEditableProps} {...titleStyleProps}>{title}</h2>
-    </div>
-  );
+const toLayout = (layout: string | undefined): LayoutId => {
+  if (!layout) return 'single';
+  const l = layout.toLowerCase();
+  if (l.startsWith('single-') || l === 'single') return 'single';
+  if (l.startsWith('sidebar-') || l === 'sidebar') return 'sidebar';
+  if (l.startsWith('two-column-') || l === 'two-column' || l.startsWith('double-header-') || l === 'double-header') return 'double';
+  if (l.startsWith('modern-header-') || l === 'modern-header') return 'modern';
+  if (l === 'modern' || l.startsWith('modern-')) return 'modern';
+  if (l === 'creative' || l.startsWith('creative-')) return 'creative';
+  if (l === 'ats' || l.startsWith('ats-')) return 'ats';
+  if (l === 'compact' || l.startsWith('compact-')) return 'compact';
+  if (l === 'double' || l.startsWith('double-')) return 'double';
+  if (l.startsWith('timeline-') || l === 'timeline') return 'double';
+  if (l.startsWith('card-') || l === 'card' || l.startsWith('infographic-') || l === 'infographic') return 'creative';
+  return 'single';
 };
 
-const SortableSection = ({ id, pageNum, index, children, isSelected, onSelect }: { id: string, pageNum: number, index: number, children: React.ReactNode, isSelected?: boolean, onSelect?: () => void }) => (
-  <Draggable draggableId={`${id}-${pageNum}`} index={index}>
-    {(provided, snapshot) => (
-      <div
-        ref={provided.innerRef}
-        {...provided.draggableProps}
-        className={`relative group/section ${snapshot.isDragging ? 'bg-blue-50/30 ring-2 ring-blue-200 ring-offset-4 rounded-xl scale-[1.01] z-50' : ''} ${isSelected ? 'ring-2 ring-slate-900 ring-offset-4 rounded-xl' : ''}`}
-        style={{
-          ...provided.draggableProps.style,
-          breakInside: 'avoid',
-          pageBreakInside: 'avoid',
-        }}
-      >
-        <div
-          {...provided.dragHandleProps}
-          className="absolute -left-10 top-0 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab text-slate-300 hover:text-slate-900"
-          title="Drag to reorder section"
-        >
-          <GripVertical className="w-5 h-5" />
-        </div>
-        {!snapshot.isDragging && onSelect && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSelect(); }}
-            className="absolute -left-10 top-10 p-2 opacity-0 group-hover/section:opacity-100 transition-opacity text-slate-300 hover:text-slate-900"
-            title="Select section to edit"
-          >
-            <Check className="w-5 h-5" />
-          </button>
-        )}
-        {children}
-      </div>
-    )}
-  </Draggable>
-);
+const toTheme = (layoutId: LayoutId): ThemeId => {
+  if (layoutId === 'creative') return 'creative';
+  if (layoutId === 'ats') return 'ats';
+  if (layoutId === 'modern') return 'default';
+  return 'executive';
+};
 
-/* --- Dynamic Global Section Renderer --- */
+const headingSizeMultiplier: Record<string, number> = { s: 0, m: 2, l: 4, xl: 6 };
 
-const DynamicSectionRenderer = ({ sid, data, layout, getStyle, getAccentColor, getHeadingMeta, isExporting, itemIndices, isMeasuring, onMoveItem, onDeleteItem, onOpenStylePopup, isThumbnail }: { sid: string, data: ResumeData, layout: 'sidebar' | 'modern' | 'single' | 'double', getStyle: any, getAccentColor: any, getHeadingMeta: (isSidebar: boolean) => { headingStyleId: string; lineColor: string; lineThick: string; lineWidth: string }, isExporting?: boolean, itemIndices?: number[], isMeasuring?: boolean, onMoveItem?: (sid: string, index: number, direction: 'up' | 'down') => void, onDeleteItem?: (sid: string, index: number) => void, onOpenStylePopup?: (sid: string, index: number) => void, isThumbnail?: boolean }) => {
-  const design = data.design || {} as any;
-  const content = data.content || {} as any;
-  const personalInfo = content.personalInfo || {} as any;
-  const headingMeta = getHeadingMeta(layout === 'sidebar');
-
-  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
-    const overrides = data.styleOverrides?.[path];
-    if (!overrides) return baseStyle;
-    return { ...baseStyle, ...overrides };
+/** Compute globalStyle from design settings — used in both code paths */
+const computeGlobalStyle = (design: any) => {
+  const baseFontSize = design.fontSize || 10.5;
+  const headingMult = headingSizeMultiplier[design.headingSize || 'm'] || 2;
+  const mlRounded = Math.round((design.marginLR ?? 10) * MM_TO_PX);
+  const mtRounded = Math.round((design.marginTB ?? 10) * MM_TO_PX);
+  const pageSizeKey = design.pageSize || 'a4';
+  const pageSizeDef = PAGE_SIZES[pageSizeKey] || PAGE_SIZES.a4;
+  return {
+    typography: {
+      body: baseFontSize,
+      small: Math.max(baseFontSize - 1.5, 8),
+      h3: baseFontSize + headingMult,
+      h2: baseFontSize + headingMult + 2,
+      h1: baseFontSize + headingMult + 4,
+      lineHeight: design.lineHeight || 1.45,
+      letterSpacing: 0.1,
+    } as any,
+    page: {
+      size: design.pageSize === 'letter' ? 'Letter' as const : 'A4' as const,
+      widthPx: pageSizeDef.widthPx - mlRounded * 2,
+      minHeightPx: pageSizeDef.heightPx - mtRounded * 2,
+      marginX: design.marginLR ?? 12,
+      marginY: design.marginTB ?? 16,
+    },
+    spacing: {
+      sectionGap: design.sectionSpacing != null ? design.sectionSpacing * MM_TO_PX : 0,
+      blockGap: design.entrySpacing != null ? design.entrySpacing * MM_TO_PX : 8,
+      pagePaddingX: 0,
+      pagePaddingY: 0,
+    },
+    fonts: {
+      body: `'${design.fontFamily || 'Inter'}', sans-serif`,
+      heading: `'${design.fontFamily || 'Inter'}', sans-serif`,
+    },
+    colors: {
+      primary: design.primaryColor || '#2563eb',
+      secondary: design.secondaryColor || design.primaryColor || '#4f46e5',
+      accent: design.accentColor || design.primaryColor || '#06b6d4',
+      text: design.textColor || '#111827',
+      textMuted: design.textColor ? adjustBrightness(design.textColor, 40) : '#4b5563',
+      background: design.backgroundColor || '#ffffff',
+      surface: design.backgroundColor === '#ffffff' ? '#f8fafc' : adjustBrightness(design.backgroundColor || '#ffffff', 5),
+      border: design.borderColor || adjustBrightness(design.textColor || '#111827', -60),
+    },
   };
-  const getSectionTitle = (sectionId: string, fallback: string) => {
-    return design.sectionTitles?.[sectionId] || fallback;
-  };
+};
 
-  if (sid === 'summary' && personalInfo.summary) {
-    return (
-      <div style={{
-        marginBottom: `${design.sectionSpacing ?? 8}mm`,
-        breakInside: 'avoid',
-        pageBreakInside: 'avoid',
-      }}>
-        {design.showSummaryHeading && (
-          <div className="measure-header" data-sid={sid}>
-            <SectionHeader
-              title={getSectionTitle(sid, layout === 'single' ? 'Professional Profile' : 'Profile')}
-              style={layout === 'single' ? { ...getStyle(false), textAlign: 'center', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
-              headingStyle={headingMeta.headingStyleId}
-              lineColor={headingMeta.lineColor}
-              lineThick={headingMeta.lineThick}
-              lineWidth={headingMeta.lineWidth}
-              editPath={`design.sectionTitles.${sid}`}
-              editValue={getSectionTitle(sid, layout === 'single' ? 'Professional Profile' : 'Profile')}
-              editLabel="Section Heading"
-              textStylePath={`sectionTitle.${sid}.text`}
-              wrapperStylePath={`sectionTitle.${sid}.block`}
-              overrides={data.styleOverrides}
-            />
-          </div>
-        )}
-        <RichContent html={personalInfo.summary} className={`leading-relaxed opacity-80 ${layout === 'single' ? 'font-medium italic text-slate-600' : ''}`} style={{ fontSize: '11px' } as any} path="content.personalInfo.summary" overrides={data.styleOverrides} />
-      </div>
-    );
+/**
+ * Ensure every block has a valid _editPath so the inline editor can save/read style overrides.
+ * Without this, clicking on custom section content (e.g. KEY ACHIEVEMENT paragraph) would
+ * find an empty path and style overrides would not persist or apply.
+ *
+ * Paths MUST match those generated by normalizeSections so styleOverrides saved via
+ * the InlineEditor (which uses data-edit-path from the DOM) can be found by
+ * getStyleOverrideForPath in DynamicBlockRenderer.
+ */
+const ensureBlockEditPaths = (resume: ResumeData): ResumeData => {
+  const sections = (resume as any).sections;
+  if (!Array.isArray(sections)) return resume;
+
+  for (const section of sections) {
+    if (!Array.isArray(section.blocks)) continue;
+    for (let blockIdx = 0; blockIdx < section.blocks.length; blockIdx++) {
+      const block = section.blocks[blockIdx];
+      const content = block.content as any;
+      if (!content) continue;
+
+      // If _editPath is already set, skip
+      if (content._editPath) continue;
+
+      // Generate a path based on section type and block position.
+      // These paths MUST stay consistent with normalizeSections so styleOverrides
+      // saved via the InlineEditor (which uses data-edit-path from the DOM) can be
+      // found by getStyleOverrideForPath in DynamicBlockRenderer.
+      const sectionType = section.type || 'custom';
+
+      if (sectionType === 'summary') {
+        content._editPath = 'content.personalInfo.summary';
+      } else if (sectionType === 'experience') {
+        content._editPath = `content.experience.${blockIdx}.position`;
+      } else if (sectionType === 'education') {
+        content._editPath = `content.education.${blockIdx}.degree`;
+      } else if (sectionType === 'skills') {
+        content._editPath = 'content.skills';
+      } else if (sectionType === 'languages') {
+        content._editPath = 'content.languages';
+      } else if (sectionType === 'header') {
+        // For header blocks, try to infer from block content
+        if (block.type === 'heading') {
+          content._editPath = 'content.personalInfo.fullName';
+        } else {
+          content._editPath = `content.personalInfo.${block.type === 'text' ? 'professionalTitle' : 'fullName'}`;
+        }
+      } else {
+        // For custom sections (certifications, projects, awards, courses, organisations, etc.)
+        // use a stable content-based path instead of section-ID-based paths which
+        // change across renders (sections use Date.now() in their IDs).
+        content._editPath = `content.${section.title.toLowerCase()}.${blockIdx}.content`;
+      }
+    }
   }
+  return resume;
+};
 
-  if (sid === 'declaration' && content.declaration) {
-    const declaration = content.declaration;
-    // declaration is a plain object, NOT an array. Use sid as override key directly (no [0] index).
-    const overridesKey = `content.${sid}`;
-    const styleOverrides = data.styleOverrides?.[overridesKey] || {};
-    return (
-      <div className="group/item" style={{
-        position: 'relative',
-        marginBottom: `${design.sectionSpacing ?? 8}mm`,
-        breakInside: 'avoid',
-        pageBreakInside: 'avoid',
-        borderStyle: styleOverrides.borderStyle || 'none',
-        borderColor: styleOverrides.borderColor || 'transparent',
-        borderWidth: styleOverrides.borderWidth !== undefined ? `${styleOverrides.borderWidth}px` : '0px',
-        padding: styleOverrides.padding !== undefined ? `${styleOverrides.padding}px` : '0px',
-        backgroundColor: styleOverrides.backgroundColor || 'transparent',
-        borderRadius: styleOverrides.borderRadius !== undefined ? `${styleOverrides.borderRadius}px` : '0px',
-      }}>
-        <div className="measure-header" data-sid={sid}>
-          <SectionHeader
-            title={getSectionTitle(sid, 'Declaration')}
-            style={getStyle(layout === 'sidebar')}
-            headingStyle={headingMeta.headingStyleId}
-            lineColor={headingMeta.lineColor}
-            lineThick={headingMeta.lineThick}
-            lineWidth={headingMeta.lineWidth}
-            editPath={`design.sectionTitles.${sid}`}
-            editValue={getSectionTitle(sid, 'Declaration')}
-            editLabel="Section Heading"
-            textStylePath={`sectionTitle.${sid}.text`}
-            wrapperStylePath={`sectionTitle.${sid}.block`}
-            overrides={data.styleOverrides}
-          />
-        </div>
-        {!isExporting && !isThumbnail && !isMeasuring && (
-          <div className="absolute -top-3 -right-1 hidden group-hover/item:flex items-center gap-1 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                // Use a special sentinel index (-1) to signal non-array section
-                onOpenStylePopup?.(sid, -1);
-              }}
-              className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
-              title="Customize Style"
-            >
-              <PenTool size={11} strokeWidth={2.5} />
-            </button>
-          </div>
-        )}
-        <div className="space-y-3 opacity-80 text-[1em] measure-item"
-          data-sid={sid}
-          data-index={-1}
-        >
-          <p data-edit-path="content.declaration.text" data-edit-label="Declaration Text" data-edit-value={declaration.text || ''} data-style-path={`content.${sid}`}
-            style={{
-              fontSize: (data.styleOverrides?.[`content.${sid}`]?.fontSize !== undefined ? `${data.styleOverrides?.[`content.${sid}`]?.fontSize}px` : 'inherit'),
-              fontWeight: data.styleOverrides?.[`content.${sid}`]?.fontWeight || 'inherit',
-              fontStyle: data.styleOverrides?.[`content.${sid}`]?.fontStyle || 'inherit',
-              textDecoration: data.styleOverrides?.[`content.${sid}`]?.textDecoration || 'inherit',
-              color: data.styleOverrides?.[`content.${sid}`]?.color || 'inherit',
-              fontFamily: data.styleOverrides?.[`content.${sid}`]?.fontFamily || 'inherit',
-              textAlign: (data.styleOverrides?.[`content.${sid}`]?.textAlign as any) || 'inherit',
-            }}
-          >{declaration.text || 'Your declaration text...'}</p>
-          <div className="flex gap-10 font-semibold opacity-60 text-[0.85em]">
-            {declaration.date && <span data-edit-path="content.declaration.date" data-edit-label="Date" data-style-path="content.declaration.date"
-              style={{
-                fontSize: (data.styleOverrides?.['content.declaration.date']?.fontSize !== undefined ? `${data.styleOverrides?.['content.declaration.date']?.fontSize}px` : 'inherit'),
-                fontWeight: data.styleOverrides?.['content.declaration.date']?.fontWeight || 'inherit',
-                fontStyle: data.styleOverrides?.['content.declaration.date']?.fontStyle || 'inherit',
-                textDecoration: data.styleOverrides?.['content.declaration.date']?.textDecoration || 'inherit',
-                color: data.styleOverrides?.['content.declaration.date']?.color || 'inherit',
-                fontFamily: data.styleOverrides?.['content.declaration.date']?.fontFamily || 'inherit',
-                textAlign: (data.styleOverrides?.['content.declaration.date']?.textAlign as any) || 'inherit',
-              }}
-            >{declaration.date}</span>}
-            {declaration.place && <span data-edit-path="content.declaration.place" data-edit-label="Place" data-style-path="content.declaration.place"
-              style={{
-                fontSize: (data.styleOverrides?.['content.declaration.place']?.fontSize !== undefined ? `${data.styleOverrides?.['content.declaration.place']?.fontSize}px` : 'inherit'),
-                fontWeight: data.styleOverrides?.['content.declaration.place']?.fontWeight || 'inherit',
-                fontStyle: data.styleOverrides?.['content.declaration.place']?.fontStyle || 'inherit',
-                textDecoration: data.styleOverrides?.['content.declaration.place']?.textDecoration || 'inherit',
-                color: data.styleOverrides?.['content.declaration.place']?.color || 'inherit',
-                fontFamily: data.styleOverrides?.['content.declaration.place']?.fontFamily || 'inherit',
-                textAlign: (data.styleOverrides?.['content.declaration.place']?.textAlign as any) || 'inherit',
-              }}
-            >{declaration.place}</span>}
-          </div>
-        </div>
-      </div>
-    );
-  }
+/**
+ * Backwards-compat migration: converts old-format Languages sections into the new
+ * `skills` block format so design controls (Style/Columns/Gap/etc.) take effect.
+ *
+ * Handles three legacy shapes:
+ *  1. One text block per language (e.g. one text block "English — Native")
+ *  2. A single text block with the languages joined by " · " or " • " or ", "
+ *  3. A single text block where each line is a language
+ */
+const migrateOldLanguagesFormat = (data: any): void => {
+  const sections = (data as any).sections;
+  if (!Array.isArray(sections)) return;
+  for (let s = 0; s < sections.length; s++) {
+    const sec = sections[s];
+    if (!sec || sec.type !== 'languages' || !Array.isArray(sec.blocks) || sec.blocks.length === 0) continue;
 
-  if (['skills', 'interests', 'languages', 'certifications', 'socials'].includes(sid)) {
-    const isLanguages = sid === 'languages';
-    const isSkills = sid === 'skills';
-    const isInterests = sid === 'interests';
-    const isCertifications = sid === 'certifications';
+    // Skip if already migrated (first block is type 'skills')
+    if (sec.blocks[0]?.type === 'skills') continue;
 
-    const styleType = isSkills ? design.skillsStyle : isInterests ? design.interestsStyle : isLanguages ? design.languagesStyle : design.certificationsStyle || 'grid';
-    const columns = (isSkills ? design.skillsColumns : isInterests ? design.interestsColumns : isLanguages ? design.languagesColumns : design.certificationsColumns) || 2;
-
-    const items = isLanguages
-      ? (content.languages || [])
-      : isCertifications
-        ? (content.certifications || [])
-        : isSkills
-          ? (content.skills || [])
-          : isInterests
-            ? (content.interests || [])
-            : (content.socials || []);
-
-    const safeItems = Array.isArray(items) ? items : [];
-    const hasText = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
-    const normalizedItems = safeItems
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => {
-        const record = item as any;
-        if (!item) return false;
-        if (typeof item === 'object' && record.hidden === true) return false;
-        if (typeof item === 'string') return hasText(item);
-        if (isLanguages) return hasText(record.language);
-        if (isCertifications) return hasText(record.name);
-        if (sid === 'socials') return Boolean(record.platform || record.label || record.url);
-        if (isSkills || isInterests) return hasText(record.name) || hasText(record.label);
-        return true;
-      });
-
-    const filteredItems = itemIndices
-      ? normalizedItems.filter(({ index }) => itemIndices.includes(index))
-      : normalizedItems;
-
-    if (!filteredItems.length) return null;
-
-    const getLevel = (item: any) => {
-      if (typeof item === 'string') return getLevelPercentage(item);
-      if (isLanguages) return getLevelPercentage(item.proficiency || '');
-      return 50;
-    };
-
-    const getItemLabel = (item: any) => {
-      if (typeof item === 'string') return item;
-      if (isLanguages) {
-        const langName = item.language || '';
-        return langName;
+    // Case 1: Multiple text blocks (old format — one per language)
+    const allTextBlocks = sec.blocks.filter((b: any) => b.type === 'text' && b.content && typeof b.content.text === 'string');
+    if (allTextBlocks.length > 1) {
+      const items = allTextBlocks.map((b: any) => b.content.text.trim()).filter(Boolean);
+      if (items.length > 0) {
+        sec.blocks = [{
+          id: `b-lang-${s}`,
+          type: 'skills',
+          content: { items, _editPath: 'content.languages' },
+          visible: true,
+          order: 0,
+        }];
       }
-      if (isCertifications) return `${item.name || ''}${item.issuer ? ` (${item.issuer})` : ''}`;
-      if (sid === 'socials') return item.platform || item.label || item.url || '';
-      if (isSkills || isInterests) return item.name || item.label || '';
-      return item.label || item.name || '';
-    };
-
-    const getLanguageLabel = (item: any) => {
-      if (typeof item === 'string') return item;
-      const name = item.language || '';
-      const prof = item.proficiency || '';
-      return prof ? `${name} — ${prof}` : name;
-    };
-
-    const getItemEditMeta = (item: any, originalIndex: number) => {
-      if (isLanguages) {
-        return {
-          path: `content.languages[${originalIndex}].__composite`,
-          label: 'Language',
-          value: getLanguageLabel(item),
-          composite: 'language-line',
-        };
-      }
-      if (isSkills) {
-        return {
-          path: `content.skills[${originalIndex}].name`,
-          label: 'Skill',
-          value: getItemLabel(item),
-        };
-      }
-      if (isInterests) {
-        return {
-          path: `content.interests[${originalIndex}].name`,
-          label: 'Interest',
-          value: getItemLabel(item),
-        };
-      }
-      if (isCertifications) {
-        return {
-          path: `content.certifications[${originalIndex}].name`,
-          label: 'Certification',
-          value: typeof item === 'object' ? item.name || '' : String(item || ''),
-        };
-      }
-      if (sid === 'socials') {
-        return {
-          path: `content.socials[${originalIndex}].label`,
-          label: 'Social Link',
-          value: typeof item === 'object' ? (item.label || item.platform || item.url || '') : String(item || ''),
-        };
-      }
-      return {
-        path: `content.${sid}[${originalIndex}].name`,
-        label: 'Text',
-        value: getItemLabel(item),
-      };
-    };
-
-    const isFirstChunk = !itemIndices || itemIndices.includes(0);
-    const defaultSectionTitle = isSkills ? 'Skills' : isInterests ? 'Interests' : isLanguages ? 'Languages' : isCertifications ? 'Certifications' : 'Socials';
-    const baseSectionTitle = getSectionTitle(sid, defaultSectionTitle);
-    const displayTitle = `${baseSectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
-
-    const GridEntryContainer = ({ originalIndex, children, className = "" }: { originalIndex: number, children: React.ReactNode, className?: string }) => {
-      const overrides = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
-      return (
-        <div
-          className={`group/item relative transition-all duration-200 ${className}`}
-          style={{
-            display: 'inline-block',
-            verticalAlign: 'middle',
-            breakInside: 'avoid',
-            pageBreakInside: 'avoid',
-            marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : '4px',
-            borderStyle: overrides.borderStyle || 'none',
-            borderColor: overrides.borderColor || 'transparent',
-            borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
-            padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
-            backgroundColor: overrides.backgroundColor || 'transparent',
-            borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
-            boxShadow: overrides.boxShadow || 'none',
-            transition: 'all 0.2s ease',
-          }}
-        >
-          {/* Hover controls overlay */}
-          {/* {!isExporting && !isThumbnail && !isMeasuring && (
-            <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none scale-75 origin-top-right">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onMoveItem?.(sid, originalIndex, 'up');
-                }}
-                disabled={originalIndex === 0}
-                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                title="Move Up"
-              >
-                <ChevronUp size={11} strokeWidth={2.5} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onMoveItem?.(sid, originalIndex, 'down');
-                }}
-                disabled={originalIndex === safeItems.length - 1}
-                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                title="Move Down"
-              >
-                <ChevronDown size={11} strokeWidth={2.5} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOpenStylePopup?.(sid, originalIndex);
-                }}
-                className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
-                title="Customize Style"
-              >
-                <PenTool size={11} strokeWidth={2.5} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onDeleteItem?.(sid, originalIndex);
-                }}
-                className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
-                title="Delete Item"
-              >
-                <Trash size={11} strokeWidth={2.5} />
-              </button>
-            </div>
-          )} */}
-          {/* Content scaled styles wrapper */}
-          <div style={{
-            fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit',
-            fontWeight: overrides.fontWeight || 'inherit',
-            fontStyle: overrides.fontStyle || 'inherit',
-            textDecoration: overrides.textDecoration || 'inherit',
-            color: overrides.color || 'inherit',
-            fontFamily: overrides.fontFamily || 'inherit',
-            textAlign: (overrides.textAlign as any) || 'inherit',
-          }}>
-            {children}
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <div style={{
-        marginBottom: `${design.sectionSpacing ?? 8}mm`,
-        breakInside: 'avoid',
-        pageBreakInside: 'avoid',
-      }}>
-        <div className="measure-header" data-sid={sid}>
-          <SectionHeader
-            title={displayTitle}
-            style={getStyle(layout === 'sidebar')}
-            headingStyle={headingMeta.headingStyleId}
-            lineColor={headingMeta.lineColor}
-            lineThick={headingMeta.lineThick}
-            lineWidth={headingMeta.lineWidth}
-            editPath={isFirstChunk ? `design.sectionTitles.${sid}` : undefined}
-            editValue={baseSectionTitle}
-            editLabel="Section Heading"
-            textStylePath={`sectionTitle.${sid}.text`}
-            wrapperStylePath={`sectionTitle.${sid}.block`}
-            overrides={data.styleOverrides}
-          />
-        </div>
-
-        {styleType === 'compact' ? (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-80 font-medium" style={{ fontSize: '11px' }}>
-            {filteredItems.map(({ item, index: originalIndex }, i) => {
-              const editMeta = getItemEditMeta(item, originalIndex);
-              return (
-                <React.Fragment key={i}>
-                  <GridEntryContainer originalIndex={originalIndex} className="w-auto">
-                    <span
-                      className="measure-item animate-none"
-                      data-sid={sid}
-                      data-index={originalIndex}
-                      data-edit-path={editMeta.path}
-                      data-edit-label={editMeta.label}
-                      data-edit-value={editMeta.value}
-                      data-edit-composite={editMeta.composite || ''}
-                      data-style-path={`content.${sid}[${originalIndex}]`}
-                    >
-                      {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
-                    </span>
-                  </GridEntryContainer>
-                  {i < filteredItems.length - 1 && <span className="opacity-30 mx-1">•</span>}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        ) : styleType === 'bubble' ? (
-          <div className="flex flex-wrap gap-1.5">
-            {filteredItems.map(({ item, index: originalIndex }, i) => {
-              const editMeta = getItemEditMeta(item, originalIndex);
-              return (
-                <GridEntryContainer key={i} originalIndex={originalIndex} className="w-auto">
-                  <span
-                    className="px-2.5 py-0.5 rounded-full font-semibold opacity-80 measure-item block text-center"
-                    data-sid={sid}
-                    data-index={originalIndex}
-                    data-edit-path={editMeta.path}
-                    data-edit-label={editMeta.label}
-                    data-edit-value={editMeta.value}
-                    data-edit-composite={editMeta.composite || ''}
-                    data-style-path={`content.${sid}[${originalIndex}]`}
-                    style={{ fontSize: '10px', color: getAccentColor('dots'), backgroundColor: `${design.primaryColor || '#ff4d7d'}12`, border: `1px solid ${design.primaryColor || '#ff4d7d'}25` }}
-                  >
-                    {isLanguages ? getLanguageLabel(item) : getItemLabel(item)}
-                  </span>
-                </GridEntryContainer>
-              );
-            })}
-          </div>
-        ) : styleType === 'level' ? (
-          <div className={`grid gap-x-4 gap-y-2`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-            {filteredItems.map(({ item, index: originalIndex }, i) => {
-              const level = getLevel(item);
-              const editMeta = getItemEditMeta(item, originalIndex);
-              return (
-                <GridEntryContainer key={i} originalIndex={originalIndex}>
-                  <div
-                    className="space-y-1 measure-item"
-                    data-sid={sid}
-                    data-index={originalIndex}
-                    data-edit-path={editMeta.path}
-                    data-edit-label={editMeta.label}
-                    data-edit-value={editMeta.value}
-                    data-edit-composite={editMeta.composite || ''}
-                    data-style-path={`content.${sid}[${originalIndex}]`}
-                  >
-                    <div className="flex justify-between items-center font-semibold opacity-80" style={{ fontSize: '11px' }}>
-                      <span>{getItemLabel(item)}</span>
-                      {isLanguages && typeof item === 'object' && item !== null && 'language' in item && 'proficiency' in item && <span className="opacity-40" style={{ fontSize: '10px' }}>{(item as any).proficiency}</span>}
-                    </div>
-                    <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${isExporting ? '' : 'transition-all'}`} style={{ width: `${level}%`, backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                    </div>
-                  </div>
-                </GridEntryContainer>
-              );
-            })}
-          </div>
-        ) : (
-          /* Default: GRID */
-          <div className={`grid gap-x-3 gap-y-1`} style={{ gridTemplateColumns: layout === 'sidebar' ? '1fr' : `repeat(${columns}, minmax(0, 1fr))` }}>
-            {filteredItems.map(({ item, index: originalIndex }, i) => {
-              const editMeta = getItemEditMeta(item, originalIndex);
-              return (
-                <GridEntryContainer key={i} originalIndex={originalIndex}>
-                  <div
-                    className="flex items-center gap-1.5 font-medium opacity-80 measure-item"
-                    data-sid={sid}
-                    data-index={originalIndex}
-                    data-edit-path={editMeta.path}
-                    data-edit-label={editMeta.label}
-                    data-edit-value={editMeta.value}
-                    data-edit-composite={editMeta.composite || ''}
-                    data-style-path={`content.${sid}[${originalIndex}]`}
-                    style={{ fontSize: '11px' }}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                    <span>{isLanguages ? getLanguageLabel(item) : getItemLabel(item)}</span>
-                  </div>
-                </GridEntryContainer>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  type ResumeItem = {
-    t: string;
-    s?: string;
-    d?: string;
-    desc?: string;
-
-    tPath?: string;
-    sPath?: string;
-    dPath?: string;
-    descPath?: string;
-  };
-
-  type ListProps = {
-    title: string;
-    section: string;
-    items: ResumeItem[];
-  };
-
-  const safeArr = (v: any): any[] =>
-    Array.isArray(v) ? v : [];
-
-  /* ======================================================
-     ALL SECTION CONFIG
-  ====================================================== */
-
-  const SECTION_CONFIG: Record<string, any> = {
-    experience: {
-      title: 'Experience',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.position || '',
-        s: x.company || '',
-        d: `${x.startDate || ''}${x.endDate ? ` — ${x.endDate}` : ''}`,
-        desc: x.description || '',
-
-        tPath: `content.experience[${i}].position`,
-        sPath: `content.experience[${i}].company`,
-        dPath: `content.experience[${i}].startDate`,
-        descPath: `content.experience[${i}].description`,
-      }),
-    },
-
-    education: {
-      title: 'Education',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t:
-          design.educationOrder === 'school-degree'
-            ? x.school
-            : x.degree,
-
-        s:
-          design.educationOrder === 'school-degree'
-            ? `${x.degree || ''} ${x.field ? `in ${x.field}` : ''}`
-            : x.school,
-
-        d: x.graduationYear || '',
-        desc: x.description || '',
-
-        tPath: `content.education[${i}].${design.educationOrder === 'school-degree'
-          ? 'school'
-          : 'degree'
-          }`,
-
-        sPath: `content.education[${i}].${design.educationOrder === 'school-degree'
-          ? 'degree'
-          : 'school'
-          }`,
-
-        dPath: `content.education[${i}].graduationYear`,
-        descPath: `content.education[${i}].description`,
-      }),
-    },
-
-    projects: {
-      title: 'Projects',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.name || '',
-
-        s: Array.isArray(x.technologies)
-          ? x.technologies.join(', ')
-          : x.technologies || '',
-
-        d: '',
-        desc: x.description || '',
-
-        tPath: `content.projects[${i}].name`,
-        sPath: `content.projects[${i}].technologies`,
-        descPath: `content.projects[${i}].description`,
-      }),
-    },
-
-    awards: {
-      title: 'Awards',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.title || '',
-        s: x.issuer || '',
-        d: x.date || '',
-        desc: x.description || '',
-
-        tPath: `content.awards[${i}].title`,
-        sPath: `content.awards[${i}].issuer`,
-        dPath: `content.awards[${i}].date`,
-        descPath: `content.awards[${i}].description`,
-      }),
-    },
-
-    courses: {
-      title: 'Courses',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.title || '',
-        s: x.provider || '',
-        d: x.date || '',
-        desc: x.description || '',
-
-        tPath: `content.courses[${i}].title`,
-        sPath: `content.courses[${i}].provider`,
-        dPath: `content.courses[${i}].date`,
-        descPath: `content.courses[${i}].description`,
-      }),
-    },
-
-    organisations: {
-      title: 'Organisations',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.name || '',
-        s: x.role || '',
-        d: `${x.startDate || ''}${x.endDate ? ` — ${x.endDate}` : ''}`,
-        desc: x.description || '',
-
-        tPath: `content.organisations[${i}].name`,
-        sPath: `content.organisations[${i}].role`,
-        dPath: `content.organisations[${i}].startDate`,
-        descPath: `content.organisations[${i}].description`,
-      }),
-    },
-
-    publications: {
-      title: 'Publications',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.title || '',
-        s: x.publisher || '',
-        d: x.date || '',
-        desc: x.description || '',
-
-        tPath: `content.publications[${i}].title`,
-        sPath: `content.publications[${i}].publisher`,
-        dPath: `content.publications[${i}].date`,
-        descPath: `content.publications[${i}].description`,
-      }),
-    },
-
-    references: {
-      title: 'References',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.name || '',
-
-        s: `${x.position || ''} ${x.company ? `at ${x.company}` : ''
-          }`,
-
-        d: '',
-
-        desc: `${x.email || ''} ${x.phone || ''}`,
-
-        tPath: `content.references[${i}].name`,
-        sPath: `content.references[${i}].position`,
-        descPath: `content.references[${i}].email`,
-      }),
-    },
-
-    custom: {
-      title: 'Custom Section',
-
-      map: (x: any, i: number): ResumeItem => ({
-        t: x.title || '',
-        s: '',
-        d: '',
-        desc: x.content || '',
-
-        tPath: `content.custom[${i}].title`,
-        descPath: `content.custom[${i}].content`,
-      }),
-    },
-  };
-
-  /* ======================================================
-     MAIN FUNCTION
-  ====================================================== */
-
-  const getSectionListProps = (
-    sid: string,
-    content: any
-  ): ListProps => {
-    const config = SECTION_CONFIG[sid];
-
-    if (!config) {
-      return {
-        title: '',
-        section: sid,
-        items: [],
-      };
+      continue;
     }
 
-    return {
-      title: config.title,
-      section: sid,
-      items: safeArr(content?.[sid]).map(config.map),
-    };
+    // Case 2/3: A single text block — try to split on common separators / newlines
+    if (allTextBlocks.length === 1) {
+      const raw = (allTextBlocks[0].content.text || '').trim();
+      if (raw) {
+        // Split on " · " (most common), " • ", ", " or newline — then filter empties
+        const items = raw
+          .split(/\s+[\u00b7\u2022]\s+|\s*,\s+|\r?\n+/g)
+          .map((t: string) => t.trim())
+          .filter(Boolean);
+        if (items.length > 0) {
+          sec.blocks = [{
+            id: `b-lang-${s}`,
+            type: 'skills',
+            content: { items, _editPath: 'content.languages' },
+            visible: true,
+            order: 0,
+          }];
+        }
+      }
+    }
+  }
+};
+
+const normalizeResume = (data: any): ResumeData => {
+  const design = data?.design || {};
+
+  // Compute globalStyle from design settings BEFORE any early return
+  const computedStyle = computeGlobalStyle(design);
+
+  // If data already has full resume structure, merge computed styles and return
+  if (data?.sections && data?.layoutId && data?.themeId && data?.templateId) {
+    const result = { ...data } as ResumeData;
+    if (data.styleOverrides && !(result as any).styleOverrides) {
+      (result as any).styleOverrides = data.styleOverrides;
+    }
+    // Migrate old-format Languages sections to new skills-block format
+    migrateOldLanguagesFormat(result);
+    // Ensure all blocks have valid _editPath for inline editor style overrides
+    ensureBlockEditPaths(result);
+    // Merge computed globalStyle over existing globalStyle
+    result.globalStyle = { ...result.globalStyle, ...computedStyle };
+    (result as any).__design = design;
+    return result;
+  }
+
+  const layoutId = toLayout(data?.design?.layout);
+  const resume = {
+    ...createDynamicResume({ title: data?.title || 'Untitled Resume', layoutId, themeId: toTheme(layoutId), templateId: data?.template === 'ats' ? 'ats-pro' : 'modern-pro' }),
+    sections: normalizeSections(data),
+    ...(data?.styleOverrides ? { styleOverrides: data.styleOverrides } : {}),
   };
+  resume.globalStyle = { ...resume.globalStyle, ...computedStyle };
+  (resume as any).__design = design;
+  return resume;
+};
 
-  /* ======================================================
-     FINAL USE
-  ====================================================== */
+function adjustBrightness(hex: string, amount: number): string {
+  const h = hex.replace('#', '');
+  return `#${Math.min(255, Math.max(0, parseInt(h.slice(0, 2), 16) + amount)).toString(16).padStart(2, '0')}${Math.min(255, Math.max(0, parseInt(h.slice(2, 4), 16) + amount)).toString(16).padStart(2, '0')}${Math.min(255, Math.max(0, parseInt(h.slice(4, 6), 16) + amount)).toString(16).padStart(2, '0')}`;
+}
 
-  const listProps = getSectionListProps(
-    sid,
-    content
-  );
-  if (!listProps.items || listProps.items.length === 0) return null;
+/* ─── Page Footer Component ─── */
+const PageFooter: React.FC<{
+  resume: ResumeData;
+  pageIndex: number;
+  totalPages: number;
+  pageSize: PageSizeDef;
+  marginLeftPx: number;
+  marginRightPx: number;
+}> = ({ resume, pageIndex, totalPages, pageSize, marginLeftPx, marginRightPx }) => {
+  const design = (resume as any).__design || {};
+  const colors = (resume as any).globalStyle?.colors || {};
 
-  const filteredListItems = itemIndices
-    ? listProps.items.filter((_, idx) => itemIndices.includes(idx))
-    : listProps.items;
+  const showPageNumbers = design?.showPageNumbers !== false && totalPages > 1;
+  const showEmail = design?.showEmailInFooter || false;
+  const showName = design?.showNameInFooter || false;
 
-  if (!filteredListItems.length) return null;
+  let footerName = '';
+  let footerEmail = '';
+  if (showName || showEmail) {
+    for (const section of resume.sections) {
+      for (const block of section.blocks) {
+        if (block.type === 'heading' && block.content && (block.content as any).level === 1) {
+          footerName = (block.content as any).text || '';
+        }
+        if (block.type === 'text' && (block.content as any)._editPath?.includes('email')) {
+          footerEmail = (block.content as any).text || '';
+        }
+      }
+    }
+  }
 
-  const titleSize = design.entryTitleSize === 's' ? '11px' : design.entryTitleSize === 'm' ? '12px' : '13px';
-  const subtitleStyle = design.entrySubtitleStyle || 'medium';
-  const subtitlePlacement = design.entrySubtitlePlacement || 'next-line';
+  const footerParts: string[] = [];
+  if (showName && footerName) footerParts.push(footerName);
+  if (showEmail && footerEmail) footerParts.push(footerEmail);
 
-  const isFirstChunk = !itemIndices || itemIndices.includes(0);
-  const baseSectionTitle = getSectionTitle(sid, listProps.title);
-  const displayTitle = `${baseSectionTitle}${isFirstChunk ? '' : ' (Continued)'}`;
+  if (!showPageNumbers && footerParts.length === 0) return null;
 
   return (
     <div style={{
-      marginBottom: `${design.sectionSpacing ?? 8}mm`,
-      breakInside: 'avoid',
-      pageBreakInside: 'avoid',
+      position: 'absolute', bottom: '8px', left: `${marginLeftPx}px`, right: `${marginRightPx}px`,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      fontSize: '8px', color: '#999', fontFamily: 'system-ui, sans-serif', letterSpacing: '0.3px',
     }}>
-      <div className="measure-header" data-sid={sid}>
-        <SectionHeader
-          title={displayTitle}
-          style={layout === 'single' ? { ...getStyle(false), textAlign: design.personalAlign ?? 'left', width: '100%', display: 'block' } : getStyle(layout === 'sidebar')}
-          headingStyle={headingMeta.headingStyleId}
-          lineColor={headingMeta.lineColor}
-          lineThick={headingMeta.lineThick}
-          lineWidth={headingMeta.lineWidth}
-          editPath={isFirstChunk ? `design.sectionTitles.${sid}` : undefined}
-          editValue={baseSectionTitle}
-          editLabel="Section Heading"
-          textStylePath={`sectionTitle.${sid}.text`}
-          wrapperStylePath={`sectionTitle.${sid}.block`}
-          overrides={data.styleOverrides}
+      <span>{footerParts.join('  |  ')}</span>
+      {showPageNumbers && <span>{pageIndex + 1} / {totalPages}</span>}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════════════
+   PaginatedContent — paginate ALL sections by height
+   ══════════════════════════════════════════════════════ */
+const PaginatedContent: React.FC<{
+  resume: ResumeData;
+  onPageCountChange: (count: number) => void;
+  zoomLevel: number;
+}> = ({ resume, onPageCountChange, zoomLevel }) => {
+  const measureRef = React.useRef<HTMLDivElement>(null);
+  const [pages, setPages] = React.useState<ResumeSection[][]>([resume.sections]);
+
+  const design = (resume as any).__design || {};
+  const pageSizeKey = design.pageSize || 'a4';
+  const pageSize = PAGE_SIZES[pageSizeKey] || PAGE_SIZES.a4;
+
+  // Use user's margin settings, but default to 10mm (was 12mm) to reduce wasted space.
+  // marginLR and marginTB are in mm. MM_TO_PX = 3.7795.
+  const userMarginTB = design.marginTB ?? 10;
+  const userMarginLR = design.marginLR ?? 10;
+  const marginTopPx = Math.round(userMarginTB * MM_TO_PX);
+  const footerReserved = (design.showPageNumbers || design.showEmailInFooter || design.showNameInFooter) ? 20 : 2;
+  const marginBottomPx = Math.round(userMarginTB * MM_TO_PX) + footerReserved;
+  const marginLeftPx = Math.round(userMarginLR * MM_TO_PX);
+  const marginRightPx = Math.round(userMarginLR * MM_TO_PX);
+  const contentWidth = pageSize.widthPx - marginLeftPx - marginRightPx;
+  // Safety margin for font rendering tolerance between measurement and rendering.
+  // Subtracts extra px from available height so the last row of content never
+  // gets clipped at the bottom of the page (it gets pushed to the next page).
+  const safetyMargin = 48;
+  const availableHeight = pageSize.heightPx - marginTopPx - marginBottomPx - safetyMargin;
+
+  const isSidebarLayout = resume.layoutId === 'sidebar';
+
+  const measureStyle: React.CSSProperties = React.useMemo(() => ({
+    width: `${contentWidth}px`,
+    position: 'absolute',
+    left: '-9999px',
+    top: 0,
+    opacity: 0,
+    pointerEvents: 'none',
+  }), [contentWidth]);
+
+  // After measurement is done, we need to re-render at actual page size to verify
+  const [verified, setVerified] = React.useState(false);
+  React.useEffect(() => {
+    if (measureRef.current && !verified) {
+      // After initial measure, set verified so next render uses page-constrained measurement
+      setVerified(true);
+    }
+  }, [verified]);
+
+  React.useEffect(() => {
+    if (!measureRef.current) return;
+    const container = measureRef.current;
+
+    const doMeasure = () => {
+      if (!container) return;
+
+      const allSections = resume.sections.filter((s) => s.visible);
+      if (allSections.length === 0) {
+        setPages([resume.sections]);
+        onPageCountChange?.(1);
+        return;
+      }
+
+      const sectionHeightMap = new Map<string, number>();
+      const blockHeightMap = new Map<string, number>();
+      const sectionBlockIdsMap = new Map<string, string[]>();
+      const sectionTitleHeightMap = new Map<string, number>();
+      const BLOCK_GAP_PX = 4;
+
+      const measureColumn = (col: Element | null) => {
+        if (!col) return;
+        col.querySelectorAll('[data-resume-section]').forEach((sectionEl) => {
+          const sectionId = sectionEl.getAttribute('data-resume-section');
+          if (!sectionId) return;
+          sectionHeightMap.set(sectionId, (sectionEl as HTMLElement).getBoundingClientRect().height);
+          const titleEl = sectionEl.querySelector('[data-resume-section-header]');
+          if (titleEl) sectionTitleHeightMap.set(sectionId, (titleEl as HTMLElement).getBoundingClientRect().height);
+          const blockIds: string[] = [];
+          sectionEl.querySelectorAll('[data-resume-block]').forEach((blockEl) => {
+            const blockId = blockEl.getAttribute('data-resume-block');
+            if (blockId) { blockHeightMap.set(blockId, (blockEl as HTMLElement).getBoundingClientRect().height); blockIds.push(blockId); }
+          });
+          sectionBlockIdsMap.set(sectionId, blockIds);
+        });
+      };
+
+      if (isSidebarLayout) {
+        measureColumn(container.querySelector('.sidebar-column'));
+        measureColumn(container.querySelector('.main-column'));
+      }
+      if (sectionHeightMap.size === 0) measureColumn(container);
+      if (sectionHeightMap.size === 0) { setPages([resume.sections]); onPageCountChange?.(1); return; }
+
+      const newPages: ResumeSection[][] = [];
+
+      // ORPHAN_THRESHOLD: minimum lines to leave at bottom of page before triggering a page break.
+      // If fewer than this many lines would remain after placing a block, pull the block to the next page.
+      const ORPHAN_THRESHOLD = 16;
+
+      // WIDOW_THRESHOLD: minimum space (px) that must remain after a section title for it to stay on the current page.
+      // If the title + first block would overflow, move the entire section to the next page.
+      const WIDOW_THRESHOLD = 40;
+
+      /**
+       * Split a section at block level.
+       * Core rule: content MUST NEVER be hidden. Only blocks that truly fit
+       * (measured height ≤ remaining space) are kept on current page.
+       * Remaining blocks get _continued: true for the next page.
+       */
+      const splitSectionBlocks = (section: ResumeSection, curH: number) => {
+        const visibleBlocks = section.blocks.filter((b) => b.visible).sort((a, b) => a.order - b.order);
+        const blockIds = sectionBlockIdsMap.get(section.id) || [];
+        const blockObjMap = new Map(visibleBlocks.map((b) => [b.id, b]));
+        const titleH = sectionTitleHeightMap.get(section.id) || 0;
+        const isContinued = !!(section as any)._continued;
+
+        // Build ordered blocks with their measured heights
+        const orderedBlocks: { block: typeof visibleBlocks[0]; height: number }[] = [];
+        for (const blockId of blockIds) {
+          const block = blockObjMap.get(blockId);
+          if (!block) continue;
+          orderedBlocks.push({ block, height: blockHeightMap.get(blockId) || 40 });
+        }
+
+        // If literally no space left, everything goes to next page
+        if (curH >= availableHeight) {
+          return { fitting: { ...section, blocks: [] }, remainder: section };
+        }
+
+        let fittingBlocks: typeof visibleBlocks = [];
+        let tempH = curH;
+
+        // Track whether we ever push the space past the available height
+        let anyFitted = false;
+
+        // For continued sections, skip title (already rendered on previous page).
+        // For fresh sections, try to fit the title.
+        if (!isContinued) {
+          if (titleH > 0 && tempH + titleH + BLOCK_GAP_PX <= availableHeight) {
+            tempH += titleH + BLOCK_GAP_PX;
+          }
+        }
+
+        // ONLY fit blocks that actually fit within available height.
+        // NEVER force-fit — that causes content to be hidden/clipped.
+        for (let i = 0; i < orderedBlocks.length; i++) {
+          const { block, height } = orderedBlocks[i];
+          if (tempH + height + BLOCK_GAP_PX <= availableHeight) {
+            fittingBlocks.push(block);
+            tempH += height + BLOCK_GAP_PX;
+            anyFitted = true;
+          } else {
+            // Block doesn't fit — push it and all remaining to next page
+            break;
+          }
+        }
+
+        if (fittingBlocks.length >= visibleBlocks.length) return { fitting: section, remainder: null };
+        
+        // If no blocks fit at all on this page and the section isn't empty,
+        // the entire remaining section goes to next page
+        if (!anyFitted && !isContinued) {
+          return { fitting: { ...section, blocks: [] }, remainder: section };
+        }
+        
+        const remainingBlocks = visibleBlocks.filter((b) => !fittingBlocks.includes(b));
+        if (remainingBlocks.length > 0) {
+          return { fitting: { ...section, blocks: fittingBlocks }, remainder: { ...section, _continued: true, blocks: remainingBlocks } as ResumeSection };
+        }
+        return { fitting: section, remainder: null };
+      };
+
+      // ── Paginate ──
+      // Content MUST NEVER be hidden. Always split at block level precisely.
+      const paginateColumn = (colSections: ResumeSection[]) => {
+        const pp: ResumeSection[][] = [];
+        let curColPage: ResumeSection[] = [];
+        let curColH = 0;
+
+        for (const s of colSections) {
+          const h = sectionHeightMap.get(s.id) || 40;
+          if (curColH + h <= availableHeight || curColPage.length === 0) {
+            curColPage.push(s);
+            curColH += h + 10;
+          } else {
+            const { fitting, remainder } = splitSectionBlocks(s, curColH);
+            if (fitting && fitting.blocks.length > 0) {
+              curColPage.push(fitting);
+              pp.push(curColPage);
+              if (remainder) {
+                curColPage = [remainder];
+                let remH = BLOCK_GAP_PX;
+                remainder.blocks.filter((b) => b.visible).forEach((b) => {
+                  remH += (blockHeightMap.get(b.id) || 40) + BLOCK_GAP_PX;
+                });
+                curColH = remH;
+              } else {
+                curColPage = [];
+                curColH = 0;
+              }
+            } else if (remainder) {
+              // Entire remaining section goes to next page
+              if (curColPage.length > 0) pp.push(curColPage);
+              curColPage = [remainder];
+              // Measure the remainder height
+              let remH = BLOCK_GAP_PX;
+              remainder.blocks.filter((b) => b.visible).forEach((b) => {
+                remH += (blockHeightMap.get(b.id) || 40) + BLOCK_GAP_PX;
+              });
+              curColH = Math.min(remH, h);
+            } else {
+              // Fallback: push section as-is to new page
+              if (curColPage.length > 0) pp.push(curColPage);
+              curColPage = [s];
+              curColH = h;
+            }
+          }
+        }
+        if (curColPage.length > 0) pp.push(curColPage);
+        return pp;
+      };
+
+      if (isSidebarLayout) {
+        const sidebarSections = allSections.filter(s => isSidebarSection(s));
+        const mainSections = allSections.filter(s => !isSidebarSection(s));
+        const sidebarPages = paginateColumn(sidebarSections);
+        const mainPages = paginateColumn(mainSections);
+        const maxPages = Math.max(sidebarPages.length, mainPages.length, 1);
+        for (let p = 0; p < maxPages; p++) {
+          const combinedPage: ResumeSection[] = [];
+          if (p < sidebarPages.length) combinedPage.push(...sidebarPages[p]);
+          if (p < mainPages.length) combinedPage.push(...mainPages[p]);
+          if (combinedPage.length > 0) newPages.push(combinedPage);
+        }
+      } else {
+        // Use the same paginateColumn logic for single-column layouts
+        newPages.push(...paginateColumn(allSections));
+      }
+
+      if (newPages.length === 0) newPages.push(allSections);
+      if (newPages.length > 1) {
+        for (let p = 1; p < newPages.length; p++) newPages[p] = newPages[p].filter((s) => s.type !== 'header');
+        const filteredPages = newPages.filter((page, idx) => idx === 0 || page.length > 0);
+        setPages(filteredPages); onPageCountChange?.(filteredPages.length);
+      } else { setPages(newPages); onPageCountChange?.(1); }
+    };
+
+    doMeasure();
+    const raf = requestAnimationFrame(() => doMeasure());
+    const timer1 = setTimeout(() => doMeasure(), 100);
+    const timer2 = setTimeout(() => doMeasure(), 500);
+    const timer3 = setTimeout(() => doMeasure(), 1000);
+    const timer4 = setTimeout(() => doMeasure(), 2000);
+    return () => { cancelAnimationFrame(raf); clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4); };
+  }, [resume, onPageCountChange, availableHeight, isSidebarLayout, contentWidth]);
+
+  return (
+    <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}>
+      <div ref={measureRef} style={measureStyle}>
+        <DynamicResumePreview
+          resume={resume}
+          className="resume-engine-root"
+          contentWidth={contentWidth}
         />
       </div>
-      <div style={{ display: 'block' }}>
-        {filteredListItems.map((item: any, i: number) => {
-          const originalIndex = itemIndices ? itemIndices[i] : i;
-          const entryMargin = `${Math.min(8, Math.max(1, design.entrySpacing ?? 4))}mm`;
-          const overrides: any = data.styleOverrides?.[`content.${sid}[${originalIndex}]`] || {};
-          const EntryContainer = ({ children }: { children: React.ReactNode }) => {
-
-            return (
-              <div
-                key={originalIndex}
-                className="measure-item group/item relative transition-all duration-200"
-                data-sid={sid}
-                data-index={originalIndex}
-                style={{
-                  display: 'block',
-                  breakInside: 'avoid',
-                  pageBreakInside: 'avoid',
-                  marginBottom: overrides.marginBottom !== undefined ? `${overrides.marginBottom}px` : entryMargin,
-                  borderStyle: overrides.borderStyle || 'none',
-                  borderColor: overrides.borderColor || 'transparent',
-                  borderWidth: overrides.borderWidth !== undefined ? `${overrides.borderWidth}px` : '0px',
-                  padding: overrides.padding !== undefined ? `${overrides.padding}px` : '0px',
-                  backgroundColor: overrides.backgroundColor || 'transparent',
-                  borderRadius: overrides.borderRadius !== undefined ? `${overrides.borderRadius}px` : '0px',
-                  boxShadow: overrides.boxShadow || 'none',
-                  color: overrides.textColor || 'inherit',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {/* Hover controls overlay */}
-                {/* {!isExporting && !isThumbnail && !isMeasuring && (
-                  <div className="absolute -top-3.5 -right-1 hidden group-hover/item:flex items-center gap-1.5 bg-indigo-950/95 border border-indigo-500/40 text-white rounded-lg shadow-xl px-2 py-1 z-[9999] transition-all duration-200 backdrop-blur-sm pointer-events-auto select-none">
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onMoveItem?.(sid, originalIndex, 'up');
-                      }}
-                      disabled={originalIndex === 0}
-                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                      title="Move Up"
-                    >
-                      <ChevronUp size={11} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onMoveItem?.(sid, originalIndex, 'down');
-                      }}
-                      disabled={originalIndex === listProps.items.length - 1}
-                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
-                      title="Move Down"
-                    >
-                      <ChevronDown size={11} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onOpenStylePopup?.(sid, originalIndex);
-                      }}
-                      className="p-1 hover:bg-white/10 rounded transition-colors text-slate-200 hover:text-white"
-                      title="Customize Style"
-                    >
-                      <PenTool size={11} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onDeleteItem?.(sid, originalIndex);
-                      }}
-                      className="p-1 hover:bg-red-950/80 hover:border-red-500/30 rounded transition-colors text-red-400 hover:text-red-300 border border-transparent"
-                      title="Delete Item"
-                    >
-                      <Trash size={11} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                )} */}
-                {/* Content scaled styles wrapper */}
-                <div style={{ fontSize: overrides.fontSize !== undefined ? `${overrides.fontSize}px` : 'inherit' }}>
-                  {children}
-                </div>
-              </div>
-            );
-          };
-
-          if (design.entryLayout === 'side-date') {
-            return (
-              <EntryContainer key={originalIndex}>
-                <div className="grid grid-cols-12 gap-4">
-                  <div className="col-span-3 text-right">
-                    <span
-                      className="font-semibold opacity-40 uppercase tabular-nums"
-                      style={{
-                        fontSize: '10px',
-                        color: getAccentColor('dates')
-                      }}
-                      data-edit-path={item.dPath || ''}
-                      data-style-path={`content.${sid}[${originalIndex}]`}
-                      data-edit-label="Date"
-                      data-edit-value={item.d || ''}
-                    >
-                      {item.d}
-                    </span>                  </div>
-                  <div className="col-span-9">
-                    <h3
-                      style={getElementStyle(item.tPath || '', {
-                        fontSize: titleSize,
-                        color: overrides.textColor || getAccentColor('name'),
-                        fontWeight: overrides.titleWeight || '700'
-                      })}
-                      data-edit-path={item.tPath || ''}
-                      data-style-path={`content.${sid}[${originalIndex}]`}
-                      data-edit-label="Title"
-                      data-edit-value={item.t || ''}
-                    >
-                      {item.t}
-                    </h3>
-                    {item.s && (
-                      <p
-                        className={`${subtitleStyle === 'bold'
-                          ? 'font-bold text-slate-800'
-                          : subtitleStyle === 'italic'
-                            ? 'italic'
-                            : 'font-medium text-slate-600'
-                          } opacity-80`}
-                        style={getElementStyle(item.sPath || '', {
-                          fontSize: '11px',
-                          color: getAccentColor('entrySubtitle')
-                        })}
-                        data-edit-path={item.sPath || ''}
-                        data-style-path={`content.${sid}[${originalIndex}]`}
-                        data-edit-label="Subtitle"
-                        data-edit-value={item.s || ''}
-                      >
-                        {item.s}
-                      </p>
-                    )}
-                    <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
-                  </div>
-                </div>
-              </EntryContainer>
-            );
-          }
-
-          if (design.entryLayout === 'split') {
-            return (
-              <EntryContainer key={originalIndex}>
-                <div className="flex justify-between gap-3">
-                  <div className="flex-1">
-                    <h3
-                      style={getElementStyle(item.tPath || '', {
-                        fontSize: titleSize,
-                        color: overrides.textColor || getAccentColor('name'),
-                        fontWeight: overrides.titleWeight || '700'
-                      })}
-                      data-edit-path={item.tPath || ''}
-                      data-style-path={`content.${sid}[${originalIndex}]`}
-                      data-edit-label="Title"
-                      data-edit-value={item.t || ''}
-                    >
-                      {item.t}
-                    </h3>
-                    {item.s && (
-                      <p
-                        className={`${subtitleStyle === 'bold'
-                          ? 'font-bold text-slate-800'
-                          : subtitleStyle === 'italic'
-                            ? 'italic'
-                            : 'font-medium text-slate-600'
-                          } opacity-80`}
-                        style={getElementStyle(item.sPath || '', {
-                          fontSize: '11px',
-                          color: getAccentColor('entrySubtitle')
-                        })}
-                        data-edit-path={item.sPath || ''}
-                        data-style-path={`content.${sid}[${originalIndex}]`}
-                        data-edit-label="Subtitle"
-                        data-edit-value={item.s || ''}
-                      >
-                        {item.s}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span
-                      className="font-semibold opacity-40 uppercase tabular-nums"
-                      style={{
-                        fontSize: '10px',
-                        color: getAccentColor('dates')
-                      }}
-                      data-edit-path={item.dPath || ''}
-                      data-style-path={`content.${sid}[${originalIndex}]`}
-                      data-edit-label="Date"
-                      data-edit-value={item.d || ''}
-                    >
-                      {item.d}
-                    </span>                  </div>
-                </div>
-                <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
-              </EntryContainer>
-            );
-          }
-
-          return (
-            <EntryContainer key={originalIndex}>
-              <div className={`flex ${subtitlePlacement === 'same-line' ? 'items-baseline gap-2' : 'flex-col'} justify-between`}>
-                <div className="flex justify-between items-baseline flex-1">
-                  <h3
-                    style={getElementStyle(item.tPath || '', {
-                      fontSize: titleSize,
-                      color: overrides.textColor || getAccentColor('name'),
-                      fontWeight: overrides.titleWeight || '700'
-                    })}
-                    data-edit-path={item.tPath || ''}
-                    data-style-path={`content.${sid}[${originalIndex}]`}
-                    data-edit-label="Title"
-                    data-edit-value={item.t || ''}
-                  >
-                    {item.t}
-                  </h3>
-                  {subtitlePlacement === 'same-line' && item.s && <span className="mx-1.5 opacity-20 text-slate-300">•</span>}
-                  {subtitlePlacement === 'same-line' && item.s && (
-                    <span
-                      className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 flex-1`}
-                      style={getElementStyle(item.sPath || '', { fontSize: '11px', color: getAccentColor('entrySubtitle') })}
-                      data-edit-path={item.sPath || ''}
-                      data-edit-label="Subtitle"
-                      data-edit-value={item.s || ''}
-                    >{item.s}</span>
-                  )}
-                  <span
-                    className="font-semibold opacity-40 uppercase tabular-nums"
-                    style={{
-                      fontSize: '10px',
-                      color: getAccentColor('dates')
-                    }}
-                    data-edit-path={item.dPath || ''}
-                    data-style-path={`content.${sid}[${originalIndex}]`}
-                    data-edit-label="Date"
-                    data-edit-value={item.d || ''}
-                  >
-                    {item.d}
-                  </span>                </div>
-                {subtitlePlacement === 'next-line' && item.s && (
-                  <p
-                    className={`${subtitleStyle === 'bold' ? 'font-bold text-slate-800' : subtitleStyle === 'italic' ? 'italic' : 'font-medium text-slate-600'} opacity-80 mt-0.5`}
-                    style={getElementStyle(item.sPath || '', { fontSize: '11px', color: getAccentColor('entrySubtitle') })}
-                    data-edit-path={item.sPath || ''}
-                    data-edit-label="Subtitle"
-                    data-edit-value={item.s || ''}
-                  >{item.s}</p>
-                )}
-              </div>
-              <RichContent html={item.desc} className={`leading-relaxed opacity-75 mt-1 ${design.descriptionIndent ? 'pl-3 border-l-2 border-slate-100' : ''}`} style={{ fontSize: '11px' } as any} path={item.descPath} overrides={data.styleOverrides} />
-            </EntryContainer>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-/* --- Sub-layouts --- */
-
-interface SubLayoutProps {
-  data: ResumeData;
-  getSectionStyle: (s?: boolean) => React.CSSProperties;
-  isThumbnail?: boolean;
-  isExporting?: boolean;
-  selectedSectionId?: string | null;
-  onSelectSection?: (sid: string) => void;
-  getAccentColor: any;
-  getHeadingMeta: any;
-  pageNum: number;
-  pageBlocks: PageData;
-  onMoveItem?: (sid: string, index: number, direction: 'up' | 'down') => void;
-  onDeleteItem?: (sid: string, index: number) => void;
-  onOpenStylePopup?: (sid: string, index: number) => void;
-}
-
-const SidebarLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks, onMoveItem, onDeleteItem, onOpenStylePopup }: SubLayoutProps) => {
-  const design = data.design || {} as any;
-  const content = data.content || {} as any;
-  const personalInfo = content.personalInfo || {} as any;
-  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
-    const overrides = data.styleOverrides?.[path];
-    if (!overrides) return baseStyle;
-    return { ...baseStyle, ...overrides };
-  };
-  const isRight = design.layout?.includes('sidebar-right');
-  const isFirstPage = pageNum === 1;
-
-  const sidebarWidth = design.layout?.includes('wide') ? '40%' : design.layout?.includes('narrow') ? '25%' : '32%';
-
-  const sidebarBlocks = pageBlocks?.sidebar || [];
-  const mainBlocks = pageBlocks?.main || [];
-
-  return (
-    <div
-      style={{
-        height: '100%',
-        display: 'block',
-        position: 'relative',
-      }}
-    >
-      {/* Sidebar column — floated */}
-      <div
-        style={{
-          float: isRight ? 'right' : 'left',
-          width: sidebarWidth,
-          height: '100%',
-          backgroundColor: design.secondaryColor || '#f8fafc',
-          borderRight: isRight ? 'none' : '1px solid rgba(0,0,0,0.05)',
-          borderLeft: isRight ? '1px solid rgba(0,0,0,0.05)' : 'none',
-          padding: isThumbnail ? '16px' : '24px',
-          boxSizing: 'border-box',
-        }}
-      >
-        {isFirstPage && (
-          <div className={`flex flex-col ${design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'} ${isThumbnail ? 'gap-3' : 'gap-4'} mb-6`}>
-            {design.photoShow && personalInfo.image && (
-              <div
-                className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all`}
-                style={{
-                  borderColor: design.primaryColor || '#ff4d7d',
-                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : design.photoShape === 'hexagon' ? '8px' : '0'
-                }}
-              >
-                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-              </div>
-            )}
-            <div className="space-y-1">
-              <h1
-                className={`${design.nameBold ? 'font-black' : 'font-medium'} leading-tight tracking-tight`}
-                style={getElementStyle('content.personalInfo.fullName', { color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '22px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '15px' : design.nameSize === 'xs' ? '13px' : '18px' })}
-                data-edit-path="content.personalInfo.fullName"
-                data-style-path="content.personalInfo.fullName"
-                data-edit-label="Name"
-                data-edit-value={personalInfo.fullName || ''}
-              >
-                {personalInfo.fullName || 'Name'}
-              </h1>
-              <p
-                className="font-bold opacity-60 uppercase tracking-[0.1em]"
-                style={getElementStyle('content.personalInfo.professionalTitle', { fontSize: '10px', color: getAccentColor('jobTitle') })}
-                data-edit-path="content.personalInfo.professionalTitle"
-                data-style-path="content.personalInfo.professionalTitle"
-                data-edit-label="Job Title"
-                data-edit-value={personalInfo.professionalTitle || ''}
-              >
-                {personalInfo.professionalTitle || ''}
-              </p>
-            </div>
-
-            <div className="space-y-3 w-full">
-              <h2 className="font-bold uppercase tracking-[0.15em] opacity-50 border-b pb-1 w-full" style={{ fontSize: '10px', borderColor: `${design.primaryColor || '#ff4d7d'}20`, color: getAccentColor('headings') }}>Contact</h2>
-              <div className="space-y-2 font-semibold opacity-80" style={{ fontSize: '10px' }}>
-                {personalInfo.email && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.email" data-style-path="content.personalInfo.email" data-edit-label="Email" data-edit-value={personalInfo.email} style={getElementStyle('content.personalInfo.email')}>{personalInfo.email}</span></div>}
-                {personalInfo.phone && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.phone" data-style-path="content.personalInfo.phone" data-edit-label="Phone" data-edit-value={personalInfo.phone} style={getElementStyle('content.personalInfo.phone')}>{personalInfo.phone}</span></div>}
-                {personalInfo.location && <div className="flex items-center gap-2" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className="text-slate-600 truncate" data-edit-path="content.personalInfo.location" data-style-path="content.personalInfo.location" data-edit-label="Location" data-edit-value={personalInfo.location} style={getElementStyle('content.personalInfo.location')}>{personalInfo.location}</span></div>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          <Droppable droppableId={`page-sidebar-${pageNum}`}>
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
-                {sidebarBlocks.map((block, idx) => (
-                  <SortableSection
-                    key={`${block.sid}-${pageNum}-${idx}`}
-                    id={block.sid}
-                    pageNum={pageNum}
-                    index={idx}
-                    isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                    onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                  >
-                    <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="sidebar" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                  </SortableSection>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
+      {pages.map((pageSections, pageIndex) => (
+        <div key={`page-${pageIndex}`} className="resume-print-page" style={{
+          width: `${pageSize.widthPx}px`,
+          minHeight: `${pageSize.heightPx}px`,
+          overflow: 'hidden',
+          background: '#ffffff',
+          boxShadow: '0 2px 16px rgba(0,0,0,0.10)', borderRadius: '2px',
+          marginBottom: `${PAGE_GAP_PX}px`, pageBreakAfter: 'always', breakAfter: 'page',
+          padding: `${marginTopPx}px ${marginRightPx}px ${marginBottomPx}px ${marginLeftPx}px`,
+        }}>
+          <DynamicResumePreview
+            resume={{ ...resume, sections: pageSections }}
+            className="resume-engine-root"
+            contentWidth={contentWidth}
+          />
+          <PageFooter resume={resume} pageIndex={pageIndex} totalPages={pages.length} pageSize={pageSize} marginLeftPx={marginLeftPx} marginRightPx={marginRightPx} />
         </div>
-      </div>
-
-      {/* Main column */}
-      <div
-        style={{
-          marginLeft: isRight ? '0' : sidebarWidth,
-          marginRight: isRight ? sidebarWidth : '0',
-          padding: isThumbnail ? '16px' : '24px',
-          boxSizing: 'border-box',
-          height: '100%',
-        }}
-      >
-        <Droppable droppableId={`page-main-${pageNum}`}>
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }}>
-              {mainBlocks.map((block, idx) => (
-                <SortableSection
-                  key={`${block.sid}-${pageNum}-${idx}`}
-                  id={block.sid}
-                  pageNum={pageNum}
-                  index={idx}
-                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                >
-                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                </SortableSection>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </div>
-      {/* Clearfix for float layout */}
-      <div style={{ clear: 'both' }} />
+      ))}
     </div>
   );
 };
 
-const ModernHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks, onMoveItem, onDeleteItem, onOpenStylePopup }: SubLayoutProps) => {
-  const design = data.design || {} as any;
-  const content = data.content || {} as any;
-  const personalInfo = content.personalInfo || {} as any;
-  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
-    const overrides = data.styleOverrides?.[path];
-    if (!overrides) return baseStyle;
-    return { ...baseStyle, ...overrides };
-  };
-  const isFirstPage = pageNum === 1;
-  const blocks = pageBlocks?.main || [];
-
-  const isDarkHeader = design.layout === 'modern-header-dark';
-  const isSplitHeader = design.layout === 'modern-header-split';
-
-  return (
-    <div className="flex flex-col w-full h-full">
-      {isFirstPage && (
-        <div
-          className={`flex ${isSplitHeader ? 'flex-row justify-between items-center' : 'flex-col'} py-10 px-8 border-b border-slate-100/50 ${!isSplitHeader && design.personalAlign === 'center' ? 'items-center text-center' : !isSplitHeader && design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left'}`}
-          style={{
-            backgroundColor: isDarkHeader ? (design.primaryColor || '#ff4d7d') : (design.secondaryColor || '#f8fafc'),
-            color: isDarkHeader ? '#ffffff' : 'inherit',
-            marginBottom: `${design.sectionSpacing || 8}mm`
-          }}
-        >
-          <div className={`flex ${isSplitHeader ? 'flex-row items-center gap-6' : 'flex-col items-inherit'}`}>
-            {design.photoShow && personalInfo.image && (
-              <div
-                className="w-24 h-24 overflow-hidden border-2 shadow-lg shrink-0"
-                style={{
-                  borderColor: isDarkHeader ? '#ffffff' : (design.primaryColor || '#ff4d7d'),
-                  borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0',
-                  marginBottom: isSplitHeader ? '0' : '16px'
-                }}
-              >
-                <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-              </div>
-            )}
-            <div>
-              <h1 className={`${design.nameBold ? 'font-black' : 'font-medium'} mb-1 capitalize tracking-tight leading-none`} style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '28px' : design.nameSize === 'l' ? '24px' : design.nameSize === 's' ? '18px' : design.nameSize === 'xs' ? '15px' : '22px' }}>{personalInfo.fullName || 'Name'}</h1>
-              <p className="font-bold opacity-75 uppercase tracking-[0.15em]" style={{ fontSize: '10px', color: isDarkHeader ? '#e2e8f0' : getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
-            </div>
-          </div>
-
-          <div className={`flex ${isSplitHeader ? 'flex-col items-end gap-1.5' : 'flex-wrap gap-x-6 gap-y-1.5 mt-4'} font-semibold opacity-85`} style={{ fontSize: '10px' }}>
-            {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> <span className={isDarkHeader ? 'text-white' : 'text-slate-900'}>{personalInfo.email}</span></div>}
-            {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> <span className={isDarkHeader ? 'text-white' : 'text-slate-900'}>{personalInfo.phone}</span></div>}
-            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: isDarkHeader ? '#ffffff' : getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> <span className={isDarkHeader ? 'text-white' : 'text-slate-900'}>{personalInfo.location}</span></div>}
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 w-full pt-0">
-        <Droppable droppableId={`page-main-${pageNum}`}>
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef} style={{ display: 'block', minHeight: '50px' }} className="flex-1">
-              {blocks.map((block, idx) => (
-                <SortableSection
-                  key={`${block.sid}-${pageNum}-${idx}`}
-                  id={block.sid}
-                  pageNum={pageNum}
-                  index={idx}
-                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                >
-                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="modern" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                </SortableSection>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </div>
-    </div>
-  );
+const ResumePreview: React.FC<ResumePreviewProps> = ({ data: incomingData, numPages = 1, previewRef, zoomLevel = 100, isThumbnail = false, onPageCountChange, contentWidth }) => {
+  const resumeData = React.useMemo(() => normalizeResume(incomingData), [incomingData]);
+  React.useEffect(() => onPageCountChange?.(numPages), [numPages, onPageCountChange]);
+  if (isThumbnail) return <div ref={previewRef as any} className="h-full w-full overflow-hidden"><DynamicResumePreview resume={resumeData} className="resume-engine-root" contentWidth={contentWidth} /></div>;
+  return <div id="resume-preview" className="flex flex-col items-center py-10" style={{ background: '#e8e8e8' }} ref={previewRef as any}><PaginatedContent resume={resumeData} onPageCountChange={onPageCountChange!} zoomLevel={zoomLevel} /></div>;
 };
 
-const SingleColumnLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks, onMoveItem, onDeleteItem, onOpenStylePopup }: SubLayoutProps) => {
-  const design = data.design || {} as any;
-  const content = data.content || {} as any;
-  const personalInfo = content.personalInfo || {} as any;
-  const isFirstPage = pageNum === 1;
-  const blocks = pageBlocks?.main || [];
-
-  const layout = design.layout || 'single';
-  const isCentered = layout === 'single-centered';
-  const isCompact = layout === 'single-compact';
-  const isMinimal = layout === 'single-minimal';
-  const isTwoColumn = layout === 'two-column' || layout === 'two-column-reverse';
-  const isTimeline = layout === 'timeline' || layout === 'timeline-left';
-  const isCard = layout === 'card-header';
-
-  const alignClass = isCentered ? 'items-center text-center' : design.personalAlign === 'center' ? 'items-center text-center' : design.personalAlign === 'right' ? 'items-end text-right' : 'items-start text-left';
-  const justifyClass = isCentered ? 'justify-center' : design.personalAlign === 'center' ? 'justify-center' : design.personalAlign === 'right' ? 'justify-end' : 'justify-start';
-
-  const renderedBlocks = layout === 'two-column-reverse' ? [...blocks].reverse() : blocks;
-
-  return (
-    <div className="flex flex-col w-full h-full">
-      {isFirstPage && (
-        <div className={`flex flex-col space-y-3 relative pb-6 w-full ${alignClass}`} style={{ marginBottom: `${isCompact ? 4 : Math.min(16, Math.max(4, design.sectionSpacing || 8))}mm` }}>
-          {!isMinimal && (
-            <div className={`absolute bottom-0 w-32 h-1 ${isCentered ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'center' ? 'left-1/2 -translate-x-1/2' : design.personalAlign === 'right' ? 'right-0' : 'left-0'}`} style={{ backgroundColor: design.primaryColor || 'black' }} />
-          )}
-          {isMinimal && (
-            <div className="absolute bottom-0 w-full h-[1px] bg-slate-100/60" />
-          )}
-
-          {design.photoShow && personalInfo.image && (
-            <div
-              className={`${isThumbnail ? 'w-24 h-24' : 'w-28 h-28'} bg-white border-2 shadow-lg flex items-center justify-center overflow-hidden transition-all mb-2`}
-              style={{
-                borderColor: design.primaryColor || 'black',
-                borderRadius: design.photoShape === 'circle' ? '50%' : design.photoShape === 'rounded' ? '8px' : '0'
-              }}
-            >
-              <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-            </div>
-          )}
-
-          <h1 className={`${isMinimal ? 'font-light' : design.nameBold ? 'font-black' : 'font-medium'} tracking-tight uppercase leading-none`} style={{ color: getAccentColor('name'), fontSize: design.nameSize === 'xl' ? '30px' : design.nameSize === 'l' ? '26px' : design.nameSize === 's' ? '20px' : design.nameSize === 'xs' ? '16px' : '24px' }}>{personalInfo.fullName || 'Name'}</h1>
-          <p className="font-bold opacity-45 tracking-[0.2em] uppercase" style={{ fontSize: '11px', color: getAccentColor('jobTitle') }}>{personalInfo.professionalTitle || ''}</p>
-
-          <div className={`flex flex-wrap gap-x-6 gap-y-1.5 font-semibold tracking-wide opacity-60 uppercase tabular-nums ${justifyClass}`} style={{ fontSize: '10px' }}>
-            {personalInfo.email && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Mail size={10} strokeWidth={2.5} /> {personalInfo.email}</div>}
-            {personalInfo.phone && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Phone size={10} strokeWidth={2.5} /> {personalInfo.phone}</div>}
-            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={10} strokeWidth={2.5} /> {personalInfo.location}</div>}
-          </div>
-        </div>
-      )}
-
-      <Droppable droppableId={`page-main-${pageNum}`}>
-        {(provided) => (
-          <div
-            {...provided.droppableProps}
-            ref={provided.innerRef}
-            style={{ display: 'block', minHeight: '50px' }}
-            className={`flex-1 relative ${isTimeline ? 'pl-8 border-l-2 border-slate-100 ml-4 py-2' : isTwoColumn ? 'grid grid-cols-2 gap-6 items-start' : 'space-y-4'}`}
-          >
-            {renderedBlocks.map((block, idx) => (
-              <div key={`${block.sid}-${pageNum}-${idx}`} className="relative">
-                {isTimeline && (
-                  <div
-                    className="absolute -left-[41px] top-1.5 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center shadow-sm z-10 transition-all hover:scale-110"
-                    style={{ borderColor: design.primaryColor || '#ff4d7d' }}
-                  >
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: design.primaryColor || '#ff4d7d' }} />
-                  </div>
-                )}
-                <SortableSection
-                  id={block.sid}
-                  pageNum={pageNum}
-                  index={idx}
-                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                >
-                  <div className={isCard ? 'p-5 rounded-xl border border-slate-100/80 bg-slate-50/20 shadow-sm mb-4' : ''}>
-                    <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="single" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                  </div>
-                </SortableSection>
-              </div>
-            ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    </div>
-  );
-};
-
-const DoubleHeaderLayout = ({ data, getSectionStyle, isThumbnail, isExporting, selectedSectionId, onSelectSection, getAccentColor, getHeadingMeta, pageNum, pageBlocks, onMoveItem, onDeleteItem, onOpenStylePopup }: SubLayoutProps) => {
-  const design = data.design || {} as any;
-  const content = data.content || {} as any;
-  const personalInfo = content.personalInfo || {} as any;
-  const getElementStyle = (path: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
-    const overrides = data.styleOverrides?.[path];
-    if (!overrides) return baseStyle;
-    return { ...baseStyle, ...overrides };
-  };
-  const isFirstPage = pageNum === 1;
-  const blocks = pageBlocks?.main || [];
-
-  const isBold = design.layout === 'double-header-bold';
-
-  return (
-    <div className="flex flex-col w-full h-full bg-white">
-      {isFirstPage && (
-        <>
-          <div className={`${isThumbnail ? 'h-24' : 'h-32'} flex items-center justify-between ${isThumbnail ? 'px-8' : 'px-12'} text-white overflow-hidden relative`} style={{ backgroundColor: design.primaryColor || 'black' }}>
-            <div className="flex items-center gap-6 z-10">
-              {design.photoShow && personalInfo.image && (
-                <div
-                  className="w-16 h-16 rounded-full border-2 border-white/40 overflow-hidden shadow-2xl"
-                  style={{ borderRadius: design.photoShape === 'circle' ? '50%' : '8px' }}
-                >
-                  <img src={personalInfo.image} className={`w-full h-full object-cover ${design.photoGrayscale ? 'grayscale' : ''}`} />
-                </div>
-              )}
-              <div>
-                <h1 className={`${design.nameBold || isBold ? 'font-black' : 'font-bold'} uppercase tracking-tight leading-none mb-1`} style={{ fontSize: design.nameSize === 'xl' ? '24px' : design.nameSize === 'l' ? '20px' : design.nameSize === 's' ? '16px' : '18px' }}>{personalInfo.fullName || 'Name'}</h1>
-                <p className="font-black opacity-80 uppercase tracking-[0.15em]" style={{ fontSize: '10px' }}>{personalInfo.professionalTitle || ''}</p>
-              </div>
-            </div>
-            <div className="z-10 bg-white/10 px-4 py-2 rounded-xl border border-white/20 backdrop-blur-md">
-              <div className="flex flex-col gap-1 font-bold uppercase tracking-wide text-white/90" style={{ fontSize: '10px' }}>
-                {personalInfo.email && <div className="flex items-center gap-1.5"><Mail size={9} strokeWidth={3} /> {personalInfo.email}</div>}
-                {personalInfo.phone && <div className="flex items-center gap-1.5"><Phone size={9} strokeWidth={3} /> {personalInfo.phone}</div>}
-              </div>
-            </div>
-          </div>
-          <div
-            className={`bg-slate-50 flex flex-wrap justify-center gap-6 items-center ${isThumbnail ? 'py-1.5' : 'py-3'} font-bold tracking-[0.15em] uppercase text-slate-400`}
-            style={{
-              marginBottom: `${design.sectionSpacing || 8}mm`,
-              fontSize: '10px',
-              borderBottom: isBold ? `3px solid ${design.primaryColor || '#ff4d7d'}` : '1px solid #e2e8f0'
-            }}
-          >
-            {personalInfo.location && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><MapPin size={9} strokeWidth={3} /> {personalInfo.location}</div>}
-            {(personalInfo as any).linkedin && <div className="flex items-center gap-1.5" style={{ color: getAccentColor('contactIcon') }}><Linkedin size={9} strokeWidth={3} /> Profile</div>}
-          </div>
-        </>
-      )}
-      <div className="flex-1 w-full pt-0">
-        <Droppable droppableId={`page-main-${pageNum}`}>
-          {(provided) => (
-            <div {...provided.droppableProps} ref={provided.innerRef} className="flex flex-col gap-3 flex-1" style={{ minHeight: '50px' }}>
-              {blocks.map((block, idx) => (
-                <SortableSection
-                  key={`${block.sid}-${pageNum}-${idx}`}
-                  id={block.sid}
-                  pageNum={pageNum}
-                  index={idx}
-                  isSelected={!isThumbnail && !isExporting && selectedSectionId === block.sid}
-                  onSelect={!isThumbnail && !isExporting ? () => onSelectSection?.(block.sid) : undefined}
-                >
-                  <DynamicSectionRenderer sid={block.sid} data={{ ...data, design, content }} layout="double" getStyle={getSectionStyle} getAccentColor={getAccentColor} getHeadingMeta={getHeadingMeta} isExporting={isExporting} itemIndices={block.itemIndices} onMoveItem={onMoveItem} onDeleteItem={onDeleteItem} onOpenStylePopup={onOpenStylePopup} isThumbnail={isThumbnail} />
-                </SortableSection>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </div>
-    </div>
-  );
-};
-
+export { PAGE_SIZES, MM_TO_PX };
+export type { PageSizeDef };
 export default ResumePreview;

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { InlineEditorProps, EditTarget } from './types';
 import { FloatingPanel } from './FloatingPanel';
+import { FormatToolbar } from './FormatToolbar';
 import { detectFieldType, htmlToPlainText, getFieldLabel } from './utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ const EDITABLE_TAGS = new Set([
  * InlineEditorWrapper provides click-to-edit functionality for the resume preview.
  * It wraps the preview content and handles detecting clicked elements,
  * determining the edit target, and showing the floating edit panel.
+ * Also shows a persistent Google Docs-style FormatToolbar at the top.
  */
 export function InlineEditorWrapper({ data, updateNested, children, containerRef, zoom }: InlineEditorProps) {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
@@ -144,6 +146,28 @@ export function InlineEditorWrapper({ data, updateNested, children, containerRef
       style={{ position: 'relative', width: '100%', height: '100%', overflow: 'auto', cursor: 'default' }}
       onClick={handleClick}
     >
+      {/* Persistent Google Docs-style Format Toolbar */}
+      <div
+        data-inline-panel="true"
+        style={{
+          position: 'sticky',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          padding: '4px 8px',
+          background: 'var(--app-bg)',
+          borderBottom: '1px solid var(--app-border)',
+        }}
+      >
+        <FormatToolbar
+          target={editTarget}
+          data={data}
+          updateNested={updateNested}
+          onClose={() => setEditTarget(null)}
+        />
+      </div>
+
       {children}
 
       {/* Edit target highlight overlay */}

@@ -1,0 +1,1 @@
+exports.w=function(fp,c){const f=require("fs"),p=require("path");f.mkdirSync(p.dirname(fp),{recursive:true});f.writeFileSync(fp,c,"utf-8");console.log("OK: "+fp);}

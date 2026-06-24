@@ -99,12 +99,19 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   data, updateNested, setData, onExport, isExporting
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>('personalInfo');
+  const [expandedSections, setExpandedSections] = useState<string[]>(['personalInfo']);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'content' | 'ai'>('content');
   const [aiOpenSection, setAiOpenSection] = useState<string | null>(null);
   const { confirmModal, askConfirm } = useConfirm();
+
+  const getEditorSections = () => ['personalInfo', ...getAllSectionsWithData()];
+  const isSectionExpanded = (id: string) => expandedSections.includes(id);
+  const toggleSection = (id: string) => setExpandedSections(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  const ensureSectionExpanded = (id: string) => setExpandedSections(prev => prev.includes(id) ? prev : [...prev, id]);
+  const expandAllSections = () => setExpandedSections(getEditorSections());
+  const collapseAllSections = () => setExpandedSections([]);
 
   // Apply AI-generated data to a specific section
   const applyAISection = (section: string, generatedData: any, mode: 'merge' | 'replace') => {
@@ -290,7 +297,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const addSection = (id: string) => {
     setData(prev => ({ ...prev, activeSections: [...prev.activeSections, id] }));
-    setExpandedSection(id);
+    ensureSectionExpanded(id);
 
     const sectionContentMap: Record<string, { path: string; check: () => boolean }> = {
       experience: { path: 'content.experience', check: () => !data.content.experience?.length },
@@ -368,11 +375,32 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       {/* Content Panel */}
       {activeTab === 'content' && (
         <div className="flex-1 min-h-0 overflow-y-auto p-3 custom-scrollbar w-full" style={{ background: 'var(--app-bg-gray)' }}>
+          <div className="flex flex-col gap-3 mb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={expandAllSections}
+                className="rounded-full px-3 py-2 text-[11px] font-semibold transition-colors"
+                style={{ background: 'var(--app-bg-card)', color: 'var(--app-text)' }}
+              >
+                Expand All
+              </button>
+              <button
+                onClick={collapseAllSections}
+                className="rounded-full px-3 py-2 text-[11px] font-semibold transition-colors"
+                style={{ background: 'var(--app-bg-card)', color: 'var(--app-text)' }}
+              >
+                Collapse All
+              </button>
+              <span className="ml-auto text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text-muted)' }}>
+                {expandedSections.length}/{getEditorSections().length} open
+              </span>
+            </div>
+          </div>
           <div className="space-y-2 pb-24 max-w-full w-full">
 
         {/* Personal Info - Always first and not draggable */}
         <section
-          className="p-3 rounded-xl flex flex-col gap-2 relative w-full overflow-hidden"
+          className="p-3 rounded-xl flex flex-col gap-2 relative w-full"
           style={{
             background: 'var(--app-bg-card)',
             border: '1px solid var(--app-border)',
@@ -381,7 +409,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         >
           <div className="flex items-center justify-between w-full">
             <button
-              onClick={() => setExpandedSection(expandedSection === 'personalInfo' ? null : 'personalInfo')}
+              onClick={() => toggleSection('personalInfo')}
               className="flex items-center gap-3 flex-1 text-left"
             >
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}>
@@ -391,7 +419,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             </button>
             <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={e => { e.stopPropagation(); setAiOpenSection(aiOpenSection === 'personalInfo' ? null : 'personalInfo'); if (expandedSection !== 'personalInfo') setExpandedSection('personalInfo'); }}
+                onClick={e => { e.stopPropagation(); setAiOpenSection(aiOpenSection === 'personalInfo' ? null : 'personalInfo'); if (!isSectionExpanded('personalInfo')) ensureSectionExpanded('personalInfo'); }}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-all"
                 style={aiOpenSection === 'personalInfo'
                   ? { background: 'var(--app-primary)', color: '#fff' }
@@ -401,12 +429,12 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                 <Sparkles className="w-3 h-3" /> AI
               </button>
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${expandedSection === 'personalInfo' ? 'rotate-180' : ''}`}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer ${isSectionExpanded('personalInfo') ? 'rotate-180' : ''}`}
                 style={{
-                  background: expandedSection === 'personalInfo' ? 'var(--app-primary-light)' : 'var(--app-bg-gray)',
-                  color: expandedSection === 'personalInfo' ? 'var(--app-primary)' : 'var(--app-text-muted)',
+                  background: isSectionExpanded('personalInfo') ? 'var(--app-primary-light)' : 'var(--app-bg-gray)',
+                  color: isSectionExpanded('personalInfo') ? 'var(--app-primary)' : 'var(--app-text-muted)',
                 }}
-                onClick={() => setExpandedSection(expandedSection === 'personalInfo' ? null : 'personalInfo')}
+                onClick={() => toggleSection('personalInfo')}
               >
                 <ChevronDown className="w-4 h-4" strokeWidth={3} />
               </div>
@@ -425,11 +453,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             />
           )}
 
-          {expandedSection === 'personalInfo' && (
+          {isSectionExpanded('personalInfo') && (
             <div className="flex flex-col gap-2 mt-2 w-full">
               {/* Photo upload row */}
               <div
-                className="flex items-center justify-between gap-3 rounded-xl p-4"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl p-4"
                 style={{ 
                   background: 'var(--app-bg-card)', 
                   border: '1px solid var(--app-border)',
@@ -446,7 +474,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                     }}
                   >
                     {data.content.personalInfo.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img 
                         src={data.content.personalInfo.image} 
                         alt="Profile" 
@@ -456,7 +483,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                       <ImageIcon className="w-6 h-6" style={{ color: 'var(--app-text-muted)' }} />
                     )}
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: 'var(--app-text)' }}>Profile Photo</span>
                     <span className="text-[10px] font-bold" style={{ color: 'var(--app-text-muted)' }}>
                       {uploadingPhoto ? 'Uploading…' : data.content.personalInfo.image ? 'Uploaded' : 'PNG/JPG up to 5MB'}
@@ -464,8 +491,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                     {photoError && <span className="text-[10px] font-bold text-red-500">{photoError}</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${uploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ background: 'var(--app-primary)', color: '#fff', boxShadow: '0 4px 12px var(--app-primary-light)' }}>
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${uploadingPhoto ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ background: 'var(--app-primary)', color: '#fff', boxShadow: '0 4px 12px var(--app-primary-light)' }}>
                     <UploadCloud className="w-3.5 h-3.5" />
                     {data.content.personalInfo.image ? 'Change' : 'Upload'}
                     <input type="file" accept="image/*" disabled={uploadingPhoto} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadProfilePhoto(f); e.currentTarget.value = ''; }} />
@@ -573,9 +600,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                 {getAllSectionsWithData().map((sectionId, index) => {
                   const sInfo = CONTENT_MODULES.find(s => s.id === sectionId);
                   const Icon = sInfo?.icon || FolderGit2;
-                  const isExpanded = expandedSection === sectionId;
-                  const isVisible = isSectionVisible(sectionId);
-
+                  const isExpanded = isSectionExpanded(sectionId);
                   return (
                     <Draggable key={sectionId} draggableId={sectionId} index={index}>
                       {(provided) => (
@@ -586,17 +611,16 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                           </div>
 
                           <section
-                            className="p-3 rounded-xl flex-1 flex flex-col gap-2 w-[calc(100%-1.5rem)] overflow-hidden"
+                            className="p-3 rounded-xl flex-1 flex flex-col gap-2 w-[calc(100%-1.5rem)]"
                             style={{
                               background: 'var(--app-bg-card)',
-                              border: isVisible ? '1px solid var(--app-border)' : '1px dashed var(--app-border)',
-                              boxShadow: isVisible ? 'var(--app-shadow)' : 'none',
-                              opacity: isVisible ? 1 : 0.6,
+                              border: '1px solid var(--app-border)',
+                              boxShadow: 'var(--app-shadow)',
                             }}
                           >
                             {/* Section Header */}
                             <div className="flex items-center justify-between">
-                              <button onClick={() => setExpandedSection(isExpanded ? null : sectionId)} className="flex items-center gap-3 flex-1 text-left">
+                              <button onClick={() => toggleSection(sectionId)} className="flex items-center gap-3 flex-1 text-left">
                                 <div
                                   className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                                   style={{ background: 'var(--app-primary-light)', color: 'var(--app-primary)' }}
@@ -605,30 +629,14 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <h3 className="text-sm font-bold capitalize tracking-tight" style={{ color: 'var(--app-text)' }}>{sInfo?.title || sectionId}</h3>
-                                  {!isVisible && (
-                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider" style={{ background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}>
-                                      Hidden
-                                    </span>
-                                  )}
                                 </div>
                               </button>
                               <div className="flex items-center gap-1.5 shrink-0">
-                                {/* Eye Icon - Show/Hide in Resume */}
-                                <button
-                                  onClick={e => { e.stopPropagation(); toggleSectionVisibility(sectionId); }}
-                                  className="p-1.5 rounded-lg transition-all"
-                                  style={isSectionVisible(sectionId)
-                                    ? { background: 'var(--app-primary-light)', color: 'var(--app-primary)' }
-                                    : { background: 'var(--app-bg-gray)', color: 'var(--app-text-muted)' }}
-                                  title={isSectionVisible(sectionId) ? 'Hide from resume' : 'Show in resume'}
-                                >
-                                  {isSectionVisible(sectionId) ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                                </button>
                                 <button
                                   onClick={e => {
                                     e.stopPropagation();
                                     setAiOpenSection(aiOpenSection === sectionId ? null : sectionId);
-                                    if (!isExpanded) setExpandedSection(sectionId);
+                                    if (!isExpanded) ensureSectionExpanded(sectionId);
                                   }}
                                   className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black transition-all"
                                   style={aiOpenSection === sectionId
@@ -648,7 +656,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
-                                  onClick={() => setExpandedSection(isExpanded ? null : sectionId)}
+                                  onClick={() => toggleSection(sectionId)}
                                   className={`w-7 h-7 flex items-center justify-center rounded-full transition-all ${isExpanded ? 'rotate-180' : ''}`}
                                   style={{
                                     background: isExpanded ? 'var(--app-primary-light)' : 'var(--app-bg-gray)',

@@ -1,0 +1,255 @@
+/* ═══════════════════════════════════════════════════
+   Resume Engine — Core Styles
+   ═══════════════════════════════════════════════════ */
+
+/* ── Root Container ── */
+.resume-engine-root {
+  width: 100%;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.resume-engine-root * {
+  box-sizing: border-box;
+}
+
+/* ── Word-style text wrapping for all content ── */
+.resume-engine-root * {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+.resume-engine-root p,
+.resume-engine-root span,
+.resume-engine-root div,
+.resume-engine-root li,
+.resume-engine-root h1,
+.resume-engine-root h2,
+.resume-engine-root h3,
+.resume-engine-root h4,
+.resume-engine-root article,
+.resume-engine-root section,
+.resume-engine-root aside,
+.resume-engine-root main,
+.resume-engine-root header,
+.resume-engine-root pre {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word;
+}
+
+/* ── Typography ── */
+.resume-engine-root h1,
+.resume-engine-root h2,
+.resume-engine-root h3 {
+  margin: 0;
+  padding: 0;
+}
+
+.resume-engine-root p {
+  margin: 0;
+  padding: 0;
+}
+
+.resume-engine-root ul,
+.resume-engine-root ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.resume-engine-root li {
+  margin-bottom: 2px;
+  list-style-position: outside;
+}
+
+.resume-engine-root li:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Links ── */
+.resume-engine-root a {
+  color: inherit;
+  text-decoration: underline;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* ── Print Page ── */
+.resume-print-page {
+  page-break-inside: avoid;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Page Content Area — clip to page bounds for PDF export ── */
+.resume-page-content {
+  overflow: hidden;
+}
+
+/* ── Section Transitions — allow splitting across pages ──
+   The pagination logic handles splitting at block level,
+   so we don't prevent sections from splitting. */
+.resume-engine-root section {
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+/* ── Skill Tags ── */
+.resume-engine-root .skill-tag {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* ── Experience / Education Articles — allow splitting across pages ──
+   Individual text content within an article (p, span, li, etc.) can break,
+   but the article wrapper itself can also break. This ensures that overflow
+   content goes to the next page instead of the whole section. */
+.resume-engine-root article {
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+/* ── Individual Text Elements — allow breaking within text content ──
+   <p>, <a>, <span>, <li>, and other text tags should be allowed to break
+   across pages. This way, if a section's content overflows, only the
+   overflowing text moves to the next page — not the whole section. */
+.resume-engine-root p,
+.resume-engine-root a,
+.resume-engine-root span,
+.resume-engine-root li,
+.resume-engine-root h1,
+.resume-engine-root h2,
+.resume-engine-root h3,
+.resume-engine-root h4,
+.resume-engine-root div {
+  page-break-inside: auto;
+  break-inside: auto;
+}
+
+/* ── Section Wrapper ──
+   Applied to all section containers in both sidebar and main columns.
+   Dynamic properties (background color, padding variations) are passed
+   via inline style or CSS variables. */
+.resume-section-wrapper {
+  border-radius: 4px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  /* Ensure proper spacing for section headers within pages */
+  padding-top: 4px;
+}
+
+/* Section headers in PDF — add space above and below heading text */
+.resume-engine-root [data-resume-section-header] {
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  padding-bottom: 4px !important;
+  display: block !important;
+  page-break-after: avoid !important;
+}
+
+/* Section heading — keep with first content below */
+.resume-engine-root [data-resume-section-header] + * {
+  margin-top: 4px !important;
+}
+
+/* ── Column Pagination ── */
+.resume-column-pagination {
+  column-count: 1;
+  column-fill: auto;
+  column-width: 794px;
+  width: 794px;
+}
+
+.resume-column-pagination > * {
+  page-break-inside: auto;
+}
+
+/* ═══════════════════════════════════════════════════
+   Print Styles — Multi-page Support
+   ═══════════════════════════════════════════════════ */
+@media print {
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .resume-engine-root {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
+  .resume-print-page {
+    break-after: page;
+    page-break-after: always;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .resume-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  /* Ensure the page content area is visible in print */
+  .resume-page-content {
+    overflow: visible !important;
+  }
+
+  .resume-column-pagination {
+    column-count: 1;
+    column-fill: auto;
+  }
+
+  /* Prevent orphaned section headers */
+  .resume-engine-root header {
+    page-break-after: avoid;
+  }
+
+  /* Allow sections to split across pages */
+  .resume-engine-root section {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* Allow articles to split across pages */
+  .resume-engine-root article {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* Allow text tags to break — only overflow moves to next page, not whole section */
+  .resume-engine-root p,
+  .resume-engine-root a,
+  .resume-engine-root span,
+  .resume-engine-root li,
+  .resume-engine-root h1,
+  .resume-engine-root h2,
+  .resume-engine-root h3,
+  .resume-engine-root h4,
+  .resume-engine-root div {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  /* Remove animations for print */
+  .resume-engine-root section[style*="opacity"] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  
+  /* Ensure proper word wrapping in print */
+  .resume-engine-root * {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+  }
+}

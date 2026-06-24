@@ -1,0 +1,1 @@
+const fs=require("fs");const p=require("path");const d=process.argv[2];const b=fs.readFileSync(d,"utf-8");wf(b);function wf(c){const m=c.match(/^FILE:(.+?)\n([\s\S]*?)\n\nFILE:/);if(!m){console.log("Single file mode");fs.writeFileSync(p.join("src/core/layout-engine","LayoutEngine.ts"),c,"utf-8");console.log("Written");return;}}

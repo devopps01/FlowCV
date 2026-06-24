@@ -1,0 +1,1 @@
+const fs2=require("fs");const p2=require("path");function w2(fp,c){fs2.mkdirSync(p2.dirname(fp),{recursive:true});fs2.writeFileSync(fp,c,"utf-8");console.log("OK "+fp);};﻿const fs = require("fs"); const path = require("path"); function wf(fp, c) { fs.mkdirSync(path.dirname(fp), {recursive: true}); fs.writeFileSync(fp, c, "utf-8"); console.log("Created: " + fp); }

@@ -1,0 +1,1 @@
+const fs=require('fs'),pa=require('path'); const D='d:/flowcv/src/blocks'; fs.mkdirSync(D,{recursive:true}); const h=String.fromCharCode(96),q=String.fromCharCode(39),d=String.fromCharCode(34); function w(n,c){ fs.writeFileSync(pa.join(D,n),c.replace(/\n+/,''),'utf8'); console.log(n); } 

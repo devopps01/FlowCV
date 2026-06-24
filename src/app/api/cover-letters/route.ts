@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     const coverLetters = await CoverLetter.find({ userId: session.user.id })
       .sort({ updatedAt: -1 })
-      .select('title template updatedAt previewImage content');
+      .select('title template updatedAt previewImage content design');
 
     return NextResponse.json({ coverLetters });
   } catch (error) {
@@ -38,11 +38,20 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
+    const now = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     const coverLetter = await CoverLetter.create({
       userId: session.user.id,
       title: title || 'My Cover Letter',
       template: template || 'classic',
       resumeId,
+      content: {
+        personalInfo: { fullName: '', email: '', phone: '', location: '', professionalTitle: '', photo: '' },
+        date: now,
+        recipient: { name: '', company: '', address: '' },
+        body: 'Dear ______,\n\nSincerely,',
+        signature: { fullName: '', place: '', date: '', image: '' },
+      },
+      design: { fontFamily: 'Inter', primaryColor: '#ff4d7d' },
     });
 
     return NextResponse.json({ coverLetter }, { status: 201 });

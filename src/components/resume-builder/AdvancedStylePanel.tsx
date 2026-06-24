@@ -664,7 +664,46 @@ export default function AdvancedStylePanel({
                 {s.id === 'background' && <div className="w-3/4 h-3 rounded-sm bg-gray-200 flex items-center"><div className="h-1 w-1/2 bg-gray-400 rounded-sm mx-auto" /></div>}
                 {s.id === 'badge' && <div className="w-3/4 h-3 rounded-sm" style={{ backgroundColor: accentColor }} />}
                 {s.id === 'dot' && <div className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-gray-500" /><div className="h-1 w-1/2 bg-gray-300 rounded-sm" /></div>}
-                {s.id !== 'none' && !['underline', 'background', 'badge', 'dot'].includes(s.id) && <span className="text-[6px] font-bold text-gray-400">{s.label.slice(0, 6)}</span>}
+                {/* Visual previews for all heading styles */}
+                {s.id === 'border-bottom' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-0.5 bg-gray-400" /></div>}
+                {s.id === 'border-left' && <div className="w-3/4 h-3 flex items-center"><div className="w-0.5 h-full bg-gray-400 rounded-full" /><div className="h-1 w-1/2 bg-gray-300 rounded-sm ml-1" /></div>}
+                {s.id === 'border-right' && <div className="w-3/4 h-3 flex items-center justify-end"><div className="h-1 w-1/2 bg-gray-300 rounded-sm mr-1" /><div className="w-0.5 h-full bg-gray-400 rounded-full" /></div>}
+                {s.id === 'double-line' && <div className="w-3/4 h-3 flex flex-col justify-center gap-0.5"><div className="h-0.5 bg-gray-400" /><div className="h-0.5 bg-gray-400" /></div>}
+                {s.id === 'capsule' && <div className="w-3/4 h-3 rounded-full border border-gray-400" />}
+                {s.id === 'overline' && <div className="w-3/4 h-3 flex flex-col justify-start"><div className="h-0.5 bg-gray-400" /></div>}
+                {s.id === 'double-side' && <div className="w-3/4 h-3 flex items-center gap-0.5"><div className="h-0.5 w-1/4 bg-gray-400" /><div className="h-1 w-1/3 bg-gray-300 rounded-sm" /><div className="h-0.5 w-1/4 bg-gray-400" /></div>}
+                {s.id === 'shadow' && <div className="w-3/4 h-3 flex items-center"><div className="h-1 w-2/3 bg-gray-300 rounded-sm shadow-md" /></div>}
+                {s.id === 'gradient' && <div className="w-3/4 h-3 rounded-sm" style={{ background: 'linear-gradient(90deg, #d1d5db, #9ca3af)' }} />}
+                {s.id === 'strikethrough' && <div className="w-3/4 h-3 flex items-center relative"><div className="h-0.5 w-full bg-gray-400 absolute" /><div className="h-1 w-2/3 bg-gray-200 rounded-sm relative z-10" /></div>}
+                {/* New style previews */}
+                {s.id === 'dotted-bottom' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-0.5" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #9ca3af 0, #9ca3af 2px, transparent 2px, transparent 4px)' }} /></div>}
+                {s.id === 'dashed-bottom' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-0.5" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #9ca3af 0, #9ca3af 4px, transparent 4px, transparent 7px)' }} /></div>}
+                {s.id === 'wave-bottom' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-1" style={{ background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'4\'%3E%3Cpath d=\'M0 2 Q5 0 10 2 T20 2\' stroke=\'%239ca3af\' fill=\'none\' stroke-width=\'1\'/%3E%3C/svg%3E") repeat-x' }} /></div>}
+                {s.id === 'zigzag-bottom' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-1" style={{ background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'4\'%3E%3Cpath d=\'M0 4 L4 0 L8 4\' stroke=\'%239ca3af\' fill=\'none\' stroke-width=\'1\'/%3E%3C/svg%3E") repeat-x' }} /></div>}
+                {s.id === 'diamond' && <div className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 bg-gray-400 rotate-45" /><div className="h-1 w-1/2 bg-gray-300 rounded-sm" /></div>}
+                {s.id === 'star' && <div className="flex items-center gap-0.5"><span className="text-[6px] text-gray-400">★</span><div className="h-1 w-1/2 bg-gray-300 rounded-sm" /></div>}
+                {s.id === 'arrow-left' && <div className="w-3/4 h-3 flex items-center"><div className="w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-r-[4px] border-r-gray-400" /><div className="h-0.5 flex-1 bg-gray-400 ml-0.5" /></div>}
+                {s.id === 'arrow-right' && <div className="w-3/4 h-3 flex items-center justify-end"><div className="h-0.5 flex-1 bg-gray-400 mr-0.5" /><div className="w-0 h-0 border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent border-l-[4px] border-l-gray-400" /></div>}
+                {s.id === 'bracket-left' && <div className="w-3/4 h-3 flex items-center"><span className="text-[8px] font-bold text-gray-400">[</span><div className="h-1 w-1/2 bg-gray-300 rounded-sm ml-0.5" /></div>}
+                {s.id === 'bracket-right' && <div className="w-3/4 h-3 flex items-center"><div className="h-1 w-1/2 bg-gray-300 rounded-sm mr-0.5" /><span className="text-[8px] font-bold text-gray-400">]</span></div>}
+                {s.id === 'pill' && <div className="w-3/4 h-3 rounded-full border-2 border-gray-400" />}
+                {s.id === 'tag' && <div className="w-3/4 h-3 rounded-sm bg-gray-200 flex items-center px-0.5"><div className="h-1 w-1/2 bg-gray-400 rounded-sm" /></div>}
+                {s.id === 'ribbon' && <div className="w-3/4 h-3 rounded-sm bg-gray-300 flex items-center"><div className="h-1 w-1/2 bg-gray-500 rounded-sm mx-auto" /></div>}
+                {s.id === 'flag' && <div className="w-3/4 h-3 flex items-center"><div className="w-1 h-full bg-gray-400 rounded-l-sm" /><div className="h-1 flex-1 bg-gray-300 rounded-r-sm" /></div>}
+                {s.id === 'ornament' && <div className="w-3/4 h-3 flex items-center gap-0.5"><div className="text-[5px] text-gray-400">✦</div><div className="h-0.5 flex-1 bg-gray-300" /><div className="h-1 w-1/3 bg-gray-200 rounded-sm" /><div className="h-0.5 flex-1 bg-gray-300" /><div className="text-[5px] text-gray-400">✦</div></div>}
+                {s.id === 'layered' && <div className="w-3/4 h-3 flex flex-col justify-center gap-px"><div className="h-px bg-gray-300" /><div className="h-0.5 bg-gray-400" /><div className="h-px bg-gray-300" /></div>}
+                {s.id === 'glow' && <div className="w-3/4 h-3 flex items-center"><div className="h-1 w-2/3 bg-gray-300 rounded-sm" style={{ boxShadow: '0 0 4px rgba(156,163,175,0.5)' }} /></div>}
+                {s.id === 'neon' && <div className="w-3/4 h-3 flex items-center"><div className="h-1 w-2/3 rounded-sm" style={{ background: '#6ee7b7', boxShadow: '0 0 6px rgba(110,231,183,0.6)' }} /></div>}
+                {s.id === 'emboss' && <div className="w-3/4 h-3 flex items-center"><div className="h-1 w-2/3 bg-gray-300 rounded-sm" style={{ boxShadow: '1px 1px 0 #fff, -1px -1px 0 #9ca3af' }} /></div>}
+                {s.id === 'outline' && <div className="w-3/4 h-3 border border-gray-400 rounded-sm" />}
+                {s.id === 'filled-outline' && <div className="w-3/4 h-3 border border-gray-400 rounded-sm bg-gray-100" />}
+                {s.id === 'split-bg' && <div className="w-3/4 h-3 flex"><div className="w-1/3 bg-gray-400 rounded-l-sm" /><div className="w-2/3 bg-gray-200 rounded-r-sm" /></div>}
+                {s.id === 'bottom-accent' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-1 bg-gray-400 rounded-b-sm" /></div>}
+                {s.id === 'top-accent' && <div className="w-3/4 h-3 flex flex-col justify-start"><div className="h-1 bg-gray-400 rounded-t-sm" /></div>}
+                {s.id === 'double-underline' && <div className="w-3/4 h-3 flex flex-col justify-end gap-px"><div className="h-px bg-gray-400" /><div className="h-px bg-gray-400" /></div>}
+                {s.id === 'thick-underline' && <div className="w-3/4 h-3 flex flex-col justify-end"><div className="h-1.5 bg-gray-400 rounded-b-sm" /></div>}
+                {/* Fallback for generated variants */}
+                {s.id !== 'none' && !['underline', 'background', 'badge', 'dot', 'border-bottom', 'border-left', 'border-right', 'double-line', 'capsule', 'overline', 'double-side', 'shadow', 'gradient', 'strikethrough', 'dotted-bottom', 'dashed-bottom', 'wave-bottom', 'zigzag-bottom', 'diamond', 'star', 'arrow-left', 'arrow-right', 'bracket-left', 'bracket-right', 'pill', 'tag', 'ribbon', 'flag', 'ornament', 'layered', 'glow', 'neon', 'emboss', 'outline', 'filled-outline', 'split-bg', 'bottom-accent', 'top-accent', 'double-underline', 'thick-underline'].includes(s.id) && <span className="text-[6px] font-bold text-gray-400">{s.label.slice(0, 6)}</span>}
               </div>
               <span className="text-[6px] font-medium text-gray-500 block mt-0.5 truncate">{s.label}</span>
             </button>

@@ -1,0 +1,1 @@
+// Script placeholderconst fs = require("fs");

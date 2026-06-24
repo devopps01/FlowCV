@@ -80,8 +80,18 @@ export const DUMMY_CONTENT_BASE = {
     { title: 'Excellence in Engineering', issuer: 'Stanford University', date: '2015' }
   ],
   skills: [
-    'Leadership', 'Strategic Planning', 'Product Management', 'Data Analysis', 'User Experience', 
-    'React', 'Node.js', 'TypeScript', 'System Architecture', 'Agile', 'Public Speaking', 'Cloud Computing'
+    { id: 'skill-1', name: 'Leadership', hidden: false },
+    { id: 'skill-2', name: 'Strategic Planning', hidden: false },
+    { id: 'skill-3', name: 'Product Management', hidden: false },
+    { id: 'skill-4', name: 'Data Analysis', hidden: false },
+    { id: 'skill-5', name: 'User Experience', hidden: false },
+    { id: 'skill-6', name: 'React', hidden: false },
+    { id: 'skill-7', name: 'Node.js', hidden: false },
+    { id: 'skill-8', name: 'TypeScript', hidden: false },
+    { id: 'skill-9', name: 'System Architecture', hidden: false },
+    { id: 'skill-10', name: 'Agile', hidden: false },
+    { id: 'skill-11', name: 'Public Speaking', hidden: false },
+    { id: 'skill-12', name: 'Cloud Computing', hidden: false }
   ],
   languages: [
     { language: 'English', proficiency: 'Native' },
